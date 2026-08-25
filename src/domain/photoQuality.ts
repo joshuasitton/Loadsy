@@ -1,0 +1,88 @@
+/**
+ * Spec §3 Screen 1 edge case: reject or warn on photos that are too dark, blurry,
+ * or contain no detectable furniture. An empty inventory must never be produced
+ * silently — every rejection carries a reason the user can act on.
+ */
+
+export type PhotoRejectionCode = 'tooDark' | 'tooBlurry' | 'noFurniture' | 'tooSmall';
+
+export interface PhotoQualitySignals {
+  /** mean luminance, 0–1 */
+  brightness: number;
+  /** variance-of-Laplacian style sharpness score, 0–1 */
+  sharpness: number;
+  /** pixel dimensions of the captured image */
+  widthPx: number;
+  heightPx: number;
+  /** count of items the detector returned; undefined before detection runs */
+  detectedItemCount?: number;
+}
+
+export interface PhotoQualityVerdict {
+  ok: boolean;
+  code: PhotoRejectionCode | null;
+  title: string;
+  message: string;
+  /** true when the user may proceed anyway (warn), false when we must block */
+  recoverable: boolean;
+}
+
+export const MIN_BRIGHTNESS = 0.18;
+export const MIN_SHARPNESS = 0.25;
+export const MIN_EDGE_PX = 640;
+
+const OK: PhotoQualityVerdict = {
+  ok: true,
+  code: null,
+  title: '',
+  message: '',
+  recoverable: true,
+};
+
+export function assessPhoto(signals: PhotoQualitySignals): PhotoQualityVerdict {
+  if (Math.min(signals.widthPx, signals.heightPx) < MIN_EDGE_PX) {
+    return {
+      ok: false,
+      code: 'tooSmall',
+      title: 'That photo is a little small',
+      message:
+        'Loadsy needs a larger image to measure furniture accurately. Try taking the photo with the camera instead of using a screenshot.',
+      recoverable: false,
+    };
+  }
+
+  if (signals.brightness < MIN_BRIGHTNESS) {
+    return {
+      ok: false,
+      code: 'tooDark',
+      title: 'Too dark to read the room',
+      message:
+        'Turn on the lights or open the blinds, then take the photo again. Loadsy needs to see edges to size your furniture.',
+      recoverable: false,
+    };
+  }
+
+  if (signals.sharpness < MIN_SHARPNESS) {
+    return {
+      ok: false,
+      code: 'tooBlurry',
+      title: 'That one came out blurry',
+      message:
+        'Hold still for a beat and tap to focus before shooting. A sharp photo gives a much closer size estimate.',
+      recoverable: false,
+    };
+  }
+
+  if (signals.detectedItemCount === 0) {
+    return {
+      ok: false,
+      code: 'noFurniture',
+      title: "Couldn't find any furniture",
+      message:
+        'Stand in the doorway and frame the whole room, including the corners. Or add the items by hand — that works just as well.',
+      recoverable: true,
+    };
+  }
+
+  return OK;
+}

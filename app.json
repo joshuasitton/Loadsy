@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Loadsy",
+    "slug": "loadsy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "loadsy",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loadsy.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F1B2D"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Loadsy reads the photos you select to identify furniture and estimate your moving volume. It never uploads photos you haven't selected.",
+          "cameraPermission": "Loadsy uses your camera to photograph rooms so it can identify your furniture and estimate how much truck space your move needs. Photos are used only to build your inventory."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.loadsy.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F1B2D"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    }
+  }
+}
