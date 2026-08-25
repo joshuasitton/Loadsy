@@ -9,13 +9,32 @@ export interface CapacityRange {
   max: number;
 }
 
-/** Swift: `TruckSize.capacityCuFt` (ClosedRange) */
+/**
+ * Swift: `TruckSize.capacityCuFt` (ClosedRange)
+ *
+ * `max` is the vendor's PUBLISHED interior volume, verified against U-Haul's own
+ * rental page (uhaul.com/Truck-Rentals): cargo van 246, 10ft 402, 15ft 764,
+ * 20ft 1,016, 26ft 1,682 cubic feet.
+ *
+ * The previous figures were not conservative estimates — they exceeded the trucks.
+ * A 10ft truck was listed at 550 ft³ against a real interior of 402, a claim that
+ * 137% of the box could be filled. Because recommendTruckSize returns the SMALLEST
+ * truck whose max clears the load, overstating capacity under-sizes the truck, and
+ * an under-sized truck means furniture left on the driveway and a second trip.
+ *
+ * Comparing buffered volume against geometric interior is self-consistent here
+ * because item volumes are bounding boxes: the sum of bounding boxes already
+ * exceeds what the load actually occupies once pieces nest, and the 20% buffer
+ * sits on top of that. Do NOT import "cube sheet" figures from moving-industry
+ * inventories into these items — those are packed volumes, and mixing the two
+ * conventions would introduce exactly the systematic bias this table just removed.
+ */
 export const TRUCK_CAPACITY: Record<TruckSize, CapacityRange> = {
-  van: { min: 150, max: 300 },
-  '10ft': { min: 300, max: 550 },
-  '15ft': { min: 550, max: 800 },
-  '20ft': { min: 800, max: 1100 },
-  '26ft': { min: 1100, max: 1600 },
+  van: { min: 150, max: 246 },
+  '10ft': { min: 246, max: 402 },
+  '15ft': { min: 402, max: 764 },
+  '20ft': { min: 764, max: 1016 },
+  '26ft': { min: 1016, max: 1682 },
 };
 
 export const TRUCK_LABEL: Record<TruckSize, string> = {
