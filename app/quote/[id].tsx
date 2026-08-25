@@ -3,7 +3,6 @@ import * as WebBrowser from 'expo-web-browser';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getCachedQuote } from '../../src/api/quoteCache';
 import {
-  formatUSD,
   formatUSDPrecise,
   isEstimatedLineItem,
   LINE_ITEM_LABEL,

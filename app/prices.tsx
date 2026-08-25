@@ -23,6 +23,7 @@ import {
 } from '../src/domain/quotes';
 import type { RentalQuote } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
+import { getDeviceZip, hasLocationPermission } from '../src/location/deviceZip';
 import { useMove } from '../src/state/moveStore';
 import {
   Banner,
@@ -54,6 +55,9 @@ export default function PricesScreen() {
    * of the install, recoverable only by deleting app data.
    */
   const [editingZip, setEditingZip] = useState(false);
+  /** null while idle; a message when a location attempt could not produce a ZIP. */
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [filter, setFilter] = useState<QuoteFilter>('bestMatch');
   /** The last result, tagged with the request it actually answered. */
   const [result, setResult] = useState<{
@@ -65,6 +69,48 @@ export default function PricesScreen() {
   const [attempt, setAttempt] = useState(0);
 
   const zip = move.originZip;
+
+  /**
+   * Default the ZIP from the device — but only when permission is ALREADY granted.
+   *
+   * Requesting on first paint would put a system location prompt in front of a user
+   * who has not yet been told why Loadsy wants it, which is both poor practice and
+   * a reliable App Store review note. Users who have not granted get the explicit
+   * button below instead, next to the copy explaining the reason.
+   */
+  useEffect(() => {
+    if (move.originZip.length === 5) return;
+    let cancelled = false;
+    (async () => {
+      if (!(await hasLocationPermission())) return;
+      const result = await getDeviceZip();
+      if (cancelled || result.status !== 'ok') return;
+      setZipDraft(result.zip);
+      dispatch({ type: 'setOriginZip', zip: result.zip });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [move.originZip, dispatch]);
+
+  async function fillZipFromLocation() {
+    setLocating(true);
+    setLocationNote(null);
+    const result = await getDeviceZip({ request: true });
+    setLocating(false);
+    if (result.status === 'ok') {
+      setZipDraft(result.zip);
+      dispatch({ type: 'setOriginZip', zip: result.zip });
+      setEditingZip(false);
+      return;
+    }
+    // Never a blocking error: the text field beside this is the real path.
+    setLocationNote(
+      result.status === 'denied'
+        ? 'Location is off for Loadsy. Enter your ZIP below instead.'
+        : "Couldn't read your location. Enter your ZIP below instead.",
+    );
+  }
   // Must be memoised. `new Date()` on every render would give the effect below a
   // new date every render, and it would refetch forever.
   const isoDate = useMemo(() => move.moveDate ?? new Date().toISOString(), [move.moveDate]);
@@ -139,6 +185,15 @@ export default function PricesScreen() {
               accessibilityLabel="Origin ZIP code"
               maxLength={5}
             />
+            <SecondaryButton
+              title={locating ? 'Finding you…' : 'Use my current location'}
+              onPress={() => {
+                void fillZipFromLocation();
+              }}
+              disabled={locating}
+              accessibilityLabel="Fill in my ZIP code from my current location"
+            />
+            {locationNote ? <Text style={styles.zipNote}>{locationNote}</Text> : null}
             <PrimaryButton
               title="Find local prices"
               disabled={zipDraft.length < 5}
@@ -324,6 +379,7 @@ function EmptyState({
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xl, gap: space.lg },
+  zipNote: { ...type.caption, color: colors.textMuted },
   headerTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   headerChange: { ...type.caption, color: colors.accent, textDecorationLine: 'underline' },
   header: { gap: space.xs, marginTop: space.sm },

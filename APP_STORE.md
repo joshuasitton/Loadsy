@@ -20,6 +20,22 @@ no data — photos are processed and discarded, ZIP stays on device — so the a
 "Data Not Collected" throughout. Confirm that is still true if the Vision agent starts
 retaining images server-side.
 
+**Location permission — ZIP autofill only, never stored**
+
+`NSLocationWhenInUseUsageDescription` in `app.json` states plainly that location is
+used only to fill in the ZIP and can be typed instead. Loadsy never prompts on first
+paint: `app/prices.tsx` autofills only when permission is ALREADY granted, and users
+who have not granted get an explicit "Use my current location" button sitting next to
+the copy explaining why. Every failure path — denied, services off, no postal code,
+web — falls back to manual entry with a non-blocking note.
+
+Only the resulting five-digit ZIP is persisted; the coordinate is discarded and never
+leaves the device by our hand. Note for the nutrition label: iOS resolves the postal
+code through the OS geocoder, so **Apple** sees the coordinate even though Loadsy does
+not retain it. The honest answer is still "Data Not Collected" for Loadsy's own
+collection, but if a reviewer asks about Precise Location, that is the explanation.
+Background location is explicitly disabled in the plugin config.
+
 **"Estimated" language on every price surface**
 
 Not just the breakdown sheet. Every price renders through the `EstimateTag` component,
