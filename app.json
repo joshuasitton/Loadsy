@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "Loadsy",
+    "slug": "loadsy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "loadsy",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loadsy.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere — you can always type the ZIP in instead."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F1B2D"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Loadsy reads the photos you select to identify furniture and estimate your moving volume. It never uploads photos you haven't selected.",
+          "cameraPermission": "Loadsy uses your camera to photograph rooms so it can identify your furniture and estimate how much truck space your move needs. Photos are used only to build your inventory.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere — you can always type the ZIP in instead.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.loadsy.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F1B2D"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0354a3bd-76ac-4a62-8aee-bfb81004f9df"
+      }
+    },
+    "owner": "jdsitton",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0354a3bd-76ac-4a62-8aee-bfb81004f9df"
+    }
+  }
+}
