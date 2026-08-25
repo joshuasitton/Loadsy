@@ -65,8 +65,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "64aec79b-4746-4688-98ee-fcd5c5ceab87"
+        "projectId": "0354a3bd-76ac-4a62-8aee-bfb81004f9df"
       }
-    }
+    },
+    "owner": "jdsitton"
   }
 }
