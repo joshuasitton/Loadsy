@@ -6,6 +6,8 @@ import { canLeaveInventory, confidenceBannerCopy, isUnresolved, markConfirmed, u
 import type { InventoryItem, ItemCategory, WeightClass } from '../src/domain/types';
 import { cubicFeetFor, roomCubicFeet } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
+import { shouldPromptCoverage, uncoveredAreas } from '../src/domain/coverage';
+import { resolveRoomId } from '../src/domain/rooms';
 import { Banner, Card, Chip, Divider, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
 
@@ -88,6 +90,34 @@ export default function InventoryScreen() {
           </View>
         ))}
 
+        {shouldPromptCoverage(move) ? (
+          <Card style={styles.coverage}>
+            <SectionLabel>EASY TO MISS</SectionLabel>
+            <Text style={styles.coverageBody}>
+              A room left out is the one thing a truck estimate can&apos;t recover from — we can
+              size for a sofa measured wrong, not for a garage we never saw. Tap anything you
+              still need to add.
+            </Text>
+            <View style={styles.coverageChips}>
+              {uncoveredAreas(move).map((area) => (
+                <Chip
+                  key={area.id}
+                  label={area.label}
+                  active={false}
+                  onPress={() =>
+                    dispatch({
+                      type: 'addRoom',
+                      id: resolveRoomId(move, area.label, `room-${Date.now()}`),
+                      name: area.label,
+                    })
+                  }
+                  accessibilityLabel={`Add ${area.label}. ${area.hint}`}
+                />
+              ))}
+            </View>
+          </Card>
+        ) : null}
+
         <Card style={styles.addRoom}>
           <SectionLabel>ADD A ROOM BY HAND</SectionLabel>
           <View style={styles.addRoomRow}>
@@ -105,7 +135,11 @@ export default function InventoryScreen() {
               onPress={() => {
                 const name = newRoomName.trim();
                 if (!name) return;
-                dispatch({ type: 'addRoom', id: `room-${Date.now()}`, name });
+                dispatch({
+                  type: 'addRoom',
+                  id: resolveRoomId(move, name, `room-${Date.now()}`),
+                  name,
+                });
                 setNewRoomName('');
               }}
             />
@@ -466,6 +500,9 @@ const styles = StyleSheet.create({
   itemEditLinkText: { ...type.caption, color: colors.accent, fontWeight: '600' },
   iconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   iconButtonText: { color: colors.textDim, fontSize: 16 },
+  coverage: { gap: space.sm },
+  coverageBody: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
+  coverageChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },
   addRoom: { gap: space.sm },
   addRoomRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
   input: {
