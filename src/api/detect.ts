@@ -1,4 +1,5 @@
 import type { InventoryItem } from '../domain/types';
+import { assessDimensions } from '../domain/plausibility';
 import { cubicFeetFor } from '../domain/volume';
 import { finiteNumber, isRecord, nonEmptyString, oneOf } from '../lib/guards';
 import { ApiError, apiFetch, mockDelay, USE_MOCKS } from './client';
@@ -99,8 +100,16 @@ function parseDetectedItem(
   const cubicFeet = cubicFeetFor(dimensions);
   if (!Number.isFinite(cubicFeet) || cubicFeet <= 0) return [];
 
-  const confidence = oneOf(item.confidence, ['high', 'low'] as const);
-  if (confidence === null) return [];
+  const stated = oneOf(item.confidence, ['high', 'low'] as const);
+  if (stated === null) return [];
+
+  // A detector's own confidence is about whether it RECOGNISED the object, which
+  // says nothing about whether the size it returned is physically possible. A
+  // mis-scaled sofa is reported with complete certainty. Downgrading here routes
+  // it into the Screen 2 review the app already blocks on, rather than letting it
+  // silently add a truck's worth of volume.
+  const plausibility = assessDimensions(name, dimensions);
+  const confidence = plausibility.plausible ? stated : 'low';
 
   const category = oneOf(item.category, CATEGORIES) ?? 'other';
   return [
@@ -112,9 +121,13 @@ function parseDetectedItem(
       dimensions,
       cubicFeet,
       confidence,
+      // The plausibility reason wins when it fired: "unusually large for a sofa"
+      // tells the reviewer what to look at, where the detector's own reason would
+      // not mention size at all.
       confidenceReason:
         confidence === 'low'
-          ? (nonEmptyString(item.confidenceReason) ??
+          ? (plausibility.reason ??
+            nonEmptyString(item.confidenceReason) ??
             'Needs a quick check — the detector was unsure about this one')
           : null,
       isFragile: item.isFragile === true || category === 'fragile',

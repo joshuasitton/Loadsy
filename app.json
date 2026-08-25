@@ -55,6 +55,8 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
@@ -68,6 +70,12 @@
         "projectId": "0354a3bd-76ac-4a62-8aee-bfb81004f9df"
       }
     },
-    "owner": "jdsitton"
+    "owner": "jdsitton",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0354a3bd-76ac-4a62-8aee-bfb81004f9df"
+    }
   }
 }
