@@ -45,6 +45,15 @@ export default function PricesScreen() {
   const { move, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
   const [zipDraft, setZipDraft] = useState(move.originZip);
+  /**
+   * Forces the ZIP card back open after one has been set.
+   *
+   * The card rendered only while the stored ZIP was under 5 digits, and nothing in
+   * the app dispatched setOriginZip anywhere else — so a single fat-fingered entry
+   * locked every quote, distance and depot lookup to the wrong metro for the life
+   * of the install, recoverable only by deleting app data.
+   */
+  const [editingZip, setEditingZip] = useState(false);
   const [filter, setFilter] = useState<QuoteFilter>('bestMatch');
   /** The last result, tagged with the request it actually answered. */
   const [result, setResult] = useState<{
@@ -110,7 +119,7 @@ export default function PricesScreen() {
     }
   }
 
-  if (zip.length < 5) {
+  if (zip.length < 5 || editingZip) {
     return (
       <Screen>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -133,8 +142,21 @@ export default function PricesScreen() {
             <PrimaryButton
               title="Find local prices"
               disabled={zipDraft.length < 5}
-              onPress={() => dispatch({ type: 'setOriginZip', zip: zipDraft })}
+              onPress={() => {
+                dispatch({ type: 'setOriginZip', zip: zipDraft });
+                setEditingZip(false);
+              }}
             />
+            {zip.length === 5 ? (
+              <SecondaryButton
+                title="Cancel"
+                onPress={() => {
+                  setZipDraft(zip);
+                  setEditingZip(false);
+                }}
+                accessibilityLabel={`Keep the current ZIP code, ${zip}`}
+              />
+            ) : null}
           </Card>
         </ScrollView>
       </Screen>
@@ -145,7 +167,22 @@ export default function PricesScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{TRUCK_LABEL[recommendation.size]} near {zip}</Text>
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerTitle}>
+              {TRUCK_LABEL[recommendation.size]} near {zip}
+            </Text>
+            <Pressable
+              onPress={() => {
+                setZipDraft(zip);
+                setEditingZip(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Change origin ZIP code, currently ${zip}`}
+              hitSlop={8}
+            >
+              <Text style={styles.headerChange}>Change</Text>
+            </Pressable>
+          </View>
           <Text style={styles.headerSubtitle}>
             Every price below is an estimate. The vendor confirms the exact total at booking.
           </Text>
@@ -287,6 +324,8 @@ function EmptyState({
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xl, gap: space.lg },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  headerChange: { ...type.caption, color: colors.accent, textDecorationLine: 'underline' },
   header: { gap: space.xs, marginTop: space.sm },
   headerTitle: { ...type.title, color: colors.text },
   headerSubtitle: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
