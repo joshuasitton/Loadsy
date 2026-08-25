@@ -57,8 +57,8 @@ test('the duplicate room this prevents would have doubled the truck size', () =>
   assert.equal(Math.round(inflated), Math.round(honest * 2), 'the duplicate doubles the volume');
 
   // And the harm: the same home is quoted a larger truck, and a larger price.
-  // 225 ft³ buffered fits a cargo van; 449 needs a 15ft truck — two sizes up,
-  // for furniture the user owns exactly one of.
-  assert.equal(recommendTruckSize(honest * 1.2), 'van');
+  // 225 ft³ buffered takes a 10ft truck; 449 needs a 15ft — a size up, for
+  // furniture the user owns exactly one of.
+  assert.equal(recommendTruckSize(honest * 1.2), '10ft');
   assert.equal(recommendTruckSize(inflated * 1.2), '15ft');
 });

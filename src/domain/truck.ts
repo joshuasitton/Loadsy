@@ -78,14 +78,49 @@ export interface TruckRecommendation {
 }
 
 /**
- * Smallest truck whose capacity range can hold the buffered volume.
- * Deliberately compares against `capacity.max`: the range's upper bound is what the
- * truck actually holds, the lower bound is the point below which it is over-sized.
+ * Reserve kept between the buffered load and the truck's published interior.
+ *
+ * Without it, selection sits on a knife edge: `adjusted <= capacity.max` hands a
+ * load computed at exactly 402.0 ft³ a 10ft truck with ZERO slack, so any error at
+ * all — a missed footstool, a sofa measured 6 inches short — under-sizes it.
+ *
+ * The two failures are not symmetric and must not be traded off as if they were.
+ * An over-sized truck costs roughly thirty dollars. An under-sized one means
+ * furniture standing on the driveway, a second trip, and a moving day that does
+ * not finish. So the boundary is deliberately biased one way.
+ *
+ * 10% and not more, because conservatism is already stacked twice upstream and
+ * over-reserving would push every move to a truck it does not need:
+ *   - item volumes are BOUNDING BOXES, which exceed what a load actually occupies
+ *     once pieces nest (moving-industry packed figures run 11-50% lower)
+ *   - the 20% packing buffer sits on top of that
+ * Together those already imply filling a truck to only ~60-69% of its interior,
+ * which is the realistic range for household goods. This reserve buys margin for
+ * ESTIMATION error at the boundary, not for packing — packing is already paid for.
+ */
+export const SAFETY_HEADROOM_PCT = 0.1;
+
+/**
+ * What a truck may be asked to carry: its published interior, less the reserve.
+ * This, not `capacity.max`, is the number selection is allowed to fill.
+ */
+export function usableCapacityCuFt(size: TruckSize): number {
+  return Math.round(TRUCK_CAPACITY[size].max * (1 - SAFETY_HEADROOM_PCT) * 100) / 100;
+}
+
+/**
+ * Smallest truck that can hold the buffered volume WITH the safety reserve intact.
+ *
+ * A load that would exactly fill a truck is given the next size up. That is the
+ * intended behaviour, not an off-by-one: filling a truck to its geometric ceiling
+ * is not achievable with rigid irregular objects, and being wrong here costs the
+ * user their moving day rather than a rental upgrade.
  */
 export function recommendTruckSize(adjustedCuFt: number): TruckSize {
+  // A load we cannot measure must not silently select the smallest truck.
+  if (!Number.isFinite(adjustedCuFt)) return '26ft';
   for (const size of TRUCK_SIZES) {
-    const cap = TRUCK_CAPACITY[size];
-    if (adjustedCuFt <= cap.max) return size;
+    if (adjustedCuFt <= usableCapacityCuFt(size)) return size;
   }
   return '26ft';
 }
@@ -104,7 +139,10 @@ export function buildRecommendation(move: Move): TruckRecommendation {
     bufferPct: clampBuffer(move.packingBufferPct),
     adjustedCuFt,
     capacity,
-    exceedsLargest: adjustedCuFt > TRUCK_CAPACITY['26ft'].max,
+    // Measured against the same usable figure selection uses, so the second-trip
+    // warning fires while there is still time to plan one — not once the load has
+    // already passed the point a single truck could take it.
+    exceedsLargest: adjustedCuFt > usableCapacityCuFt('26ft'),
     headroomCuFt: Math.round((capacity.max - adjustedCuFt) * 100) / 100,
   };
 }

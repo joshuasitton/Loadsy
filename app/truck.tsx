@@ -73,7 +73,9 @@ export default function TruckScreen() {
           />
           {!recommendation.exceedsLargest ? (
             <Text style={styles.headroom}>
-              That leaves about {recommendation.headroomCuFt} ft³ of headroom.
+              That leaves about {recommendation.headroomCuFt} ft³ of headroom. We size up rather
+              than fill a truck to its limit — a truck that is slightly too big costs a few
+              dollars, one that is too small costs you the day.
             </Text>
           ) : null}
         </Card>
