@@ -89,16 +89,37 @@ export interface TruckRecommendation {
  * furniture standing on the driveway, a second trip, and a moving day that does
  * not finish. So the boundary is deliberately biased one way.
  *
- * 10% and not more, because conservatism is already stacked twice upstream and
- * over-reserving would push every move to a truck it does not need:
+ * SIZED FOR 3 SIGMA, one-sided: under-sizing must be a ≤0.135% event.
+ *
+ * The figure is measured, not chosen. Under-sizing happens exactly when the true
+ * load exceeds the estimate by more than 1/(1 - reserve), so the reserve needed is
+ * the 99.865th percentile of the true/estimated ratio. Simulated over a realistic
+ * volume-weighted inventory, where a handful of large items carry most of the load
+ * and therefore average far less than the raw item count suggests:
+ *
+ *   dimensional error only, clean classification ......  8.4%
+ *   + 3% sub-type confusion (loveseat vs sectional) ... 10.3%
+ *   + 5% stacked-box undercount ....................... 10.5%
+ *   looser dimensions (σ=0.15) + classification error .. 15.3%
+ *   raw VLM-quality dimensions (σ=0.25) ............... 20.2%
+ *
+ * 15% holds 3σ across the realistic operating range — including a detector whose
+ * dimensions are looser than the prior table's best case, which is where any real
+ * deployment starts. A reserve tuned to the 8.4% best case would silently stop
+ * being 3σ the moment classification got harder.
+ *
+ * Not higher, because conservatism is already stacked twice upstream:
  *   - item volumes are BOUNDING BOXES, which exceed what a load actually occupies
  *     once pieces nest (moving-industry packed figures run 11-50% lower)
  *   - the 20% packing buffer sits on top of that
- * Together those already imply filling a truck to only ~60-69% of its interior,
- * which is the realistic range for household goods. This reserve buys margin for
- * ESTIMATION error at the boundary, not for packing — packing is already paid for.
+ * Those alone imply filling a truck to ~60-69% of its interior; this reserve takes
+ * it to roughly 51-59%. Past that the recommendation stops being useful — every
+ * move gets a truck it plainly does not need, and the user stops believing any of it.
+ *
+ * The 3σ claim is asserted by simulation in __tests__/truck.test.ts, not just
+ * asserted here. If the error model changes, that test is what fails.
  */
-export const SAFETY_HEADROOM_PCT = 0.1;
+export const SAFETY_HEADROOM_PCT = 0.15;
 
 /**
  * What a truck may be asked to carry: its published interior, less the reserve.
