@@ -16,20 +16,37 @@ import type {
   Room,
   TruckSize,
 } from '../domain/types';
+import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
 import { DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const STORAGE_KEY = 'loadsy.move.v1';
+/**
+ * Where an unreadable payload is moved before a fresh move takes its place. Writing
+ * over it would destroy the only copy of the user's inventory on the very launch
+ * they most need it back.
+ */
+const QUARANTINE_KEY = 'loadsy.move.v1.unreadable';
 
 export interface MoveState {
   move: Move;
   packingPlan: PackingPlan | null;
   hydrated: boolean;
+  /**
+   * False when this launch could not read storage at all. The app still runs on a
+   * fresh move, but must not write it back: the stored data is probably intact and
+   * simply unreadable right now, and overwriting it would turn a transient read
+   * failure into permanent loss.
+   */
+  persistable: boolean;
 }
 
 type Action =
   | { type: 'hydrate'; payload: { move: Move; packingPlan: PackingPlan | null } }
+  /** Nothing stored, or nothing salvageable. Safe to start clean and persist. */
   | { type: 'hydrateFailed' }
+  /** Storage could not be read at all. Start clean but never persist over it. */
+  | { type: 'hydrateUnavailable' }
   | { type: 'addRoom'; id: string; name: string }
   | { type: 'renameRoom'; roomId: string; name: string }
   | { type: 'removeRoom'; roomId: string }
@@ -58,7 +75,12 @@ function newMove(): Move {
   };
 }
 
-const initialState: MoveState = { move: newMove(), packingPlan: null, hydrated: false };
+const initialState: MoveState = {
+  move: newMove(),
+  packingPlan: null,
+  hydrated: false,
+  persistable: true,
+};
 
 /**
  * The recommendation is derived, never user-set: spec §3 Screen 3 says tapping a
@@ -80,10 +102,14 @@ function reducer(state: MoveState, action: Action): MoveState {
         move: withRecommendation(action.payload.move),
         packingPlan: action.payload.packingPlan,
         hydrated: true,
+        persistable: true,
       };
 
     case 'hydrateFailed':
-      return { ...state, hydrated: true };
+      return { ...state, hydrated: true, persistable: true };
+
+    case 'hydrateUnavailable':
+      return { ...state, hydrated: true, persistable: false };
 
     case 'addRoom': {
       // The id is supplied by the caller, not generated here: screens need to
@@ -166,7 +192,8 @@ function reducer(state: MoveState, action: Action): MoveState {
       return { ...state, packingPlan: action.plan };
 
     case 'reset':
-      return { move: newMove(), packingPlan: null, hydrated: true };
+      // An explicit user-initiated wipe is always safe to persist.
+      return { move: newMove(), packingPlan: null, hydrated: true, persistable: true };
   }
 }
 
@@ -191,11 +218,30 @@ export function MoveProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'hydrateFailed' });
           return;
         }
-        const parsed = JSON.parse(raw) as { move: Move; packingPlan: PackingPlan | null };
-        dispatch({ type: 'hydrate', payload: { move: parsed.move, packingPlan: parsed.packingPlan ?? null } });
+
+        // Validated, never trusted. The payload can predate the current shape, or
+        // have been truncated by a kill mid-write; feeding it straight to the
+        // reducer threw during render, which no try/catch out here could reach.
+        const parsed = parseStoredState(raw);
+        if (parsed === null) {
+          // Nothing salvageable. Preserve the original before a clean move starts
+          // overwriting the slot, so the data is still recoverable off-device.
+          await AsyncStorage.setItem(QUARANTINE_KEY, raw).catch(() => {});
+          if (!cancelled) dispatch({ type: 'hydrateFailed' });
+          return;
+        }
+        if (__DEV__ && parsed.repairs.length > 0) {
+          console.warn('[loadsy] repaired stored move:', parsed.repairs.join('; '));
+        }
+        dispatch({
+          type: 'hydrate',
+          payload: { move: parsed.move, packingPlan: parsed.packingPlan },
+        });
       } catch {
-        // A corrupt payload must not brick the app — start clean instead.
-        if (!cancelled) dispatch({ type: 'hydrateFailed' });
+        // Reaching here means storage itself failed, not the payload. Do NOT mark
+        // hydrated: that would release the persist effect below to write an empty
+        // move over data we were simply unable to read this launch.
+        if (!cancelled) dispatch({ type: 'hydrateUnavailable' });
       }
     })();
     return () => {
@@ -204,14 +250,14 @@ export function MoveProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!state.hydrated) return;
+    if (!state.hydrated || !state.persistable) return;
     AsyncStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ move: state.move, packingPlan: state.packingPlan }),
     ).catch(() => {
       // Persistence is best-effort; losing it must never interrupt the user.
     });
-  }, [state.move, state.packingPlan, state.hydrated]);
+  }, [state.move, state.packingPlan, state.hydrated, state.persistable]);
 
   const recommendation = useMemo(() => buildRecommendation(state.move), [state.move]);
 
