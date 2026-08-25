@@ -19,19 +19,37 @@ export default function PackingScreen() {
   const { move, packingPlan, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('load');
-  const [failed, setFailed] = useState(false);
+  /** The inventory a build already failed for, so a retry is not fired in a loop. */
+  const [failedFor, setFailedFor] = useState<string | null>(null);
 
   // Memoised so the effect below can depend on it honestly: allItems() builds a
   // fresh array every call, which would otherwise re-trigger the build forever.
   const items = useMemo(() => allItems(move), [move]);
 
-  // A stored plan outlives the inventory it was built from. Rebuilding whenever
-  // the counts disagree keeps this screen and the truck diagram from describing
-  // two different moves after the user edits their items.
-  const plannedItemCount =
-    packingPlan?.loadSteps.reduce((total, step) => total + step.itemIds.length, 0) ?? -1;
+  /**
+   * A stored plan outlives the inventory it was built from, so freshness is decided
+   * by WHICH items a plan covers — not how many.
+   *
+   * Comparing counts meant any edit that preserved the count left the stale plan in
+   * place: delete a chair and add a piano, and the Load Plan silently skipped the
+   * piano (LoadPlanTab drops ids it cannot resolve) while the By Room tab, which
+   * derives from live items, listed it under a step. Two tabs, same item, different
+   * answers — and the truck diagram agreed with neither.
+   */
+  const inventoryKey = useMemo(() => items.map((item) => item.id).sort().join('|'), [items]);
+  const plannedKey = useMemo(
+    () =>
+      packingPlan
+        ? packingPlan.loadSteps
+            .flatMap((step) => step.itemIds)
+            .sort()
+            .join('|')
+        : null,
+    [packingPlan],
+  );
 
-  const needsPlan = items.length > 0 && plannedItemCount !== items.length;
+  const needsPlan = items.length > 0 && plannedKey !== inventoryKey;
+  const failed = failedFor === inventoryKey;
   // Derived, not stored. A `loading` flag would have to be raised synchronously
   // inside the effect, which costs an extra render pass before anything paints.
   const loading = needsPlan && !failed;
@@ -41,19 +59,31 @@ export default function PackingScreen() {
     let cancelled = false;
     fetchPackingPlan(move.id, items, recommendation.size)
       .then((plan) => {
-        if (!cancelled) dispatch({ type: 'setPackingPlan', plan });
+        if (cancelled) return;
+        const covered = plan.loadSteps
+          .flatMap((step) => step.itemIds)
+          .sort()
+          .join('|');
+        if (covered !== inventoryKey) {
+          // Accepting a plan that does not account for exactly this inventory would
+          // leave needsPlan true with nothing in the deps left to change — a
+          // permanent spinner, no error, and no reachable retry.
+          setFailedFor(inventoryKey);
+          return;
+        }
+        dispatch({ type: 'setPackingPlan', plan });
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) setFailedFor(inventoryKey);
       });
     // An inventory edited mid-build must not have the older plan land on top of it.
     return () => {
       cancelled = true;
     };
-  }, [needsPlan, failed, move.id, items, recommendation.size, dispatch]);
+  }, [needsPlan, failed, inventoryKey, move.id, items, recommendation.size, dispatch]);
 
   // Clearing the flag is what re-runs the effect — no separate trigger needed.
-  const retry = useCallback(() => setFailed(false), []);
+  const retry = useCallback(() => setFailedFor(null), []);
 
   if (items.length === 0) {
     return (
@@ -86,15 +116,17 @@ export default function PackingScreen() {
           />
         ) : null}
 
-        {loading ? (
+        {/* By Room is derived from the inventory alone, so it stays readable while
+            a load plan is still building — the spinner belongs to the other tab. */}
+        {tab === 'room' ? (
+          <ByRoomTab move={move} />
+        ) : loading ? (
           <View style={styles.busy}>
             <ActivityIndicator color={colors.accent} />
             <Text style={styles.busyText}>Working out the load order…</Text>
           </View>
-        ) : tab === 'load' ? (
-          <LoadPlanTab steps={packingPlan?.loadSteps ?? []} items={items} onRetry={retry} failed={failed} />
         ) : (
-          <ByRoomTab move={move} />
+          <LoadPlanTab steps={packingPlan?.loadSteps ?? []} items={items} onRetry={retry} failed={failed} />
         )}
       </ScrollView>
 
