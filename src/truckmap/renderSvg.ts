@@ -24,12 +24,18 @@ const BED_DIMENSIONS: Record<TruckSize, { lengthFt: number; widthFt: number }> =
   '26ft': { lengthFt: 26, widthFt: 8.1 },
 };
 
-const STEP_COLORS: Record<LoadStepOrder, string> = {
-  1: '#B4553D',
-  2: '#C98A3E',
-  3: '#4F7A9B',
-  4: '#7A5C9E',
-  5: '#4E8A63',
+/**
+ * Retuned as one set so every zone carries its white label at AA. Zone 2 measured
+ * 2.92:1 and zone 5 4.09:1 — the labels inside those blocks were effectively
+ * unreadable — while zones 1 and 3 sat on the 4.5 line with no margin.
+ */
+/** Exported for the contrast test: these fills are backgrounds for white labels. */
+export const STEP_COLORS_FOR_TEST: Record<LoadStepOrder, string> = {
+  1: '#9C3F2A',
+  2: '#8A5A0B',
+  3: '#3F6480',
+  4: '#63467F',
+  5: '#2E6B48',
 };
 
 const STEP_LABELS: Record<LoadStepOrder, string> = {
@@ -98,7 +104,7 @@ export function computeZones(items: InventoryItem[]): LoadZone[] {
     .map((step) => ({
       step,
       label: STEP_LABELS[step],
-      color: STEP_COLORS[step],
+      color: STEP_COLORS_FOR_TEST[step],
       cubicFeet: Math.round((totals.get(step) ?? 0) * 100) / 100,
       fraction: (totals.get(step) ?? 0) / loaded,
     }));

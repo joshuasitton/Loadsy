@@ -5,10 +5,15 @@ export const colors = {
   border: '#2A3D57',
   text: '#F4F7FB',
   textMuted: '#94A3B8',
-  textDim: '#64748B',
+  // Lightened from #64748B, which rendered at 3.21:1 on surface — below AA, and
+  // it carries the affiliate disclosure, an App Store commitment.
+  textDim: '#8595A8',
 
   accent: '#3B9E7A',
-  accentText: '#FFFFFF',
+  // Dark ink, not white. White on this green measured 3.30:1 — the single most
+  // important piece of text in the app, below AA. Darkening the green instead
+  // would have dulled the one brand colour; inverting the label keeps it.
+  accentText: '#08150F',
   accentDim: '#1F4D3C',
 
   /** estimated line items and low-confidence flags */
@@ -17,7 +22,7 @@ export const colors = {
   /** confirmed / included line items */
   green: '#4FBF8B',
   greenDim: '#173D2C',
-  danger: '#E06C5A',
+  danger: '#E88472',
   dangerDim: '#4A211B',
 
   disabled: '#2A3D57',
