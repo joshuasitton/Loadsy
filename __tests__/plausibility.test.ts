@@ -74,7 +74,9 @@ test('per-item priors catch what generic limits cannot', () => {
   // bounds; only knowing what a nightstand is makes it wrong.
   const verdict = assessDimensions('Nightstand', dims(72, 40, 40));
   assert.equal(verdict.plausible, false);
-  assert.match(verdict.reason ?? '', /nightstand/i);
+  // Nightstands, end tables and side tables share one band — they are the same
+  // object at different names — so the reason names the shared category.
+  assert.match(verdict.reason ?? '', /side table/i);
 
   // And the other direction — a sofa the size of a shoebox.
   const tiny = assessDimensions('Sofa', dims(12, 8, 8));
@@ -116,5 +118,116 @@ test('the mock catalogue is entirely plausible, so dev never sees a false flag',
         `mock "${item.name}" in ${room} was flagged: ${verdict.reason}`,
       );
     }
+  }
+});
+
+test('every item at its published typical size passes without a flag', () => {
+  // The nag budget is the constraint that makes this gate work at all: it blocks
+  // the primary CTA, so a user flagged on correct detections learns to clear the
+  // banner without reading it, and then it catches nothing real either.
+  //
+  // These are the sourced typical dimensions the bands were derived from. If a
+  // band is ever tightened past its own typical value, this fails loudly.
+  const typical: [string, number, number, number][] = [
+    ['3-Seat Sofa', 84, 36, 34],
+    ['Loveseat', 62, 36, 34],
+    ['Sectional', 110, 85, 34],
+    ['Sleeper Sofa', 86, 38, 36],
+    ['Armchair', 34, 34, 34],
+    ['Recliner', 36, 38, 42],
+    ['Ottoman', 24, 24, 18],
+    ['Coffee Table', 48, 24, 18],
+    ['End Table', 22, 22, 24],
+    ['Console Table', 52, 16, 30],
+    ['TV Stand', 58, 16, 22],
+    ['Bookcase', 32, 12, 72],
+    ['Floor Lamp', 16, 16, 60],
+    ['Table Lamp', 12, 12, 26],
+    ['Area Rug', 12, 12, 96],
+    ['TV (75")', 66, 4, 38],
+    ['Wall Mirror', 32, 3, 66],
+    ['Queen Mattress', 80, 60, 12],
+    ['King Mattress', 80, 76, 12],
+    ['Box Spring', 80, 60, 9],
+    ['Bed Frame', 84, 64, 14],
+    ['Headboard', 62, 3, 50],
+    ['Dresser', 60, 18, 34],
+    ['Nightstand', 22, 18, 26],
+    ['Wardrobe', 42, 22, 72],
+    ['Dining Table', 84, 42, 30],
+    ['Dining Chair', 18, 20, 36],
+    ['Bar Stool', 16, 16, 42],
+    ['China Cabinet', 50, 18, 72],
+    ['Sideboard', 60, 18, 34],
+    ['Refrigerator', 36, 35, 70],
+    ['Chest Freezer', 48, 26, 34],
+    ['Washer', 27, 30, 43],
+    ['Dryer', 27, 32, 39],
+    ['Dishwasher', 24, 24, 35],
+    ['Range', 30, 27, 36],
+    ['Microwave', 21, 16, 12],
+    ['Window AC Unit', 24, 22, 16],
+    ['Desk', 50, 28, 30],
+    ['Office Chair', 26, 26, 42],
+    ['Filing Cabinet', 15, 25, 52],
+    ['Bicycle', 68, 24, 42],
+    ['Treadmill', 75, 34, 62],
+    ['Exercise Bike', 45, 24, 50],
+    ['Gas Grill', 52, 26, 46],
+    ['Lawn Mower', 60, 22, 40],
+    ['Patio Table', 48, 48, 29],
+    ['Vacuum', 14, 14, 44],
+    ['Step Ladder', 20, 6, 72],
+    ['Storage Tote', 27, 17, 15],
+    ['Moving Box', 18, 18, 24],
+    ['Wardrobe Box', 24, 20, 46],
+    ['Picture Box', 40, 4, 60],
+  ];
+
+  const flagged = typical
+    .map(([name, l, w, h]) => [name, assessDimensions(name, dims(l, w, h))] as const)
+    .filter(([, verdict]) => !verdict.plausible)
+    .map(([name, verdict]) => `${name}: ${verdict.reason}`);
+
+  assert.deepEqual(flagged, [], `correct detections were flagged:\n  ${flagged.join('\n  ')}`);
+});
+
+test('the bands still catch a gross error in every covered category', () => {
+  // The other half of the trade: wide enough not to nag, tight enough to bite.
+  // 10x on one axis is the canonical unit/decimal slip.
+  const grossErrors: [string, number, number, number][] = [
+    ['3-Seat Sofa', 840, 36, 34],
+    ['Queen Mattress', 800, 60, 12],
+    ['Refrigerator', 360, 35, 70],
+    ['Dining Chair', 180, 20, 36],
+    ['Nightstand', 220, 18, 26],
+    ['TV (55")', 490, 4, 29],
+  ];
+  for (const [name, l, w, h] of grossErrors) {
+    const verdict = assessDimensions(name, dims(l, w, h));
+    assert.equal(verdict.plausible, false, `${name} at ${l}x${w}x${h} slipped through`);
+  }
+});
+
+test('a more specific rule always wins over the general one it lives inside', () => {
+  // volumePriorFor returns the FIRST match, so a general pattern placed above a
+  // specific one silently swallows it. That is how "Wardrobe Box" was measured
+  // against an armoire and flagged as impossibly small.
+  const overlaps: [string, string][] = [
+    ['Wardrobe Box', 'a wardrobe box'],
+    ['Sleeper Sofa', 'a sleeper sofa'],
+    ['Dining Table', 'a dining table'],
+    ['Coffee Table', 'a coffee table'],
+    ['Office Chair', 'an office chair'],
+    ['Bar Stool', 'a bar stool'],
+    ['TV Stand', 'a media console'],
+    ['Exercise Bike', 'an exercise bike'],
+  ];
+  for (const [name, expected] of overlaps) {
+    assert.equal(
+      volumePriorFor(name)?.label,
+      expected,
+      `"${name}" matched the wrong rule — check ordering`,
+    );
   }
 });
