@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "loadsy",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,

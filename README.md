@@ -39,6 +39,54 @@ npx expo install --fix
 
 The app runs entirely on mocked API responses out of the box — no backend needed.
 
+### Building for a device without Xcode
+
+This machine has only the Command Line Tools, so `expo run:ios` and the simulator
+are unavailable. EAS Build compiles on Apple hardware in the cloud instead, which is
+what makes TestFlight, screenshots and submission reachable from here.
+
+`eas.json` is committed and ready. Three one-time steps, all needing your account:
+
+```bash
+npx eas-cli login
+```
+
+```bash
+npx eas-cli init
+```
+
+`init` writes `extra.eas.projectId` into `app.json` — commit that. Then:
+
+```bash
+npx eas-cli build --platform ios --profile preview
+```
+
+The first build asks whether EAS should manage your signing credentials; saying yes
+means you never touch a provisioning profile. It needs an active Apple Developer
+Program membership.
+
+**The three profiles:**
+
+| Profile | What it is | Use it for |
+|---|---|---|
+| `development` | Dev client, simulator build | Running against a local Metro server |
+| `preview` | Release build, internal distribution | TestFlight, real-device testing, screenshots |
+| `production` | Release build, store credentials | App Store submission |
+
+`production` sets `autoIncrement`, and `cli.appVersionSource` is `remote`, so EAS owns
+the build number — the `buildNumber` in `app.json` is no longer the source of truth.
+Bump `version` there for a marketing version change; leave the build number alone.
+
+All three profiles pin `EXPO_PUBLIC_USE_MOCKS=true`, because no backend exists yet.
+**Remove it from `production` the moment `/v1/detect` is real** — otherwise you would
+ship a build that quietly serves the mock catalogue.
+
+To submit once a production build finishes:
+
+```bash
+npx eas-cli submit --platform ios --profile production
+```
+
 ---
 
 ## What's built

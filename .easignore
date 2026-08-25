@@ -1,0 +1,8 @@
+# Everything here is excluded from the tarball uploaded to EAS Build.
+# .gitignore already applies; this adds files that ARE tracked but that the
+# build does not need, so uploads stay small and fast.
+
+_archive/
+__tests__/
+.claude/
+APP_STORE.md
