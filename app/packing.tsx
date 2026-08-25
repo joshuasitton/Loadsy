@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchPackingPlan } from '../src/api/packingPlan';
+import { guidanceFor } from '../src/domain/itemGuidance';
 import { stepForItem } from '../src/domain/packing';
 import type { InventoryItem, LoadStep } from '../src/domain/types';
 import { allItems, roomCubicFeet } from '../src/domain/volume';
@@ -182,13 +183,27 @@ function LoadPlanTab({
             {step.itemIds.map((itemId) => {
               const item = byId.get(itemId);
               if (!item) return null;
+              const guidance = guidanceFor(item);
               return (
-                <View key={itemId} style={styles.stepItem}>
-                  <Text style={styles.stepItemName}>{item.name}</Text>
-                  <Text style={styles.stepItemMeta}>
-                    {item.estimatedWeightClass}
-                    {item.isFragile ? ' · fragile' : ''} · {item.cubicFeet} ft³
-                  </Text>
+                <View key={itemId} style={styles.stepItemBlock}>
+                  <View style={styles.stepItem}>
+                    <Text style={styles.stepItemName}>{item.name}</Text>
+                    <Text style={styles.stepItemMeta}>
+                      {item.estimatedWeightClass}
+                      {item.isFragile ? ' · fragile' : ''} · {item.cubicFeet} ft³
+                    </Text>
+                  </View>
+                  {guidance ? (
+                    <View style={styles.guidance}>
+                      <Text style={styles.guidanceLine}>{guidance.orientation}</Text>
+                      {guidance.prep ? (
+                        <Text style={styles.guidanceLine}>First: {guidance.prep}</Text>
+                      ) : null}
+                      {guidance.caution ? (
+                        <Text style={styles.guidanceCaution}>{guidance.caution}</Text>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
               );
             })}
@@ -248,7 +263,17 @@ const styles = StyleSheet.create({
   stepTitle: { ...type.heading, color: colors.text },
   stepInstruction: { ...type.caption, color: colors.textMuted, lineHeight: 20 },
   stepItems: { gap: space.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.md },
+  stepItemBlock: { gap: 2 },
   stepItem: { flexDirection: 'row', justifyContent: 'space-between', gap: space.md },
+  guidance: {
+    gap: 2,
+    paddingLeft: space.md,
+    paddingBottom: space.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+  },
+  guidanceLine: { ...type.caption, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  guidanceCaution: { ...type.caption, color: colors.amber, fontSize: 12, lineHeight: 17 },
   stepItemName: { ...type.caption, color: colors.text, flex: 1 },
   stepItemMeta: { ...type.caption, color: colors.textDim, fontSize: 12 },
   rooms: { gap: space.md },
