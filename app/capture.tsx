@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
+import { resolveRoomId } from '../src/domain/rooms';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -20,7 +21,7 @@ const TIPS = [
 
 export default function CaptureScreen() {
   const router = useRouter();
-  const { dispatch } = useMove();
+  const { move, dispatch } = useMove();
   const [roomName, setRoomName] = useState('');
   const [busy, setBusy] = useState(false);
   const [rejection, setRejection] = useState<ReturnType<typeof assessPhoto> | null>(null);
@@ -55,7 +56,8 @@ export default function CaptureScreen() {
     // create two identically-named empty rooms.
     if (inFlight.current) return;
     inFlight.current = true;
-    dispatch({ type: 'addRoom', id: `room-${Date.now()}`, name: trimmedName || 'Room' });
+    const name = trimmedName || 'Room';
+    dispatch({ type: 'addRoom', id: resolveRoomId(move, name, `room-${Date.now()}`), name });
     router.replace('/inventory');
   }
 
@@ -143,7 +145,10 @@ export default function CaptureScreen() {
         return;
       }
 
-      const roomId = `room-${Date.now()}`;
+      // Reuses the room the user already named rather than minting a second one.
+      // The same id must carry through to addItems below: addRoom is a no-op on a
+      // colliding id, so items aimed at a fresh id would land in no room at all.
+      const roomId = resolveRoomId(move, trimmedName, `room-${Date.now()}`);
       phase = 'detect';
       const items = await detectItems({
         photoId,
