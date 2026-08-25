@@ -92,9 +92,21 @@ export const DAILY_WAIT_PENALTY_USD = 12;
 
 /** Lower is better. Effective cost = price + the dollar cost of waiting for it. */
 export function bestMatchScore(quote: RentalQuote, quotes: RentalQuote[]): number {
-  const soonest = Math.min(...quotes.map((q) => Date.parse(q.earliestAvailability)));
-  const waitMs = Date.parse(quote.earliestAvailability) - soonest;
-  const waitDays = Number.isFinite(waitMs) ? Math.max(0, waitMs) / 86_400_000 : 0;
+  // Only parseable dates establish the baseline. Math.min over a list containing
+  // one NaN is NaN, which made waitMs NaN for EVERY quote — the isFinite guard
+  // below then zeroed the wait penalty across the whole list, silently collapsing
+  // Best Match into Cheapest. The quote that ranked wrong was never the bad one,
+  // so the symptom pointed nowhere near the cause.
+  const parsed = quotes
+    .map((q) => Date.parse(q.earliestAvailability))
+    .filter((ms) => Number.isFinite(ms));
+  if (parsed.length === 0) return round2(quote.estimatedTotal);
+
+  const soonest = Math.min(...parsed);
+  const own = Date.parse(quote.earliestAvailability);
+  // A quote with no readable date carries no wait penalty rather than poisoning
+  // the comparison — it competes on price alone.
+  const waitDays = Number.isFinite(own) ? Math.max(0, own - soonest) / 86_400_000 : 0;
   return round2(quote.estimatedTotal + waitDays * DAILY_WAIT_PENALTY_USD);
 }
 

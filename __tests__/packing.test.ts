@@ -98,3 +98,32 @@ test('every item lands in exactly one step', () => {
   assert.equal(assigned.length, items.length);
   assert.equal(new Set(assigned).size, items.length);
 });
+
+test('an item edited out of the fragile category stops being loaded as fragile', () => {
+  // stepForItem is `isFragile || category === 'fragile'` — deliberately not
+  // symmetric, so a heavy mirror stays protected. That asymmetry means a stale
+  // isFragile survives a category change and silently misplaces the item.
+  resetIds();
+  const wasFragile = makeItem({
+    id: 'mirror',
+    name: 'Mirror',
+    category: 'box',
+    isFragile: true, // stale flag left behind by an edit
+    estimatedWeightClass: 'heavy',
+  });
+  assert.equal(stepForItem(wasFragile), 4, 'a stale flag still forces the fragile step');
+
+  const corrected = { ...wasFragile, isFragile: false };
+  assert.equal(stepForItem(corrected), 3, 'once corrected it loads with the boxes');
+});
+
+test('turning an item INTO a fragile category protects it even without the flag', () => {
+  resetIds();
+  const nowFragile = makeItem({
+    id: 'shelf',
+    category: 'fragile',
+    isFragile: false,
+    estimatedWeightClass: 'heavy',
+  });
+  assert.equal(stepForItem(nowFragile), 4, 'category alone must be enough to protect it');
+});

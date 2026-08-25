@@ -243,6 +243,14 @@ function ItemEditor({
           ...draft,
           dimensions,
           cubicFeet: cubicFeetFor(dimensions),
+          // Recomputed, because Draft carries no isFragile and the spread above
+          // would otherwise preserve the old one. stepForItem tests
+          // isFragile OR category === fragile, which is deliberately not
+          // symmetric so a heavy mirror stays protected — and that asymmetry is
+          // exactly what lets a stale flag survive. Editing a Mirror from fragile
+          // to box left it loading under "Fragile & Awkward" and still labelled
+          // fragile, while the By Room tab, which derives live, disagreed.
+          isFragile: draft.category === 'fragile',
           // Editing resolves the confidence flag — this is what unblocks the CTA.
           userEdited: true,
         });

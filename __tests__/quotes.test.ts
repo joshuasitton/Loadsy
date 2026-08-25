@@ -182,3 +182,52 @@ test('every vendor has a search URL so the empty state is never a dead end', () 
     assert.ok(url.startsWith('https://'), `${vendor} search URL is not https`);
   }
 });
+
+test('one unreadable date cannot degrade Best Match into Cheapest', () => {
+  // Math.min over a list containing NaN is NaN, so waitMs went NaN for every
+  // quote and the wait penalty was zeroed across the board. The mis-ranked quote
+  // was never the one with the bad date.
+  resetIds();
+  const cheapButFarOff = makeQuote({
+    id: 'a-cheap',
+    estimatedTotal: 100,
+    earliestAvailability: '2026-10-03T00:00:00.000Z', // three weeks out
+  });
+  const dearButTomorrow = makeQuote({
+    id: 'b-soon',
+    estimatedTotal: 115,
+    earliestAvailability: '2026-09-12T00:00:00.000Z',
+  });
+  const poisoned = makeQuote({
+    id: 'c-broken',
+    estimatedTotal: 130,
+    earliestAvailability: 'next week',
+  });
+
+  const ranked = sortQuotes([cheapButFarOff, dearButTomorrow, poisoned], 'bestMatch');
+  assert.equal(
+    ranked[0]?.id,
+    'b-soon',
+    'a $115 truck available tomorrow must outrank a $100 truck three weeks out',
+  );
+
+  // And the healthy pair alone must rank identically — the bad quote changes
+  // nothing about how the others compare.
+  const withoutPoison = sortQuotes([cheapButFarOff, dearButTomorrow], 'bestMatch');
+  assert.deepEqual(
+    withoutPoison.map((q) => q.id),
+    ranked.filter((q) => q.id !== 'c-broken').map((q) => q.id),
+  );
+});
+
+test('a quote set with no readable dates at all still ranks by price', () => {
+  resetIds();
+  const ranked = sortQuotes(
+    [
+      makeQuote({ id: 'x', estimatedTotal: 200, earliestAvailability: 'soon' }),
+      makeQuote({ id: 'y', estimatedTotal: 150, earliestAvailability: 'later' }),
+    ],
+    'bestMatch',
+  );
+  assert.deepEqual(ranked.map((q) => q.id), ['y', 'x']);
+});
