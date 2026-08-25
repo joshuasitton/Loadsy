@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  formatUSD,
+  formatUSDPrecise,
   hasV1DeepLink,
   isEstimatedLineItem,
   QUOTE_LINE_ITEM_KEYS,
@@ -10,7 +12,56 @@ import {
   VENDOR_SEARCH_URL,
 } from '../src/domain/quotes';
 import { mockQuotes } from '../src/api/mocks/quotes';
+import { TRUCK_SIZES } from '../src/domain/types';
 import { makeQuote, resetIds } from './helpers';
+
+/** Reads a rendered money string back as a number, the way a user adding up a column does. */
+function readMoney(rendered: string): number {
+  return Number(rendered.replace(/[$,]/g, ''));
+}
+
+const SWEEP_ZIPS = ['94110', '20147', '10001', '90210', '60601'];
+
+test('the breakdown a user can add up reconciles with the total shown above it', () => {
+  // totalMatchesLineItems runs at cent precision, so it cannot see a discrepancy
+  // that exists only in the rendering. This asserts the DISPLAYED numbers, which
+  // is what the price-breakdown screen actually promises.
+  let checked = 0;
+  for (const size of TRUCK_SIZES) {
+    for (const zip of SWEEP_ZIPS) {
+      for (const quote of mockQuotes(size, zip, '2026-09-12T00:00:00.000Z')) {
+        const shownLines = QUOTE_LINE_ITEM_KEYS.filter((key) => quote[key] != null).map((key) =>
+          readMoney(formatUSDPrecise(quote[key] ?? 0)),
+        );
+        const shownSum = Math.round(shownLines.reduce((a, b) => a + b, 0) * 100) / 100;
+        const shownTotal = readMoney(formatUSDPrecise(quote.estimatedTotal));
+        assert.equal(
+          shownSum,
+          shownTotal,
+          `${quote.id} @ ${zip}: displayed lines sum to ${shownSum}, displayed total says ${shownTotal}`,
+        );
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked >= 100, `expected a broad sweep, only checked ${checked} quotes`);
+});
+
+test('whole-dollar formatting is why the breakdown may not use it', () => {
+  // Pins the reason formatUSDPrecise exists. If this ever stops finding a
+  // mismatch, formatUSD became safe for itemised surfaces and the split can go.
+  const offenders = TRUCK_SIZES.flatMap((size) =>
+    SWEEP_ZIPS.flatMap((zip) =>
+      mockQuotes(size, zip, '2026-09-12T00:00:00.000Z').filter((quote) => {
+        const lines = QUOTE_LINE_ITEM_KEYS.filter((key) => quote[key] != null).map((key) =>
+          readMoney(formatUSD(quote[key] ?? 0)),
+        );
+        return lines.reduce((a, b) => a + b, 0) !== readMoney(formatUSD(quote.estimatedTotal));
+      }),
+    ),
+  );
+  assert.ok(offenders.length > 0, 'expected whole-dollar rounding to produce visible mismatches');
+});
 
 test('CONTRACT 4.2: estimatedTotal is reconstructable from its own line items', () => {
   resetIds();

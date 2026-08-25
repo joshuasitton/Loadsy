@@ -116,12 +116,34 @@ export function sortQuotes(quotes: RentalQuote[], filter: QuoteFilter): RentalQu
   }
 }
 
+/**
+ * Whole dollars. For summary surfaces where a single price stands alone — the quote
+ * list, a headline figure. Never use it for amounts the user can add up.
+ */
 export function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/**
+ * Exact cents. Required anywhere individual amounts are shown alongside a total.
+ *
+ * `formatUSD` rounds every amount independently, so six rounded line items sitting
+ * above a separately-rounded total routinely disagree by a dollar or more — on the
+ * one screen whose entire purpose is showing the user where the money goes. The
+ * §4.2 reconciliation check runs at cent precision, so it never fires on a
+ * discrepancy that only exists in the rendering.
+ */
+export function formatUSDPrecise(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 

@@ -4,6 +4,7 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getCachedQuote } from '../../src/api/quoteCache';
 import {
   formatUSD,
+  formatUSDPrecise,
   isEstimatedLineItem,
   LINE_ITEM_LABEL,
   QUOTE_LINE_ITEM_KEYS,
@@ -35,7 +36,13 @@ export default function QuoteBreakdownScreen() {
             title="That quote is no longer loaded"
             message="Rates refresh when you reopen the prices list. Head back and tap it again."
           />
-          <SecondaryButton title="Back to prices" onPress={() => router.back()} />
+          <SecondaryButton
+            title="Back to prices"
+            // A cold deep link (loadsy://quote/<id>) opens this modal as the only
+            // route on the stack, where back() is silently dropped and the user is
+            // left with no way out but force-quitting.
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/prices'))}
+          />
         </View>
       </Screen>
     );
@@ -45,7 +52,11 @@ export default function QuoteBreakdownScreen() {
     key,
     label: LINE_ITEM_LABEL[key],
     value: quote[key] ?? 0,
-    present: quote[key] !== null,
+    // `!= null`, not `!== null`: a field the vendor simply omitted arrives as
+    // undefined, and treating that as present renders a green "$0 · INCLUDED" —
+    // an affirmative claim that the vendor charges nothing for something they
+    // never quoted at all.
+    present: quote[key] != null,
     estimated: isEstimatedLineItem(key),
   }));
 
@@ -67,7 +78,7 @@ export default function QuoteBreakdownScreen() {
           <Banner
             tone="danger"
             title="These numbers don't add up"
-            message={`The line items total ${formatUSD(sumLineItems(quote))} but the quote says ${formatUSD(quote.estimatedTotal)}. Check with the vendor directly before booking.`}
+            message={`The line items total ${formatUSDPrecise(sumLineItems(quote))} but the quote says ${formatUSDPrecise(quote.estimatedTotal)}. Check with the vendor directly before booking.`}
           />
         ) : null}
 
@@ -88,7 +99,7 @@ export default function QuoteBreakdownScreen() {
                       : styles.lineValueConfirmed,
                 ]}
               >
-                {line.present ? formatUSD(line.value) : '—'}
+                {line.present ? formatUSDPrecise(line.value) : '—'}
               </Text>
             </View>
           ))}
@@ -97,7 +108,7 @@ export default function QuoteBreakdownScreen() {
 
           <View style={styles.line}>
             <Text style={styles.totalLabel}>Estimated total</Text>
-            <Text style={styles.totalValue}>{formatUSD(quote.estimatedTotal)}</Text>
+            <Text style={styles.totalValue}>{formatUSDPrecise(quote.estimatedTotal)}</Text>
           </View>
         </Card>
 
