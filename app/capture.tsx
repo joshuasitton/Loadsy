@@ -131,10 +131,13 @@ export default function CaptureScreen() {
 
       // Spec §3 Screen 1 edge case: gate the photo before it can produce an inventory.
       const signals: PhotoQualitySignals = {
-        // Brightness and sharpness come from the Vision agent in production; until
-        // then we can only check what the picker gives us and let detection decide.
-        brightness: 1,
-        sharpness: 1,
+        // Left UNMEASURED rather than asserted. These were previously hardcoded to
+        // 1 — a claim of perfect exposure and perfect focus for every photo — which
+        // is why MIN_BRIGHTNESS and MIN_SHARPNESS have never once fired. Passing
+        // undefined says the true thing: nobody has looked. The gate skips them
+        // either way, but a later reader now sees a gap rather than a passing test.
+        brightness: undefined,
+        sharpness: undefined,
         // Left undefined when the picker did not report them — unknown, not small.
         widthPx: asset.width,
         heightPx: asset.height,

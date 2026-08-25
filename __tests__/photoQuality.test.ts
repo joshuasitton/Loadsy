@@ -93,3 +93,26 @@ test('a rejection the user can act on is never marked unrecoverable', () => {
   // the manual path instead.
   assert.equal(assessPhoto({ ...good, detectedItemCount: 0 }).recoverable, true);
 });
+
+test('unmeasured brightness and sharpness do not reject a good photo', () => {
+  // capture.tsx passes these as undefined until on-device measurement exists.
+  // Unknown must behave exactly like the size gate's unknown: skipped, not failed.
+  const { brightness, sharpness, ...withoutSignals } = good;
+  assert.equal(assessPhoto(withoutSignals).ok, true);
+  assert.equal(assessPhoto({ ...withoutSignals, detectedItemCount: 3 }).ok, true);
+
+  // And unknown must not mask a genuine rejection from another signal.
+  assert.equal(assessPhoto({ ...withoutSignals, detectedItemCount: 0 }).code, 'noFurniture');
+  assert.equal(assessPhoto({ ...withoutSignals, widthPx: 100, heightPx: 100 }).code, 'tooSmall');
+});
+
+test('a measured signal still fires once it exists', () => {
+  // Guards the wiring: the gates must remain live for the day real measurement
+  // lands, not be permanently disabled by the optional type.
+  assert.equal(assessPhoto({ ...good, brightness: 0.05 }).code, 'tooDark');
+  assert.equal(assessPhoto({ ...good, sharpness: 0.05 }).code, 'tooBlurry');
+  // Zero is a real measurement, not a missing one.
+  assert.equal(assessPhoto({ ...good, brightness: 0 }).code, 'tooDark');
+  // NaN is not a measurement at all.
+  assert.equal(assessPhoto({ ...good, brightness: NaN }).ok, true);
+});

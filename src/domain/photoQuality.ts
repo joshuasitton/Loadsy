@@ -7,10 +7,14 @@
 export type PhotoRejectionCode = 'tooDark' | 'tooBlurry' | 'noFurniture' | 'tooSmall';
 
 export interface PhotoQualitySignals {
-  /** mean luminance, 0–1 */
-  brightness: number;
-  /** variance-of-Laplacian style sharpness score, 0–1 */
-  sharpness: number;
+  /**
+   * Mean luminance, 0–1. Optional for exactly the reason widthPx is: there is no
+   * safe number to invent when it has not been measured. 1 waves every dark photo
+   * through, 0 blocks every photo. Unknown is not too dark.
+   */
+  brightness?: number;
+  /** Variance-of-Laplacian style sharpness score, 0–1. Unknown is not blurry. */
+  sharpness?: number;
   /**
    * Pixel dimensions, when the picker actually reported them.
    *
@@ -47,6 +51,10 @@ const OK: PhotoQualityVerdict = {
   recoverable: true,
 };
 
+function isMeasured(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export function assessPhoto(signals: PhotoQualitySignals): PhotoQualityVerdict {
   const { widthPx, heightPx } = signals;
   const measured =
@@ -68,7 +76,10 @@ export function assessPhoto(signals: PhotoQualitySignals): PhotoQualityVerdict {
     };
   }
 
-  if (signals.brightness < MIN_BRIGHTNESS) {
+  // Guarded rather than compared directly: `undefined < 0.18` is false, which
+  // happens to be the behaviour we want but only by accident. Saying so out loud
+  // stops a later refactor turning an accident into a regression.
+  if (isMeasured(signals.brightness) && signals.brightness < MIN_BRIGHTNESS) {
     return {
       ok: false,
       code: 'tooDark',
@@ -79,7 +90,7 @@ export function assessPhoto(signals: PhotoQualitySignals): PhotoQualityVerdict {
     };
   }
 
-  if (signals.sharpness < MIN_SHARPNESS) {
+  if (isMeasured(signals.sharpness) && signals.sharpness < MIN_SHARPNESS) {
     return {
       ok: false,
       code: 'tooBlurry',
