@@ -2,7 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
-import { unresolvedCount } from '../src/domain/confidence';
+import { canLeaveInventory, confidenceBannerCopy, unresolvedCount } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
 import { Card, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
@@ -15,6 +15,22 @@ interface StepRow {
   title: string;
   href: '/inventory' | '/truck' | '/packing' | null;
   detail: (ctx: ReturnType<typeof useMove>) => string;
+  /**
+   * Why this row cannot be opened yet, or null when it can.
+   *
+   * The spec's confidence gate is a hard requirement, but it used to be enforced
+   * only on Screen 2's own CTA. This row pushed '/truck' unconditionally, so
+   * tapping it here produced a full recommendation built on unconfirmed AI
+   * dimensions — or on an empty inventory. A gate with a second door is not a gate.
+   */
+  lockedReason: (ctx: ReturnType<typeof useMove>) => string | null;
+}
+
+/** The single reason string, so Screen 7 and Screen 2 can never disagree. */
+function inventoryGate(ctx: ReturnType<typeof useMove>): string | null {
+  if (allItems(ctx.move).length === 0) return 'Add your inventory first';
+  if (!canLeaveInventory(ctx.move)) return confidenceBannerCopy(unresolvedCount(ctx.move));
+  return null;
 }
 
 const ROWS: StepRow[] = [
@@ -30,24 +46,25 @@ const ROWS: StepRow[] = [
         ? `${count} items · ${unresolved} need a quick check`
         : `${count} items · ${ctx.recommendation.rawCuFt} ft³`;
     },
+    lockedReason: () => null,
   },
   {
     status: 'truckAndPrice',
     title: 'Truck & Price',
     href: '/truck',
-    detail: (ctx) =>
-      allItems(ctx.move).length === 0
-        ? 'Add your inventory first'
-        : `${TRUCK_LABEL[ctx.recommendation.size]} · estimated prices from 5 vendors`,
+    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · estimated prices from 5 vendors`,
+    lockedReason: inventoryGate,
   },
   {
     status: 'packingPlan',
     title: 'Packing Plan',
     href: '/packing',
     detail: (ctx) =>
-      ctx.packingPlan
+      inventoryGate(ctx) ??
+      (ctx.packingPlan
         ? `${ctx.packingPlan.loadSteps.length} load steps ready`
-        : 'Build a load order once your inventory is set',
+        : 'Build a load order once your inventory is set'),
+    lockedReason: inventoryGate,
   },
   {
     // Spec §3 Screen 7: MVP-scope stub. No booking logic behind this.
@@ -55,12 +72,14 @@ const ROWS: StepRow[] = [
     title: 'Reservations',
     href: null,
     detail: () => 'Book directly with the vendor, then check it off here',
+    lockedReason: () => null,
   },
   {
     status: 'movingDay',
     title: 'Moving Day',
     href: null,
     detail: () => 'Your day-of checklist — coming together as you go',
+    lockedReason: () => null,
   },
 ];
 
@@ -100,13 +119,19 @@ export default function MyMoveScreen() {
           {ROWS.map((row, index) => {
             const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo';
             const isStub = row.href === null;
+            const locked = row.lockedReason(ctx);
+            // Programmatically inert, not merely dimmed — the same standard the
+            // spec sets for Screen 2's CTA.
+            const blocked = isStub || locked !== null;
             return (
               <Pressable
                 key={row.status}
-                disabled={isStub}
-                onPress={() => row.href && router.push(row.href)}
-                accessibilityRole={isStub ? 'text' : 'button'}
+                disabled={blocked}
+                onPress={() => row.href && !locked && router.push(row.href)}
+                accessibilityRole={blocked ? 'text' : 'button'}
                 accessibilityLabel={`${row.title}. ${row.detail(ctx)}`}
+                accessibilityState={{ disabled: blocked }}
+                accessibilityHint={locked ?? undefined}
                 style={({ pressed }) => [styles.row, pressed && !isStub && styles.rowPressed]}
               >
                 <View style={[styles.rowBadge, state === 'done' && styles.rowBadgeDone, state === 'current' && styles.rowBadgeCurrent]}>
