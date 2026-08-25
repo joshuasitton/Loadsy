@@ -11,9 +11,17 @@ export interface PhotoQualitySignals {
   brightness: number;
   /** variance-of-Laplacian style sharpness score, 0–1 */
   sharpness: number;
-  /** pixel dimensions of the captured image */
-  widthPx: number;
-  heightPx: number;
+  /**
+   * Pixel dimensions, when the picker actually reported them.
+   *
+   * Optional on purpose: iOS returns no dimensions for some library assets and for
+   * iCloud originals that have not downloaded yet. Coercing that to 0 made a
+   * perfectly good 4032x3024 photo fail the size gate — and `tooSmall` is a
+   * blocking verdict, so the user was told to retake a photo that was already fine,
+   * with no way forward. Unknown is not the same as too small.
+   */
+  widthPx?: number;
+  heightPx?: number;
   /** count of items the detector returned; undefined before detection runs */
   detectedItemCount?: number;
 }
@@ -40,7 +48,16 @@ const OK: PhotoQualityVerdict = {
 };
 
 export function assessPhoto(signals: PhotoQualitySignals): PhotoQualityVerdict {
-  if (Math.min(signals.widthPx, signals.heightPx) < MIN_EDGE_PX) {
+  const { widthPx, heightPx } = signals;
+  const measured =
+    typeof widthPx === 'number' &&
+    typeof heightPx === 'number' &&
+    Number.isFinite(widthPx) &&
+    Number.isFinite(heightPx) &&
+    widthPx > 0 &&
+    heightPx > 0;
+
+  if (measured && Math.min(widthPx, heightPx) < MIN_EDGE_PX) {
     return {
       ok: false,
       code: 'tooSmall',

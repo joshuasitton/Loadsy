@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
@@ -25,6 +25,23 @@ export default function CaptureScreen() {
   const [busy, setBusy] = useState(false);
   const [rejection, setRejection] = useState<ReturnType<typeof assessPhoto> | null>(null);
 
+  /**
+   * Synchronous re-entrancy guard. `busy` cannot do this job: it was only raised
+   * after the picker resolved, and a state update would not be visible to a second
+   * tap in the same tick anyway. Presenting the picker takes a few hundred ms, so
+   * a double-tap ran two captures — two detect calls, two addRoom dispatches, and
+   * a duplicated inventory that silently inflated the truck recommendation.
+   */
+  const inFlight = useRef(false);
+  /** A slow detection must not dispatch or navigate after the user has left. */
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const trimmedName = roomName.trim();
 
   /**
@@ -34,6 +51,10 @@ export default function CaptureScreen() {
    * per attempt.
    */
   function continueByHand() {
+    // Same guard as capture(): two taps before the transition committed used to
+    // create two identically-named empty rooms.
+    if (inFlight.current) return;
+    inFlight.current = true;
     dispatch({ type: 'addRoom', id: `room-${Date.now()}`, name: trimmedName || 'Room' });
     router.replace('/inventory');
   }
@@ -46,7 +67,15 @@ export default function CaptureScreen() {
       );
       return;
     }
+    if (inFlight.current) return;
+    inFlight.current = true;
     setRejection(null);
+
+    // Tracks how far the flow got, so a failure is reported for what actually
+    // failed. Every error used to be described by `source`, so a detection
+    // outage after a successful camera shot read "Can't open the camera — no
+    // camera is available on this device."
+    let phase: 'picker' | 'detect' = 'picker';
 
     try {
       // Spec §5: justify the permission in-app BEFORE the system prompt appears.
@@ -80,6 +109,21 @@ export default function CaptureScreen() {
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
 
+      // An undecoded image would post as an empty string, the detector would find
+      // nothing, and assessPhoto would blame the user's framing for a failure that
+      // happened on this device. Fail honestly instead.
+      if (!asset.base64) {
+        setRejection({
+          ok: false,
+          code: 'tooSmall',
+          title: "Couldn't read that photo",
+          message:
+            'That image could not be opened on this device. Try taking a new photo, or add the items by hand.',
+          recoverable: true,
+        });
+        return;
+      }
+
       setBusy(true);
       const photoId = `photo-${Date.now()}`;
 
@@ -89,8 +133,9 @@ export default function CaptureScreen() {
         // then we can only check what the picker gives us and let detection decide.
         brightness: 1,
         sharpness: 1,
-        widthPx: asset.width ?? 0,
-        heightPx: asset.height ?? 0,
+        // Left undefined when the picker did not report them — unknown, not small.
+        widthPx: asset.width,
+        heightPx: asset.height,
       };
       const preVerdict = assessPhoto(signals);
       if (!preVerdict.ok) {
@@ -99,12 +144,14 @@ export default function CaptureScreen() {
       }
 
       const roomId = `room-${Date.now()}`;
+      phase = 'detect';
       const items = await detectItems({
         photoId,
         roomId,
         roomName: trimmedName,
-        imageData: asset.base64 ?? '',
+        imageData: asset.base64,
       });
+      if (!mounted.current) return;
 
       const postVerdict = assessPhoto({ ...signals, detectedItemCount: items.length });
       if (!postVerdict.ok) {
@@ -112,6 +159,7 @@ export default function CaptureScreen() {
         return;
       }
 
+      if (!mounted.current) return;
       dispatch({ type: 'addRoom', id: roomId, name: trimmedName });
       dispatch({ type: 'addPhoto', roomId, photoId });
       dispatch({ type: 'addItems', roomId, items });
@@ -120,14 +168,29 @@ export default function CaptureScreen() {
       // launchCameraAsync rejects outright on the iOS Simulator, which has no
       // camera. Every await above is inside this try so that failure surfaces as
       // an explanation rather than an unhandled rejection and a dead button.
+      if (!mounted.current) return;
+      if (phase === 'detect') {
+        // Rendered inline, not as an Alert: this one has a path forward, and the
+        // banner is where every other capture failure already speaks.
+        setRejection({
+          ok: false,
+          code: 'noFurniture',
+          title: "Couldn't measure that room",
+          message:
+            'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
+          recoverable: true,
+        });
+        return;
+      }
       Alert.alert(
         source === 'camera' ? "Can't open the camera" : "Couldn't read that photo",
         source === 'camera'
           ? 'No camera is available on this device. Choose a photo from your library instead.'
-          : 'Something went wrong on our side. Try again, or add the items by hand.',
+          : 'Something went wrong opening that photo. Try again, or add the items by hand.',
       );
     } finally {
-      setBusy(false);
+      inFlight.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
 

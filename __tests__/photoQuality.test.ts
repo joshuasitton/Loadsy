@@ -58,3 +58,38 @@ test('every rejection carries a title and a message the user can act on', () => 
     assert.ok(verdict.message.length > 10, `${verdict.code} has no actionable message`);
   }
 });
+
+test('dimensions the picker never reported are unknown, not too small', () => {
+  // iOS returns no width/height for some library assets and for iCloud originals
+  // that have not downloaded. Coercing that to 0 failed the size gate, and
+  // tooSmall is a BLOCKING verdict — so a perfectly good photo was rejected with
+  // "try taking the photo with the camera instead" and no way forward.
+  for (const missing of [{}, { widthPx: undefined, heightPx: undefined }]) {
+    const verdict = assessPhoto({ ...good, ...missing, widthPx: undefined, heightPx: undefined });
+    assert.equal(verdict.ok, true, `unknown dimensions were rejected as ${verdict.code}`);
+  }
+
+  // A half-known pair is still unknown — one axis cannot establish the other.
+  assert.equal(assessPhoto({ ...good, widthPx: 4032, heightPx: undefined }).ok, true);
+  assert.equal(assessPhoto({ ...good, widthPx: undefined, heightPx: 3024 }).ok, true);
+
+  // And a genuinely small photo is still caught.
+  assert.equal(assessPhoto({ ...good, widthPx: 100, heightPx: 100 }).code, 'tooSmall');
+});
+
+test('a rejection the user can act on is never marked unrecoverable', () => {
+  // `recoverable: false` suppresses the manual-entry button on Screen 1, so any
+  // verdict that blocks must be one a retake can actually fix.
+  const blocking = [
+    assessPhoto({ ...good, widthPx: 100, heightPx: 100 }),
+    assessPhoto({ ...good, brightness: 0 }),
+    assessPhoto({ ...good, sharpness: 0 }),
+  ];
+  for (const verdict of blocking) {
+    assert.equal(verdict.recoverable, false, `${verdict.code} should block`);
+    assert.match(verdict.message, /photo|camera|lights|focus/i, `${verdict.code} lacks a retake instruction`);
+  }
+  // Zero detections is the one the user cannot fix by retaking, so it must offer
+  // the manual path instead.
+  assert.equal(assessPhoto({ ...good, detectedItemCount: 0 }).recoverable, true);
+});
