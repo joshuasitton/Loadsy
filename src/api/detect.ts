@@ -6,11 +6,25 @@ import { ApiError, apiFetch, mockDelay, USE_MOCKS } from './client';
 import { mockDetect } from './mocks/detect';
 
 /** Spec §4.1 — Vision/Detection Agent. */
-export interface DetectRequest {
+export interface CapturedPhoto {
   photoId: string;
+  /** base64 JPEG, already resized by prepareUpload. */
+  imageData: string;
+}
+
+export interface DetectRequest {
   roomId: string;
   roomName: string;
-  imageData: string;
+  /**
+   * Every photo of ONE room, sent together in a single call.
+   *
+   * Not one request per photo. Two shots of the same living room both contain the
+   * same sofa, and deciding whether that is one sofa from two angles or two
+   * matching sofas needs both images in view at once — no rule applied afterwards
+   * can tell those apart, and guessing wrong either doubles the sofa or loses one.
+   * So deduplication has to happen where the pixels are.
+   */
+  photos: CapturedPhoto[];
 }
 
 interface DetectResponseItem {
@@ -34,16 +48,22 @@ export interface DetectResponse {
  * rather than letting it render as a blank explanation to the user.
  */
 export async function detectItems(request: DetectRequest): Promise<InventoryItem[]> {
+  if (request.photos.length === 0) return [];
+
   if (USE_MOCKS) {
-    return mockDelay(mockDetect(request.roomId, request.roomName, request.photoId));
+    // Deliberately keyed on the room, not the photo count: the mock stands in for
+    // an endpoint that deduplicates, so three angles of one room must return that
+    // room's contents ONCE. A mock that returned three copies would make the
+    // duplication bug invisible in development, which is where it must be visible.
+    return mockDelay(mockDetect(request.roomId, request.roomName, captureId(request)));
   }
 
   const response = await apiFetch<DetectResponse>('/v1/detect', {
     method: 'POST',
     body: JSON.stringify({
-      photoId: request.photoId,
       roomId: request.roomId,
-      imageData: request.imageData,
+      roomName: request.roomName,
+      photos: request.photos,
     }),
   });
 
@@ -54,6 +74,16 @@ export async function detectItems(request: DetectRequest): Promise<InventoryItem
   return response.items.flatMap((item, index) =>
     parseDetectedItem(item, index, request),
   );
+}
+
+/**
+ * A stable id for one capture session, derived from its first photo.
+ *
+ * Item ids are built from this, so a later capture of the same room produces a
+ * different prefix and cannot collide with items already in the inventory.
+ */
+function captureId(request: DetectRequest): string {
+  return request.photos[0]?.photoId ?? request.roomId;
 }
 
 const CATEGORIES: readonly InventoryItem['category'][] = [
@@ -114,7 +144,7 @@ function parseDetectedItem(
   const category = oneOf(item.category, CATEGORIES) ?? 'other';
   return [
     {
-      id: `${request.photoId}-item-${index}`,
+      id: `${captureId(request)}-item-${index}`,
       name,
       category,
       roomId: request.roomId,
@@ -132,7 +162,7 @@ function parseDetectedItem(
           : null,
       isFragile: item.isFragile === true || category === 'fragile',
       estimatedWeightClass: oneOf(item.estimatedWeightClass, WEIGHT_CLASSES) ?? 'medium',
-      sourcePhotoId: request.photoId,
+      sourcePhotoId: captureId(request),
       userEdited: false,
     },
   ];

@@ -19,10 +19,9 @@ function respondWith(body: unknown, ok = true, status = 200) {
 }
 
 const REQUEST = {
-  photoId: 'photo-1',
   roomId: 'room-1',
   roomName: 'Living Room',
-  imageData: 'BASE64',
+  photos: [{ photoId: 'photo-1', imageData: 'BASE64' }],
 };
 
 test('a detected item with no cubicFeet cannot reach the truck recommendation', async () => {
@@ -152,4 +151,70 @@ test('a 200 response that is not a quote list throws rather than reading as no c
     () => fetchQuotes('15ft', '20147', '2026-09-12T00:00:00.000Z'),
     /no quote list/,
   );
+});
+
+test('every angle of a room is sent in one request, not one request per photo', async () => {
+  // Deduplication needs all the views at once. Whether the sofa in the second shot
+  // is the same sofa or a second one cannot be decided after the fact, so shipping
+  // them separately would make it undecidable no matter how good the model is.
+  const { detectItems } = await import('../src/api/detect');
+  let captured: { photos?: { photoId: string }[] } | null = null;
+  (globalThis as Record<string, unknown>).fetch = (_url: string, init: RequestInit) => {
+    captured = JSON.parse(String(init.body)) as { photos?: { photoId: string }[] };
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ items: [] }),
+    } as Response);
+  };
+
+  await detectItems({
+    roomId: 'room-1',
+    roomName: 'Living Room',
+    photos: [
+      { photoId: 'p1', imageData: 'A' },
+      { photoId: 'p2', imageData: 'B' },
+      { photoId: 'p3', imageData: 'C' },
+    ],
+  });
+
+  assert.equal(captured!.photos?.length, 3, 'all three angles should go in one call');
+  assert.deepEqual(captured!.photos?.map((p) => p.photoId), ['p1', 'p2', 'p3']);
+});
+
+test('a request with no photos never reaches the network', async () => {
+  const { detectItems } = await import('../src/api/detect');
+  let called = false;
+  (globalThis as Record<string, unknown>).fetch = () => {
+    called = true;
+    return Promise.reject(new Error('should not be called'));
+  };
+  assert.deepEqual(await detectItems({ roomId: 'r', roomName: 'Room', photos: [] }), []);
+  assert.equal(called, false);
+});
+
+test('item ids follow the capture, so a later capture of the same room cannot collide', async () => {
+  const { detectItems } = await import('../src/api/detect');
+  const item = {
+    name: 'Sofa',
+    category: 'furniture',
+    confidence: 'high',
+    dimensions: { lengthIn: 84, widthIn: 36, heightIn: 34 },
+  };
+  respondWith({ items: [item] });
+
+  const first = await detectItems({
+    roomId: 'room-1',
+    roomName: 'Living Room',
+    photos: [{ photoId: 'capture-a', imageData: 'A' }],
+  });
+  const second = await detectItems({
+    roomId: 'room-1',
+    roomName: 'Living Room',
+    photos: [{ photoId: 'capture-b', imageData: 'B' }],
+  });
+
+  assert.notEqual(first[0]?.id, second[0]?.id, 'a second capture must not reuse ids');
+  assert.match(first[0]?.id ?? '', /^capture-a/);
+  assert.match(second[0]?.id ?? '', /^capture-b/);
 });

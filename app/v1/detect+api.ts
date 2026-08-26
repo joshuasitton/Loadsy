@@ -30,11 +30,20 @@ const UPSTREAM_TIMEOUT_MS = 11_000;
 /** Roughly a 1568x1176 JPEG at quality 0.8, plus base64 overhead and headroom. */
 const MAX_IMAGE_BYTES = 3_000_000;
 
+/**
+ * Photos accepted per room.
+ *
+ * Every extra angle is billed and adds latency against the client's deadline, and
+ * the returns fall off fast — the third shot of a room mostly re-photographs what
+ * the first two already showed. Four is generous for a room and still fits inside
+ * the timeout.
+ */
+const MAX_PHOTOS = 4;
+
 interface DetectBody {
-  photoId?: unknown;
   roomId?: unknown;
   roomName?: unknown;
-  imageData?: unknown;
+  photos?: unknown;
 }
 
 function json(body: unknown, status: number): Response {
@@ -56,13 +65,25 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'Malformed request body' }, 400);
   }
 
-  const imageData = typeof body.imageData === 'string' ? body.imageData : '';
   const roomName = typeof body.roomName === 'string' ? body.roomName.slice(0, 64) : 'Room';
 
-  if (imageData.length === 0) return json({ error: 'No image supplied' }, 400);
-  if (imageData.length > MAX_IMAGE_BYTES) {
-    // The client resizes before sending, so an oversized body means it did not.
-    // Rejecting is cheaper than paying to tokenise a full-resolution frame.
+  const photos = Array.isArray(body.photos)
+    ? body.photos.flatMap((photo) => {
+        const data =
+          typeof photo === 'object' && photo !== null && typeof (photo as { imageData?: unknown }).imageData === 'string'
+            ? (photo as { imageData: string }).imageData
+            : '';
+        return data.length > 0 ? [data] : [];
+      })
+    : [];
+
+  if (photos.length === 0) return json({ error: 'No image supplied' }, 400);
+  if (photos.length > MAX_PHOTOS) {
+    return json({ error: `At most ${MAX_PHOTOS} photos per room` }, 400);
+  }
+  // The client resizes before sending, so an oversized body means it did not.
+  // Rejecting is cheaper than paying to tokenise a full-resolution frame.
+  if (photos.some((data) => data.length > MAX_IMAGE_BYTES)) {
     return json({ error: 'Image too large — resize before sending' }, 413);
   }
 
@@ -86,13 +107,17 @@ export async function POST(request: Request): Promise<Response> {
           {
             role: 'user',
             content: [
-              // Image before text: the model is asked to look before it is told
+              // Images before text: the model is asked to look before it is told
               // what to look for, which is the documented ordering for vision.
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/jpeg', data: imageData },
-              },
-              { type: 'text', text: userTurn(roomName) },
+              // Each is numbered so the dedup instruction has something to refer to.
+              ...photos.flatMap((data, index) => [
+                { type: 'text', text: `Image ${index + 1}:` },
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: 'image/jpeg', data },
+                },
+              ]),
+              { type: 'text', text: userTurn(roomName, photos.length) },
             ],
           },
         ],
@@ -129,9 +154,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 }
 
-function userTurn(roomName: string): string {
+function userTurn(roomName: string, photoCount: number): string {
   return [
     `Room label given by the user: "${roomName}"`,
+    photoCount > 1
+      ? `\nThe ${photoCount} images above are different views of this ONE room. Every physical object exists once and must appear exactly once in your output.`
+      : '',
     '',
     'List every object in this room that will be loaded onto the moving truck.',
     'Return only JSON of the form {"items":[...]}, with no prose and no markdown.',
@@ -183,6 +211,22 @@ Do not list an object because rooms of this type usually contain one. If you can
 Never drop an object because you can only see part of it — an omission is invisible to the user and cannot be corrected. Report the dimensions of the WHOLE object as you infer it to be, not of the visible portion. If you can see one arm and two cushions of a three-seat sofa, report a three-seat sofa.
 
 If you can see something large but cannot identify it, still emit it: a descriptive label, category "other", confidence "low", and your best guess at its bulk. A visible uncertainty the user can correct beats a silent omission.
+
+## More than one photograph
+
+When you are given several images they are different views of the SAME room. Each
+physical object exists once and must appear exactly once in your output. A sofa
+visible in image 1 and again in image 3 is one sofa, not two.
+
+Attribute each object to the image where it is most fully visible, and take its
+dimensions from that view. Extra angles exist to resolve what one view could not —
+an item cut off at the edge of the first shot may be fully visible in the second,
+and a piece with no scale reference nearby in one image may sit beside a doorway in
+another. Use them that way.
+
+Duplicating an object across views is the worst error you can make here: it adds a
+truck's worth of phantom volume and the user sees their own sofa listed twice,
+which discredits every other number on the screen.
 
 ## Counting
 
