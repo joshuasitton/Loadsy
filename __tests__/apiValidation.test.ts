@@ -153,18 +153,3 @@ test('a 200 response that is not a quote list throws rather than reading as no c
     /no quote list/,
   );
 });
-
-test('a packing plan without loadSteps falls back instead of persisting a crash', async () => {
-  // Accepting it stored a plan the dashboard then dereferenced unguarded, so a
-  // merely incomplete 200 crashed the app on every launch afterwards.
-  const { fetchPackingPlan } = await import('../src/api/packingPlan');
-  const { makeItem, resetIds } = await import('./helpers');
-  resetIds();
-  const items = [makeItem({ id: 'a', category: 'furniture', estimatedWeightClass: 'heavy' })];
-
-  respondWith({ truckMapSVG: '<svg></svg>' });
-  const plan = await fetchPackingPlan('move-1', items, '15ft');
-  assert.ok(Array.isArray(plan.loadSteps));
-  assert.ok(plan.loadSteps.length > 0, 'expected a locally built fallback plan');
-  assert.ok(plan.loadSteps.flatMap((s) => s.itemIds).includes('a'));
-});

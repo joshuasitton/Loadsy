@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchPackingPlan } from '../src/api/packingPlan';
 import { SvgXml } from 'react-native-svg';
 import { guidanceFor } from '../src/domain/itemGuidance';
 import { renderZoneSVG, zoneAriaLabel } from '../src/truckmap/renderSvg';
@@ -19,74 +18,21 @@ type Tab = 'load' | 'room';
 
 export default function PackingScreen() {
   const router = useRouter();
-  const { move, packingPlan, dispatch, recommendation } = useMove();
+  const { move, packingPlan, recommendation } = useMove();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('load');
-  /** The inventory a build already failed for, so a retry is not fired in a loop. */
-  const [failedFor, setFailedFor] = useState<string | null>(null);
 
-  // Memoised so the effect below can depend on it honestly: allItems() builds a
-  // fresh array every call, which would otherwise re-trigger the build forever.
+  // Memoised because allItems() builds a fresh array every call, and the diagrams
+  // below are keyed on it.
   const items = useMemo(() => allItems(move), [move]);
 
-  /**
-   * A stored plan outlives the inventory it was built from, so freshness is decided
-   * by WHICH items a plan covers — not how many.
-   *
-   * Comparing counts meant any edit that preserved the count left the stale plan in
-   * place: delete a chair and add a piano, and the Load Plan silently skipped the
-   * piano (LoadPlanTab drops ids it cannot resolve) while the By Room tab, which
-   * derives from live items, listed it under a step. Two tabs, same item, different
-   * answers — and the truck diagram agreed with neither.
+  /*
+   * There is no loading state, no retry and no freshness check any more, because
+   * the plan is no longer fetched — useMove() derives it from this same inventory.
+   * A plan that cannot lag the inventory cannot need reconciling with it, so the
+   * spinner, the failure banner, the convergence guard and the stale-plan
+   * comparison all went with the endpoint that made them necessary.
    */
-  const inventoryKey = useMemo(() => items.map((item) => item.id).sort().join('|'), [items]);
-  const plannedKey = useMemo(
-    () =>
-      packingPlan
-        ? packingPlan.loadSteps
-            .flatMap((step) => step.itemIds)
-            .sort()
-            .join('|')
-        : null,
-    [packingPlan],
-  );
-
-  const needsPlan = items.length > 0 && plannedKey !== inventoryKey;
-  const failed = failedFor === inventoryKey;
-  // Derived, not stored. A `loading` flag would have to be raised synchronously
-  // inside the effect, which costs an extra render pass before anything paints.
-  const loading = needsPlan && !failed;
-
-  useEffect(() => {
-    if (!needsPlan || failed) return;
-    let cancelled = false;
-    fetchPackingPlan(move.id, items, recommendation.size)
-      .then((plan) => {
-        if (cancelled) return;
-        const covered = plan.loadSteps
-          .flatMap((step) => step.itemIds)
-          .sort()
-          .join('|');
-        if (covered !== inventoryKey) {
-          // Accepting a plan that does not account for exactly this inventory would
-          // leave needsPlan true with nothing in the deps left to change — a
-          // permanent spinner, no error, and no reachable retry.
-          setFailedFor(inventoryKey);
-          return;
-        }
-        dispatch({ type: 'setPackingPlan', plan });
-      })
-      .catch(() => {
-        if (!cancelled) setFailedFor(inventoryKey);
-      });
-    // An inventory edited mid-build must not have the older plan land on top of it.
-    return () => {
-      cancelled = true;
-    };
-  }, [needsPlan, failed, inventoryKey, move.id, items, recommendation.size, dispatch]);
-
-  // Clearing the flag is what re-runs the effect — no separate trigger needed.
-  const retry = useCallback(() => setFailedFor(null), []);
 
   if (items.length === 0) {
     return (
@@ -111,30 +57,13 @@ export default function PackingScreen() {
           <Chip label="By Room" active={tab === 'room'} onPress={() => setTab('room')} />
         </View>
 
-        {failed ? (
-          <Banner
-            tone="danger"
-            title="Couldn't build the plan"
-            message="Something went wrong on our side. Tap below to try again."
-          />
-        ) : null}
-
-        {/* By Room is derived from the inventory alone, so it stays readable while
-            a load plan is still building — the spinner belongs to the other tab. */}
         {tab === 'room' ? (
           <ByRoomTab move={move} />
-        ) : loading ? (
-          <View style={styles.busy}>
-            <ActivityIndicator color={colors.accent} />
-            <Text style={styles.busyText}>Working out the load order…</Text>
-          </View>
         ) : (
           <LoadPlanTab
             steps={packingPlan?.loadSteps ?? []}
             items={items}
             truckSize={recommendation.size}
-            onRetry={retry}
-            failed={failed}
           />
         )}
       </ScrollView>
@@ -183,25 +112,18 @@ function LoadPlanTab({
   steps,
   items,
   truckSize,
-  onRetry,
-  failed,
 }: {
   steps: LoadStep[];
   items: InventoryItem[];
   /** Drives the bed proportions in each step's diagram. */
   truckSize: TruckSize;
-  onRetry: () => void;
-  failed: boolean;
 }) {
   const byId = new Map(items.map((item) => [item.id, item]));
 
-  if (steps.length === 0) {
-    return (
-      <View style={styles.emptyWrap}>
-        <PrimaryButton title={failed ? 'Try again' : 'Build my plan'} onPress={onRetry} />
-      </View>
-    );
-  }
+  // Unreachable in practice: every item maps to a step, so an empty plan means an
+  // empty inventory, which the screen above already handles with its own empty
+  // state. There is no longer anything to retry — the plan is derived, not fetched.
+  if (steps.length === 0) return null;
 
   return (
     <View style={styles.steps}>

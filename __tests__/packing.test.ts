@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLoadSteps, stepForItem } from '../src/domain/packing';
+import { buildPackingPlan } from '../src/domain/packingPlan';
 import { makeItem, resetIds } from './helpers';
 
 test('weight class, not category, decides the step for a box (spec Screen 5)', () => {
@@ -126,4 +127,52 @@ test('turning an item INTO a fragile category protects it even without the flag'
     estimatedWeightClass: 'heavy',
   });
   assert.equal(stepForItem(nowFragile), 4, 'category alone must be enough to protect it');
+});
+
+test('the plan is a function of the inventory, so it cannot describe a different one', () => {
+  // This is what deleting /v1/packing-plan bought. A fetched plan was a COPY of a
+  // past inventory, and keeping the copy in step with the real one needed a
+  // freshness check, a convergence guard and a retry path — all of which had bugs.
+  // A derived plan has no copy to fall out of step.
+  resetIds();
+  const before = [
+    makeItem({ id: 'sofa', category: 'furniture', estimatedWeightClass: 'heavy', cubicFeet: 59.5 }),
+    makeItem({ id: 'chair', category: 'furniture', estimatedWeightClass: 'light', cubicFeet: 7.5 }),
+  ];
+  // The exact edit that used to defeat the count-based freshness check: swap one
+  // item for another, leaving the count identical.
+  const after = [
+    before[0]!,
+    makeItem({ id: 'piano', category: 'furniture', estimatedWeightClass: 'heavy', cubicFeet: 60 }),
+  ];
+
+  const planBefore = buildPackingPlan('m1', before, '15ft');
+  const planAfter = buildPackingPlan('m1', after, '15ft');
+  assert.ok(planBefore && planAfter);
+
+  const covered = (plan: NonNullable<typeof planBefore>) =>
+    plan.loadSteps.flatMap((step) => step.itemIds).sort();
+  assert.deepEqual(covered(planAfter), ['piano', 'sofa']);
+  assert.ok(!covered(planAfter).includes('chair'), 'the removed item must not survive');
+});
+
+test('an empty inventory has no plan rather than an empty one', () => {
+  // Null, not a plan with zero steps: the dashboard reads a null plan as "not yet"
+  // and a present one as "ready", and "0 load steps ready" is neither.
+  assert.equal(buildPackingPlan('m1', [], '15ft'), null);
+});
+
+test('a derived plan always covers exactly the inventory it was built from', () => {
+  resetIds();
+  const items = [
+    makeItem({ id: 'a', category: 'appliance', estimatedWeightClass: 'heavy' }),
+    makeItem({ id: 'b', category: 'box', estimatedWeightClass: 'light' }),
+    makeItem({ id: 'c', category: 'fragile', isFragile: true }),
+    makeItem({ id: 'd', category: 'other', estimatedWeightClass: 'medium' }),
+  ];
+  const plan = buildPackingPlan('m1', items, '20ft');
+  assert.ok(plan);
+  const covered = plan.loadSteps.flatMap((step) => step.itemIds).sort();
+  assert.deepEqual(covered, ['a', 'b', 'c', 'd']);
+  assert.ok(plan.truckMapSVG && plan.truckMapSVG.startsWith('<svg'));
 });

@@ -16,9 +16,10 @@ import type {
   Room,
   TruckSize,
 } from '../domain/types';
+import { buildPackingPlan } from '../domain/packingPlan';
 import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
-import { DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
+import { allItems, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const STORAGE_KEY = 'loadsy.move.v1';
 /**
@@ -30,7 +31,6 @@ const QUARANTINE_KEY = 'loadsy.move.v1.unreadable';
 
 export interface MoveState {
   move: Move;
-  packingPlan: PackingPlan | null;
   hydrated: boolean;
   /**
    * False when this launch could not read storage at all. The app still runs on a
@@ -42,7 +42,7 @@ export interface MoveState {
 }
 
 type Action =
-  | { type: 'hydrate'; payload: { move: Move; packingPlan: PackingPlan | null } }
+  | { type: 'hydrate'; payload: { move: Move } }
   /** Nothing stored, or nothing salvageable. Safe to start clean and persist. */
   | { type: 'hydrateFailed' }
   /** Storage could not be read at all. Start clean but never persist over it. */
@@ -59,7 +59,6 @@ type Action =
   | { type: 'setDestinationZip'; zip: string | null }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
-  | { type: 'setPackingPlan'; plan: PackingPlan }
   | { type: 'reset' };
 
 function newMove(): Move {
@@ -77,7 +76,6 @@ function newMove(): Move {
 
 const initialState: MoveState = {
   move: newMove(),
-  packingPlan: null,
   hydrated: false,
   persistable: true,
 };
@@ -100,7 +98,6 @@ function reducer(state: MoveState, action: Action): MoveState {
     case 'hydrate':
       return {
         move: withRecommendation(action.payload.move),
-        packingPlan: action.payload.packingPlan,
         hydrated: true,
         persistable: true,
       };
@@ -188,16 +185,15 @@ function reducer(state: MoveState, action: Action): MoveState {
     case 'setStatus':
       return { ...state, move: { ...state.move, status: action.status } };
 
-    case 'setPackingPlan':
-      return { ...state, packingPlan: action.plan };
-
     case 'reset':
       // An explicit user-initiated wipe is always safe to persist.
-      return { move: newMove(), packingPlan: null, hydrated: true, persistable: true };
+      return { move: newMove(), hydrated: true, persistable: true };
   }
 }
 
 interface MoveContextValue extends MoveState {
+  /** Derived from the inventory on every change. Null when there is nothing to load. */
+  packingPlan: PackingPlan | null;
   dispatch: React.Dispatch<Action>;
   recommendation: ReturnType<typeof buildRecommendation>;
   previewSize: (size: TruckSize) => void;
@@ -235,7 +231,10 @@ export function MoveProvider({ children }: { children: ReactNode }) {
         }
         dispatch({
           type: 'hydrate',
-          payload: { move: parsed.move, packingPlan: parsed.packingPlan },
+          // parsed.packingPlan is deliberately ignored. Plans are derived from the
+          // inventory now, so a stored one is at best redundant and at worst a
+          // description of an inventory the user has since edited.
+          payload: { move: parsed.move },
         });
       } catch {
         // Reaching here means storage itself failed, not the payload. Do NOT mark
@@ -253,20 +252,30 @@ export function MoveProvider({ children }: { children: ReactNode }) {
     if (!state.hydrated || !state.persistable) return;
     AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ move: state.move, packingPlan: state.packingPlan }),
+      JSON.stringify({ move: state.move }),
     ).catch(() => {
       // Persistence is best-effort; losing it must never interrupt the user.
     });
-  }, [state.move, state.packingPlan, state.hydrated, state.persistable]);
+  }, [state.move, state.hydrated, state.persistable]);
 
   const recommendation = useMemo(() => buildRecommendation(state.move), [state.move]);
+
+  /**
+   * Derived, never stored. Consumers read it exactly as before, but it is now a
+   * function of the current inventory rather than a copy of a past one — which is
+   * what makes "the plan describes a different move" impossible to express.
+   */
+  const packingPlan = useMemo(
+    () => buildPackingPlan(state.move.id, allItems(state.move), recommendation.size),
+    [state.move, recommendation.size],
+  );
 
   // Preview is intentionally a no-op on state: chips never change the recommendation.
   const previewSize = useCallback((_size: TruckSize) => {}, []);
 
   const value = useMemo(
-    () => ({ ...state, dispatch, recommendation, previewSize }),
-    [state, recommendation, previewSize],
+    () => ({ ...state, packingPlan, dispatch, recommendation, previewSize }),
+    [state, packingPlan, recommendation, previewSize],
   );
 
   return <MoveContext.Provider value={value}>{children}</MoveContext.Provider>;
