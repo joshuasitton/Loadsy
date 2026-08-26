@@ -142,6 +142,35 @@ export default function PackingScreen() {
   );
 }
 
+/**
+ * Collapses runs of the same item into one row with a count.
+ *
+ * Six identical box entries, each repeating the same three lines of guidance, is
+ * how a plan stops being read. The instructions for one box are the instructions
+ * for all six; what the loader needs to know is that there are six.
+ *
+ * Grouped on name AND volume, so two genuinely different dressers stay separate.
+ */
+function groupIdentical(
+  itemIds: string[],
+  byId: Map<string, InventoryItem>,
+): { item: InventoryItem; count: number; key: string }[] {
+  const groups: { item: InventoryItem; count: number; key: string }[] = [];
+  for (const id of itemIds) {
+    const item = byId.get(id);
+    // An id the plan references but the inventory no longer has. The plan is
+    // rebuilt whenever the item set changes, so this should be unreachable.
+    if (!item) continue;
+    const last = groups[groups.length - 1];
+    if (last && last.item.name === item.name && last.item.cubicFeet === item.cubicFeet) {
+      last.count += 1;
+    } else {
+      groups.push({ item, count: 1, key: id });
+    }
+  }
+  return groups;
+}
+
 function LoadPlanTab({
   steps,
   items,
@@ -180,17 +209,21 @@ function LoadPlanTab({
           </View>
           <Text style={styles.stepInstruction}>{step.instruction}</Text>
           <View style={styles.stepItems}>
-            {step.itemIds.map((itemId) => {
-              const item = byId.get(itemId);
-              if (!item) return null;
+            {groupIdentical(step.itemIds, byId).map(({ item, count, key }) => {
               const guidance = guidanceFor(item);
               return (
-                <View key={itemId} style={styles.stepItemBlock}>
+                <View key={key} style={styles.stepItemBlock}>
                   <View style={styles.stepItem}>
-                    <Text style={styles.stepItemName}>{item.name}</Text>
+                    <Text style={styles.stepItemName}>
+                      {item.name}
+                      {count > 1 ? ` × ${count}` : ''}
+                    </Text>
                     <Text style={styles.stepItemMeta}>
                       {item.estimatedWeightClass}
-                      {item.isFragile ? ' · fragile' : ''} · {item.cubicFeet} ft³
+                      {item.isFragile ? ' · fragile' : ''} ·{' '}
+                      {count > 1
+                        ? `${Math.round(item.cubicFeet * count * 100) / 100} ft³ total`
+                        : `${item.cubicFeet} ft³`}
                     </Text>
                   </View>
                   {guidance ? (

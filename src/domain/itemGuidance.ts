@@ -117,6 +117,16 @@ const RULES: readonly GuidanceRule[] = [
     },
   },
   {
+    // Ahead of the television rule, which \btv\b would otherwise claim: a TV STAND
+    // is a wooden cabinet, and telling its owner the screen might crack is nonsense.
+    match: /\b(tv stand|media console|entertainment (unit|centre|center))\b/i,
+    guidance: {
+      orientation: 'Upright against a wall, strapped.',
+      prep: 'Empty it and tape or remove any glass doors and loose shelves.',
+      caution: null,
+    },
+  },
+  {
     match: /\b(tv|television)\b/i,
     guidance: {
       orientation: 'Upright on its edge, never flat, wedged between two soft items.',
