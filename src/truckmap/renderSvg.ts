@@ -110,6 +110,104 @@ export function computeZones(items: InventoryItem[]): LoadZone[] {
     }));
 }
 
+/** Height of a single-zone strip. Shorter than the full map — it is a locator, not a chart. */
+const ZONE_CANVAS = { width: 320, height: 96 };
+
+/**
+ * One load step, drawn in place inside the truck.
+ *
+ * The combined map answers "how is the truck divided?". Standing in the doorway
+ * holding a sofa, that is the wrong question — you need "where does THIS go?", and
+ * scanning a five-colour chart for your colour is work the diagram should have
+ * done for you.
+ *
+ * So every other zone drops to a faint outline and only this one is filled. The
+ * others stay visible rather than being erased because position is the entire
+ * message: a zone means nothing without the ones it is loaded against.
+ */
+export function renderZoneSVG(
+  items: InventoryItem[],
+  truckSize: TruckSize,
+  step: LoadStepOrder,
+): string {
+  const zones = computeZones(items);
+  const bed = BED_DIMENSIONS[truckSize];
+  const pad = 14;
+  const cabWidth = 26;
+  const bedX = pad + cabWidth + 5;
+  const bedWidth = ZONE_CANVAS.width - bedX - pad;
+  const bedY = 22;
+  const bedHeight = Math.min(48, Math.max(34, bedWidth * (bed.widthFt / bed.lengthFt)));
+
+  const parts: string[] = [
+    `<rect x="${pad}" y="${bedY + bedHeight * 0.15}" width="${cabWidth}" height="${round(bedHeight * 0.7)}" rx="4" fill="#2B3B52"/>`,
+    `<text x="${pad + cabWidth / 2}" y="${round(bedY + bedHeight / 2 + 3)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" fill="#8A94A6">CAB</text>`,
+  ];
+
+  let cursor = bedX;
+  let focus: { x: number; width: number; zone: LoadZone } | null = null;
+  for (const zone of zones) {
+    const width = Math.max(6, bedWidth * zone.fraction);
+    const isFocus = zone.step === step;
+    parts.push(
+      isFocus
+        ? `<rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="${zone.color}" opacity="0.92"/>`
+        : `<rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="${zone.color}" opacity="0.28"/><rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="none" stroke="#0F1B2D" stroke-width="1"/>`,
+    );
+    if (isFocus) focus = { x: cursor, width, zone };
+    cursor += width;
+  }
+
+  parts.push(
+    `<rect x="${bedX}" y="${bedY}" width="${round(bedWidth)}" height="${round(bedHeight)}" fill="none" stroke="#0F1B2D" stroke-width="1.5" rx="3"/>`,
+  );
+
+  if (focus) {
+    // A bracket under the zone, rather than a label inside it: a narrow zone has no
+    // room for text, and a label that vanishes on small zones is worse than none.
+    // Clamped inside the canvas: the smallest zones sit hard against the door end,
+    // and a label centred on a 6px strip would otherwise be cut off by the edge.
+    const midX = round(
+      Math.min(ZONE_CANVAS.width - 42, Math.max(42, focus.x + focus.width / 2)),
+    );
+    const y = bedY + bedHeight + 7;
+    parts.push(
+      `<path d="M ${round(focus.x)} ${y} L ${round(focus.x)} ${y + 4} L ${round(focus.x + focus.width)} ${y + 4} L ${round(focus.x + focus.width)} ${y}" fill="none" stroke="${focus.zone.color}" stroke-width="1.5"/>`,
+      `<text x="${midX}" y="${y + 18}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="600" fill="${focus.zone.color}">${focus.zone.label} · ${focus.zone.cubicFeet} ft³</text>`,
+    );
+  }
+
+  parts.push(
+    `<text x="${bedX}" y="${bedY - 7}" font-family="system-ui,sans-serif" font-size="8" fill="#8A94A6">← loaded first</text>`,
+    `<text x="${bedX + bedWidth}" y="${bedY - 7}" text-anchor="end" font-family="system-ui,sans-serif" font-size="8" fill="#8A94A6">door →</text>`,
+  );
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ZONE_CANVAS.width} ${ZONE_CANVAS.height}" width="100%" height="100%" role="img">`,
+    parts.join(''),
+    '</svg>',
+  ].join('');
+}
+
+/** The accessible name for a single-zone diagram. */
+export function zoneAriaLabel(
+  items: InventoryItem[],
+  truckSize: TruckSize,
+  step: LoadStepOrder,
+): string {
+  const zones = computeZones(items);
+  const index = zones.findIndex((z) => z.step === step);
+  if (index < 0) return 'Truck diagram';
+  const zone = zones[index]!;
+  const position =
+    index === 0
+      ? 'against the wall behind the cab'
+      : index === zones.length - 1
+        ? 'at the door end, loaded last'
+        : `${index + 1} of ${zones.length} back from the cab`;
+  return `${zone.label}: ${zone.cubicFeet} cubic feet, ${Math.round(zone.fraction * 100)} percent of the load, ${position}.`;
+}
+
 function renderTopDown(zones: LoadZone[], bed: { lengthFt: number; widthFt: number }): string {
   const pad = 16;
   const cabWidth = 34;

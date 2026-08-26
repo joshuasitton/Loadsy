@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchPackingPlan } from '../src/api/packingPlan';
+import { SvgXml } from 'react-native-svg';
 import { guidanceFor } from '../src/domain/itemGuidance';
-import { stepForItem } from '../src/domain/packing';
-import type { InventoryItem, LoadStep } from '../src/domain/types';
+import { renderZoneSVG, zoneAriaLabel } from '../src/truckmap/renderSvg';
+import { stepForItem, type LoadStepOrder } from '../src/domain/packing';
+import type { InventoryItem, LoadStep, TruckSize } from '../src/domain/types';
 import { allItems, roomCubicFeet } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
@@ -127,7 +129,13 @@ export default function PackingScreen() {
             <Text style={styles.busyText}>Working out the load order…</Text>
           </View>
         ) : (
-          <LoadPlanTab steps={packingPlan?.loadSteps ?? []} items={items} onRetry={retry} failed={failed} />
+          <LoadPlanTab
+            steps={packingPlan?.loadSteps ?? []}
+            items={items}
+            truckSize={recommendation.size}
+            onRetry={retry}
+            failed={failed}
+          />
         )}
       </ScrollView>
 
@@ -174,11 +182,14 @@ function groupIdentical(
 function LoadPlanTab({
   steps,
   items,
+  truckSize,
   onRetry,
   failed,
 }: {
   steps: LoadStep[];
   items: InventoryItem[];
+  /** Drives the bed proportions in each step's diagram. */
+  truckSize: TruckSize;
   onRetry: () => void;
   failed: boolean;
 }) {
@@ -208,6 +219,23 @@ function LoadPlanTab({
             <Text style={styles.stepTitle}>{step.title}</Text>
           </View>
           <Text style={styles.stepInstruction}>{step.instruction}</Text>
+          {/* Where this step goes, not how the whole truck divides. Scanning a
+              five-colour chart for your colour is work the diagram should do. */}
+          <View
+            style={styles.zoneMap}
+            accessibilityRole="image"
+            {...(Platform.OS === 'web'
+              ? { 'aria-label': zoneAriaLabel(items, truckSize, step.order as LoadStepOrder) }
+              : {
+                  accessible: true,
+                  accessibilityLabel: zoneAriaLabel(items, truckSize, step.order as LoadStepOrder),
+                })}
+          >
+            <SvgXml
+              xml={renderZoneSVG(items, truckSize, step.order as LoadStepOrder)}
+              override={{ width: '100%', height: '100%' }}
+            />
+          </View>
           <View style={styles.stepItems}>
             {groupIdentical(step.itemIds, byId).map(({ item, count, key }) => {
               const guidance = guidanceFor(item);
@@ -294,6 +322,7 @@ const styles = StyleSheet.create({
   },
   stepNumberText: { ...type.caption, fontWeight: '700', color: colors.accentText },
   stepTitle: { ...type.heading, color: colors.text },
+  zoneMap: { height: 96, marginTop: space.sm, marginBottom: space.xs },
   stepInstruction: { ...type.caption, color: colors.textMuted, lineHeight: 20 },
   stepItems: { gap: space.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.md },
   stepItemBlock: { gap: 2 },
