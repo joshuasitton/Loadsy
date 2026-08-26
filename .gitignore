@@ -11,3 +11,9 @@ android/
 
 expo-env.d.ts
 # @end expo-cli
+# Real eval photos and their tape-measured ground truth stay local — they are
+# pictures of somebody's home.
+eval-photos/*.jpg
+eval-photos/*.jpeg
+eval-photos/*.png
+eval-photos/truth.json
