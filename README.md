@@ -39,6 +39,41 @@ npx expo install --fix
 
 The app runs entirely on mocked API responses out of the box — no backend needed.
 
+### The backend
+
+One endpoint, `app/v1/detect+api.ts`, deployed with the app itself.
+
+It exists for exactly one reason: the vision model's API key must never reach the
+device. Everything else Loadsy computes runs on the client because it can —
+volumes, truck sizing, prices and the packing plan are all pure functions of the
+inventory. A key is the only thing that cannot ship, so it is the whole backend.
+
+```bash
+npx eas-cli@latest deploy
+```
+
+Set the key as an EAS environment secret — **never** as an `EXPO_PUBLIC_` variable,
+which is bundled into the app in plaintext:
+
+```bash
+npx eas-cli@latest env:create --name VISION_API_KEY --scope project --visibility secret
+```
+
+Then point the app at the deployment and turn the mocks off:
+
+```bash
+npx eas-cli@latest env:create --name EXPO_PUBLIC_API_BASE_URL --value https://your-deployment.expo.app
+```
+
+`EXPO_PUBLIC_USE_MOCKS` is pinned to `true` on every build profile in `eas.json`.
+Remove it from `production` when the endpoint is live, or the store build will
+quietly serve the mock furniture catalogue.
+
+**Privacy.** The route is a strict pass-through: the image is forwarded, the result
+returned, and neither is written to disk or into a log. That is what keeps the
+"Data Not Collected" answer in `APP_STORE.md` true. If retention is ever added, the
+privacy label has to change with it.
+
 ### Building for a device without Xcode
 
 This machine has only the Command Line Tools, so `expo run:ios` and the simulator

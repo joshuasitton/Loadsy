@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
+import { prepareUpload } from '../src/media/prepareUpload';
 import { resolveRoomId } from '../src/domain/rooms';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
@@ -99,9 +100,10 @@ export default function CaptureScreen() {
       const options: ImagePicker.ImagePickerOptions = {
         quality: 0.7,
         exif: false,
-        // The Vision agent in §4.1 is sent the image itself, so the picker has to
-        // decode it. Without this, imageData posts as an empty string.
-        base64: true,
+        // base64 is NOT requested here. prepareUpload produces the bytes that get
+        // sent, at a fraction of the size; asking the picker to decode the
+        // full-resolution frame as well would be several megabytes of string
+        // built only to be thrown away.
       };
       const result =
         source === 'camera'
@@ -111,10 +113,18 @@ export default function CaptureScreen() {
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
 
-      // An undecoded image would post as an empty string, the detector would find
-      // nothing, and assessPhoto would blame the user's framing for a failure that
-      // happened on this device. Fail honestly instead.
-      if (!asset.base64) {
+      setBusy(true);
+      const photoId = `photo-${Date.now()}`;
+
+      // Resized before anything else touches it. A full-resolution upload costs the
+      // user's data on moving week and buys the detector nothing.
+      const upload = await prepareUpload(asset.uri, asset.width, asset.height);
+      if (!mounted.current) return;
+
+      // A failure here would otherwise post an empty image, the detector would find
+      // nothing, and assessPhoto would blame the user's framing for something that
+      // went wrong on this device. Fail honestly instead.
+      if (!upload) {
         setRejection({
           ok: false,
           code: 'tooSmall',
@@ -125,9 +135,6 @@ export default function CaptureScreen() {
         });
         return;
       }
-
-      setBusy(true);
-      const photoId = `photo-${Date.now()}`;
 
       // Spec §3 Screen 1 edge case: gate the photo before it can produce an inventory.
       const signals: PhotoQualitySignals = {
@@ -157,7 +164,7 @@ export default function CaptureScreen() {
         photoId,
         roomId,
         roomName: trimmedName,
-        imageData: asset.base64,
+        imageData: upload.base64,
       });
       if (!mounted.current) return;
 
