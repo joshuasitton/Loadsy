@@ -1,10 +1,13 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { TRUCK_LABEL } from '../src/domain/truck';
+import type { InventoryItem } from '../src/domain/types';
 import { allItems } from '../src/domain/volume';
+import { guidanceFor } from '../src/domain/itemGuidance';
+import { buildLoadSteps, type LoadStepOrder } from '../src/domain/packing';
 import {
   computeZones,
   renderTruckMapSVG,
@@ -23,6 +26,8 @@ export default function LayoutViewScreen() {
   const { move, packingPlan, recommendation } = useMove();
   const [view, setView] = useState<TruckView>('top');
   const [saved, setSaved] = useState(false);
+  /** The zone the user has opened. Null until they ask — the diagram reads fine closed. */
+  const [openStep, setOpenStep] = useState<LoadStepOrder | null>(null);
   // Rendered inline rather than raised through Alert: react-native-web ships Alert
   // as an empty function, so an alert here is invisible in the browser preview.
   const [problem, setProblem] = useState<{ title: string; message: string } | null>(null);
@@ -177,6 +182,67 @@ export default function LayoutViewScreen() {
         </View>
 
         <Card style={styles.diagramCard}>
+          {view === 'top' ? (
+            /*
+             * Laid out with flex rather than the SVG, so each zone is a real
+             * pressable with its own hit area and accessibility node. Overlaying
+             * touch targets on a scaled viewBox would mean re-deriving the
+             * renderer's coordinates here and keeping them in step — the flex
+             * weights ARE the fractions, so there is nothing to drift.
+             */
+            <View>
+              <View style={styles.stripHeader}>
+                <Text style={styles.stripEnd}>← loaded first</Text>
+                <Text style={styles.stripEnd}>door →</Text>
+              </View>
+              <View style={styles.strip}>
+                <View style={styles.cab}>
+                  <Text style={styles.cabText}>CAB</Text>
+                </View>
+                {zones.map((zone) => {
+                  const open = openStep === zone.step;
+                  return (
+                    <Pressable
+                      key={zone.step}
+                      onPress={() => setOpenStep(open ? null : zone.step)}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: open }}
+                      accessibilityLabel={`${zone.label}, ${zone.cubicFeet} cubic feet, ${Math.round(zone.fraction * 100)} percent of the load`}
+                      accessibilityHint="Shows how to load this part of the truck"
+                      // Vertical only. A small zone is a genuinely small target —
+                      // 2% of a load is ~11px — and widening it horizontally would
+                      // overlap its neighbours, turning a miss into a WRONG answer
+                      // rather than no answer. Widening the visual would be worse
+                      // still: the proportions are the information. The legend rows
+                      // below are full-width and drive the same state, which is the
+                      // reliable path to the narrow zones.
+                      hitSlop={{ top: 14, bottom: 14, left: 0, right: 0 }}
+                      style={[
+                        styles.zone,
+                        {
+                          flex: zone.fraction,
+                          backgroundColor: zone.color,
+                          opacity: openStep === null || open ? 0.92 : 0.34,
+                        },
+                        open && styles.zoneOpen,
+                      ]}
+                    >
+                      {zone.fraction > 0.12 ? (
+                        <Text style={styles.zoneLabel} numberOfLines={1}>
+                          {zone.label}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.stripHint}>
+                {openStep === null
+                  ? 'Tap a section — or a row below — to see how to load it'
+                  : 'Tap it again to close'}
+              </Text>
+            </View>
+          ) : (
           <View style={styles.diagram}>
             <SvgXml
               xml={svg}
@@ -187,11 +253,25 @@ export default function LayoutViewScreen() {
               override={{ width: '100%', height: '100%', ...a11y }}
             />
           </View>
+          )}
         </Card>
+
+        {openStep !== null ? <ZoneDetail step={openStep} items={items} /> : null}
 
         <Card style={styles.legend}>
           {zones.map((zone) => (
-            <View key={zone.step} style={styles.legendRow}>
+            <Pressable
+              key={zone.step}
+              onPress={() => setOpenStep(openStep === zone.step ? null : zone.step)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: openStep === zone.step }}
+              // Named explicitly: turning the row into a button stops its child Text
+              // being read as the control's name, so without this it announces as an
+              // unlabelled button — worse than the plain row it replaced.
+              accessibilityLabel={`Step ${zone.step}, ${zone.label}, ${zone.cubicFeet} cubic feet, ${Math.round(zone.fraction * 100)} percent of the load`}
+              accessibilityHint="Shows how to load this part of the truck"
+              style={styles.legendRow}
+            >
               <View style={[styles.legendDot, { backgroundColor: zone.color }]} />
               <Text style={styles.legendLabel}>
                 {zone.step}. {zone.label}
@@ -199,7 +279,7 @@ export default function LayoutViewScreen() {
               <Text style={styles.legendValue}>
                 {zone.cubicFeet} ft³ · {Math.round(zone.fraction * 100)}%
               </Text>
-            </View>
+            </Pressable>
           ))}
         </Card>
 
@@ -238,6 +318,29 @@ const styles = StyleSheet.create({
   subtitleDim: { ...type.caption, color: colors.textDim },
   tabs: { flexDirection: 'row', gap: space.sm },
   diagramCard: { padding: space.sm, backgroundColor: colors.surfaceRaised },
+  stripHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  stripEnd: { ...type.caption, color: colors.textDim, fontSize: 11 },
+  strip: { flexDirection: 'row', height: 86, gap: 2 },
+  cab: {
+    width: 34,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  cabText: { ...type.caption, color: colors.textDim, fontSize: 9 },
+  zone: { justifyContent: 'center', alignItems: 'center', minWidth: 6, borderRadius: 2 },
+  zoneOpen: { borderWidth: 2, borderColor: colors.text },
+  zoneLabel: { ...type.caption, color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
+  stripHint: { ...type.caption, color: colors.textDim, fontSize: 11, marginTop: 6 },
+  detail: { gap: space.xs },
+  detailTitle: { ...type.heading, color: colors.text },
+  detailInstruction: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
+  detailItem: { gap: 2, paddingTop: space.sm },
+  detailItemName: { ...type.caption, color: colors.text },
+  detailItemGuidance: { ...type.caption, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  detailItemCaution: { ...type.caption, color: colors.amber, fontSize: 12, lineHeight: 17 },
   diagram: { height: 210, borderRadius: radius.sm, overflow: 'hidden' },
   legend: { gap: space.md },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
@@ -247,3 +350,46 @@ const styles = StyleSheet.create({
   caveat: { ...type.caption, color: colors.textDim, lineHeight: 18 },
   actions: { gap: space.md },
 });
+
+/**
+ * What actually goes in the zone the user just tapped.
+ *
+ * The diagram says where a group sits; this says what is in it and how each piece
+ * travels. Derived from buildLoadSteps rather than the stored plan so it is right
+ * even before a plan has been fetched — the load order is a pure function of the
+ * inventory, and re-deriving it costs nothing next to a network round trip.
+ */
+function ZoneDetail({ step, items }: { step: LoadStepOrder; items: InventoryItem[] }) {
+  const loadStep = buildLoadSteps(items).find((entry) => entry.order === step);
+  if (!loadStep) return null;
+  const byId = new Map(items.map((item) => [item.id, item]));
+
+  return (
+    <Card style={styles.detail}>
+      <Text style={styles.detailTitle}>
+        {loadStep.order}. {loadStep.title}
+      </Text>
+      <Text style={styles.detailInstruction}>{loadStep.instruction}</Text>
+      {loadStep.itemIds.map((id) => {
+        const item = byId.get(id);
+        if (!item) return null;
+        const guidance = guidanceFor(item);
+        return (
+          <View key={id} style={styles.detailItem}>
+            <Text style={styles.detailItemName}>
+              {item.name} · {item.cubicFeet} ft³
+            </Text>
+            {guidance ? (
+              <>
+                <Text style={styles.detailItemGuidance}>{guidance.orientation}</Text>
+                {guidance.caution ? (
+                  <Text style={styles.detailItemCaution}>{guidance.caution}</Text>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        );
+      })}
+    </Card>
+  );
+}
