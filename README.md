@@ -93,6 +93,37 @@ Testers get the loop closed: the login screen resets the demo and starts a
 walkthrough with any scenario in one tap, and the demo bar on the dashboard signs
 back out.
 
+### Moving through the flow
+
+The four working screens — Inventory, Truck Size, Local Prices, Packing Plan —
+are one ordered list in `src/domain/flow.ts`, and `StepNav` derives both
+directions from it. Back and forward therefore cannot disagree about what follows
+what; `__tests__/flow.test.ts` asserts they are inverses.
+
+Forward navigates with `replace`, not `push`. These are steps in one flow rather
+than a stack of pages, so walking forward and back a few times should not build a
+history the user then has to unwind.
+
+### Where the move starts and ends
+
+`src/domain/trip.ts` turns an origin ZIP, an optional destination ZIP and an
+optional user-entered mileage into the trip a quote is built from. Two things
+depend on it, and both change the ranking rather than only the totals:
+
+- **The one-way drop fee** applies only when the truck is left somewhere else.
+  Every quote used to carry it, so a local move was priced $50–75 high — and
+  since the fee differs by vendor, the cheapest truck for driving across town was
+  being decided partly by a fee for not driving across town.
+- **Mileage and fuel** scale with distance and dominate the base rate on a long
+  move. Deriving them from the origin ZIP alone, as Loadsy used to, priced every
+  trip as if it were across town.
+
+`estimateTripMiles` is an openly-labelled stand-in — real road miles need a
+geocoder and a routing service, and there is neither yet. It leans long rather
+than short, because under-stating distance under-states exactly the lines that
+decide a long-haul comparison. That is also why the figure is editable and why
+the screen asks the user to check it above 400 miles.
+
 ### The backend
 
 One endpoint, `app/v1/detect+api.ts`, deployed with the app itself.

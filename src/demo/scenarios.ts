@@ -47,6 +47,11 @@ export interface DemoScenario {
   /** One line under the label — what this move is, in plain words. */
   blurb: string;
   originZip: string;
+  /**
+   * Where the move ends. Null on the smaller scenarios so the local case — the
+   * one where a one-way fee must NOT be charged — is what most of them show.
+   */
+  destinationZip: string | null;
   rooms: RoomTemplate[];
 }
 
@@ -64,6 +69,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     label: 'Studio',
     blurb: 'One room and a kitchenette — the smallest move worth a truck',
     originZip: '78704',
+    destinationZip: null,
     rooms: [
       {
         name: 'Main Room',
@@ -104,6 +110,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     label: '1-Bedroom',
     blurb: 'The most common apartment move in the country',
     originZip: '78704',
+    destinationZip: null,
     rooms: [
       {
         name: 'Living Room',
@@ -156,6 +163,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     label: '2-Bedroom',
     blurb: 'Two bedrooms, a desk in the spare room, and no garage photographed',
     originZip: '78704',
+    destinationZip: '78745',
     rooms: [
       {
         name: 'Living Room',
@@ -214,6 +222,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     label: '3-Bed House',
     blurb: 'A full house — the move where getting the truck wrong really hurts',
     originZip: '78704',
+    destinationZip: '75201',
     rooms: [
       {
         name: 'Living Room',
@@ -321,7 +330,8 @@ export function buildDemoMove(scenario: DemoScenario): Move {
     // Overwritten by the store's withRecommendation on load. Never trusted from here.
     recommendedTruckSize: 'van',
     originZip: scenario.originZip,
-    destinationZip: null,
+    destinationZip: scenario.destinationZip,
+    tripMiles: null,
     moveDate: null,
     // Deliberately the first step. A scenario supplies the inventory and stops —
     // walking forward through sizing and the load plan is the demo, and starting

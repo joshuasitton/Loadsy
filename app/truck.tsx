@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +9,9 @@ import {
 } from '../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../src/domain/types';
 import { useMove } from '../src/state/moveStore';
-import { Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
+import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
+import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 3 — Truck Recommendation. */
 
@@ -24,7 +24,6 @@ const SIZE_GUIDE = [
 ];
 
 export default function TruckScreen() {
-  const router = useRouter();
   const { move, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
   // Preview only. Spec §3 Screen 3: tapping a chip must NOT change the recommendation.
@@ -127,13 +126,12 @@ export default function TruckScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
-        <PrimaryButton
-          title="See local prices"
-          onPress={() => {
-            dispatch({ type: 'setStatus', status: 'truckAndPrice' });
-            router.push('/prices');
-          }}
-          disabled={move.rooms.length === 0}
+        <StepNav
+          current="/truck"
+          blockedReason={
+            move.rooms.length === 0 ? 'Add a room before looking up prices' : null
+          }
+          onAdvance={() => dispatch({ type: 'setStatus', status: 'truckAndPrice' })}
         />
       </View>
 

@@ -1,5 +1,6 @@
 import type { RentalQuote, RentalVendor, TruckSize } from '../../domain/types';
 import { VENDOR_SEARCH_URL } from '../../domain/quotes';
+import type { Trip } from '../../domain/trip';
 
 /**
  * Deterministic mock quotes standing in for the Rental Data Agent (spec §4.2).
@@ -80,18 +81,26 @@ const VENDOR_PROFILES: VendorProfile[] = [
 
 export function mockQuotes(
   truckSize: TruckSize,
-  originZip: string,
+  trip: Trip,
   isoDate: string,
-  distanceMiles = estimateDistance(originZip),
 ): RentalQuote[] {
   const requested = Date.parse(`${isoDate.slice(0, 10)}T09:00:00.000Z`);
+  const distanceMiles = trip.distanceMiles;
 
   return VENDOR_PROFILES.map((profile) => {
     const baseRate = round2(profile.baseRate[truckSize]);
     const estimatedMileageFee = round2(distanceMiles * profile.perMile);
     const estimatedFuelFee = round2((distanceMiles / MPG_BY_SIZE[truckSize]) * FUEL_PRICE_PER_GALLON);
     const estimatedInsuranceFee = round2(profile.insurance);
-    const oneWayFee = round2(profile.oneWayFee);
+    /**
+     * Only on a one-way move. Vendors charge this for dropping the truck
+     * somewhere other than where it was collected, and it was previously added
+     * to every quote — so a local move carried $50-75 that would never appear on
+     * the bill. It is not uniform across vendors either, so it moved the ranking
+     * and not merely the totals: the cheapest truck for driving across town was
+     * being decided partly by a fee for not driving across town.
+     */
+    const oneWayFee = trip.kind === 'oneWay' ? round2(profile.oneWayFee) : 0;
     const taxable = baseRate + estimatedMileageFee + estimatedInsuranceFee + oneWayFee;
     const taxesAndFees = round2(taxable * profile.taxRate);
 
@@ -119,12 +128,6 @@ export function mockQuotes(
       isEstimate: true,
     } satisfies RentalQuote;
   });
-}
-
-/** Stand-in for a real distance lookup; stable per zip so mocks stay deterministic. */
-function estimateDistance(originZip: string): number {
-  const digits = originZip.replace(/\D/g, '').slice(-3);
-  return 40 + (Number(digits || '0') % 120);
 }
 
 function round2(n: number): number {

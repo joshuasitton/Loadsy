@@ -22,6 +22,13 @@ import {
   type QuoteFilter,
 } from '../src/domain/quotes';
 import type { RentalQuote } from '../src/domain/types';
+import {
+  buildTrip,
+  describeTrip,
+  estimateTripMiles,
+  isValidZip,
+  LONG_HAUL_MILES,
+} from '../src/domain/trip';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { getDeviceZip, hasLocationPermission } from '../src/location/deviceZip';
 import { useMove } from '../src/state/moveStore';
@@ -36,6 +43,7 @@ import {
   SectionLabel,
 } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
+import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 4 — Local Prices. */
 
@@ -46,6 +54,14 @@ export default function PricesScreen() {
   const { move, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
   const [zipDraft, setZipDraft] = useState(move.originZip);
+  const [destinationDraft, setDestinationDraft] = useState(move.destinationZip ?? '');
+  /**
+   * Blank means "use the estimate". Kept as text rather than a number so a
+   * half-typed "12" is not read as twelve miles and requoted on every keystroke.
+   */
+  const [milesDraft, setMilesDraft] = useState(
+    move.tripMiles === null ? '' : String(move.tripMiles),
+  );
   /**
    * Forces the ZIP card back open after one has been set.
    *
@@ -114,7 +130,16 @@ export default function PricesScreen() {
   // Must be memoised. `new Date()` on every render would give the effect below a
   // new date every render, and it would refetch forever.
   const isoDate = useMemo(() => move.moveDate ?? new Date().toISOString(), [move.moveDate]);
-  const requestKey = `${recommendation.size}|${zip}|${isoDate}`;
+
+  const trip = useMemo(() => buildTrip(move), [move]);
+  /**
+   * Every input the quotes depend on. The destination and the mileage belong in
+   * here as much as the origin does: changing either changes the mileage line,
+   * the fuel line and — for a one-way — which vendors charge a drop fee at all.
+   * Left out, the screen would keep showing the previous trip's prices under the
+   * new trip's heading.
+   */
+  const requestKey = `${recommendation.size}|${zip}|${trip.destinationZip ?? '-'}|${trip.kind}|${trip.distanceMiles}|${isoDate}`;
 
   // Tagging the result means a stale one stops counting the instant the zip, date
   // or truck size changes, rather than showing prices for the previous query.
@@ -128,7 +153,7 @@ export default function PricesScreen() {
   useEffect(() => {
     if (zip.length < 5) return;
     let cancelled = false;
-    fetchQuotes(recommendation.size, zip, isoDate)
+    fetchQuotes(recommendation.size, trip, isoDate)
       .then((next) => {
         if (!cancelled) setResult({ key: requestKey, quotes: next, failed: false });
       })
@@ -139,7 +164,7 @@ export default function PricesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [requestKey, attempt, zip, isoDate, recommendation.size]);
+  }, [requestKey, attempt, zip, isoDate, recommendation.size, trip]);
 
   const retry = useCallback(() => {
     // An event handler, not an effect — setting state here is exactly right.
@@ -164,6 +189,13 @@ export default function PricesScreen() {
       Alert.alert("Couldn't open the vendor page", 'Check your connection and try again.');
     }
   }
+
+  // Computed from the DRAFTS, not the saved move: this card is showing what the
+  // user is typing, and a suggestion that lags a field behind is worse than none.
+  const draftKind = isValidZip(destinationDraft) && destinationDraft !== zipDraft ? 'oneWay' : 'local';
+  const draftMilesPlaceholder = isValidZip(zipDraft)
+    ? estimateTripMiles(zipDraft, isValidZip(destinationDraft) ? destinationDraft : null)
+    : null;
 
   if (zip.length < 5 || editingZip) {
     return (
@@ -194,11 +226,58 @@ export default function PricesScreen() {
               accessibilityLabel="Fill in my ZIP code from my current location"
             />
             {locationNote ? <Text style={styles.zipNote}>{locationNote}</Text> : null}
+
+            <SectionLabel>AND WHERE TO?</SectionLabel>
+            <Text style={styles.zipBody}>
+              Leave this blank for a local move. It decides two things that change the
+              ranking, not just the totals: how far the truck is metered, and whether
+              vendors add a one-way drop fee at all.
+            </Text>
+            <TextInput
+              value={destinationDraft}
+              onChangeText={(v) => setDestinationDraft(v.replace(/\D/g, '').slice(0, 5))}
+              keyboardType="number-pad"
+              placeholder="Same town"
+              placeholderTextColor={colors.textDim}
+              style={styles.zipInput}
+              accessibilityLabel="Destination ZIP code, optional"
+              maxLength={5}
+            />
+
+            <SectionLabel>HOW FAR IS THE DRIVE?</SectionLabel>
+            <Text style={styles.zipBody}>
+              {draftMilesPlaceholder === null
+                ? 'Enter both ZIPs and Loadsy will suggest a distance.'
+                : `Blank uses about ${draftMilesPlaceholder} miles${
+                    draftKind === 'local' ? ' for the round trip' : ''
+                  } — a rough guess from your ZIPs, not a route. If you know the real figure, it is worth typing: mileage and fuel are what separate the vendors on a long move.`}
+            </Text>
+            <TextInput
+              value={milesDraft}
+              onChangeText={(v) => setMilesDraft(v.replace(/\D/g, '').slice(0, 4))}
+              keyboardType="number-pad"
+              placeholder={draftMilesPlaceholder === null ? 'Miles' : String(draftMilesPlaceholder)}
+              placeholderTextColor={colors.textDim}
+              style={styles.zipInput}
+              accessibilityLabel="Distance in miles, optional"
+              maxLength={4}
+            />
+
             <PrimaryButton
-              title="Find local prices"
+              title="Compare local prices"
               disabled={zipDraft.length < 5}
               onPress={() => {
                 dispatch({ type: 'setOriginZip', zip: zipDraft });
+                dispatch({
+                  type: 'setDestinationZip',
+                  zip: isValidZip(destinationDraft) ? destinationDraft : null,
+                });
+                // Blank means "keep using the estimate", which is null rather
+                // than zero — zero would be a claim that the truck does not move.
+                dispatch({
+                  type: 'setTripMiles',
+                  miles: milesDraft.trim() === '' ? null : Number(milesDraft),
+                });
                 setEditingZip(false);
               }}
             />
@@ -229,15 +308,25 @@ export default function PricesScreen() {
             <Pressable
               onPress={() => {
                 setZipDraft(zip);
+                setDestinationDraft(move.destinationZip ?? '');
+                setMilesDraft(move.tripMiles === null ? '' : String(move.tripMiles));
                 setEditingZip(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Change origin ZIP code, currently ${zip}`}
+              accessibilityLabel={`Change the trip. Currently ${describeTrip(trip)}`}
               hitSlop={8}
             >
               <Text style={styles.headerChange}>Change</Text>
             </Pressable>
           </View>
+          <Text style={styles.headerSubtitle}>{describeTrip(trip)}</Text>
+          {trip.isEstimated && trip.distanceMiles >= LONG_HAUL_MILES ? (
+            <Text style={styles.headerWarn}>
+              That distance is a guess from your ZIP codes. On a drive this long, mileage
+              and fuel decide which vendor is cheapest — tap Change and enter the real
+              figure before you trust the ranking.
+            </Text>
+          ) : null}
           <Text style={styles.headerSubtitle}>
             Every price below is an estimate. The vendor confirms the exact total at booking.
           </Text>
@@ -282,12 +371,9 @@ export default function PricesScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
-        <PrimaryButton
-          title="Build my packing plan"
-          onPress={() => {
-            dispatch({ type: 'setStatus', status: 'packingPlan' });
-            router.push('/packing');
-          }}
+        <StepNav
+          current="/prices"
+          onAdvance={() => dispatch({ type: 'setStatus', status: 'packingPlan' })}
         />
       </View>
     </Screen>
@@ -304,29 +390,43 @@ function QuoteCard({
   onViewDeal: () => void;
 }) {
   const available = new Date(quote.earliestAvailability);
+  /*
+   * The card is a plain container with two controls inside it, not one control
+   * containing another.
+   *
+   * It used to be pressable itself, with the View Deal button nested inside — two
+   * <button> elements one inside the other on web. React reported it as a
+   * hydration error on every render of this screen, and it is a real defect
+   * rather than a lint nicety: a screen reader announces one control where there
+   * are two, keyboard focus lands somewhere ambiguous, and a tap near the button
+   * edge is a coin flip between reading a breakdown and leaving for a vendor site.
+   */
   return (
-    <Card
-      onPress={onOpenBreakdown}
-      accessibilityLabel={`${VENDOR_LABEL[quote.vendor]}, estimated total ${formatUSD(quote.estimatedTotal)}. Tap for the full price breakdown.`}
-      style={styles.quoteCard}
-    >
-      <View style={styles.quoteTop}>
-        <View style={styles.quoteVendorBlock}>
-          <Text style={styles.quoteVendor}>{VENDOR_LABEL[quote.vendor]}</Text>
-          <Text style={styles.quoteMeta}>
-            Available {available.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ·{' '}
-            {Math.round(quote.distanceMiles)} mi
-          </Text>
+    <Card style={styles.quoteCard}>
+      <Pressable
+        onPress={onOpenBreakdown}
+        accessibilityRole="button"
+        accessibilityLabel={`${VENDOR_LABEL[quote.vendor]}, estimated total ${formatUSD(quote.estimatedTotal)}. Tap for the full price breakdown.`}
+        style={({ pressed }) => [styles.quoteSummary, pressed && styles.quotePressed]}
+      >
+        <View style={styles.quoteTop}>
+          <View style={styles.quoteVendorBlock}>
+            <Text style={styles.quoteVendor}>{VENDOR_LABEL[quote.vendor]}</Text>
+            <Text style={styles.quoteMeta}>
+              Available {available.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ·{' '}
+              {Math.round(quote.distanceMiles)} mi
+            </Text>
+          </View>
+          <View style={styles.quotePriceBlock}>
+            <Text style={styles.quotePrice}>{formatUSD(quote.estimatedTotal)}</Text>
+            <EstimateTag compact />
+          </View>
         </View>
-        <View style={styles.quotePriceBlock}>
-          <Text style={styles.quotePrice}>{formatUSD(quote.estimatedTotal)}</Text>
-          <EstimateTag compact />
-        </View>
-      </View>
 
-      <Text style={styles.quoteBreakdownHint}>
-        {formatUSD(quote.baseRate)} base + mileage, fuel and coverage · tap for the full breakdown
-      </Text>
+        <Text style={styles.quoteBreakdownHint}>
+          {formatUSD(quote.baseRate)} base + mileage, fuel and coverage · tap for the full breakdown
+        </Text>
+      </Pressable>
 
       <SecondaryButton
         title="View Deal"
@@ -382,6 +482,7 @@ const styles = StyleSheet.create({
   zipNote: { ...type.caption, color: colors.textMuted },
   headerTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   headerChange: { ...type.caption, color: colors.accent, textDecorationLine: 'underline' },
+  headerWarn: { ...type.caption, color: colors.amber, lineHeight: 19 },
   header: { gap: space.xs, marginTop: space.sm },
   headerTitle: { ...type.title, color: colors.text },
   headerSubtitle: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
@@ -389,6 +490,8 @@ const styles = StyleSheet.create({
   busy: { alignItems: 'center', gap: space.md, paddingVertical: space.xxl },
   busyText: { ...type.body, color: colors.textMuted },
   quoteCard: { gap: space.md },
+  quoteSummary: { gap: space.md },
+  quotePressed: { opacity: 0.7 },
   quoteTop: { flexDirection: 'row', justifyContent: 'space-between', gap: space.md },
   quoteVendorBlock: { flex: 1, gap: 2 },
   quoteVendor: { ...type.heading, color: colors.text },

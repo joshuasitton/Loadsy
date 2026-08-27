@@ -10,6 +10,7 @@ import { shouldPromptCoverage, uncoveredAreas } from '../src/domain/coverage';
 import { resolveRoomId } from '../src/domain/rooms';
 import { Banner, Card, Chip, Divider, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
+import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 2 — Inventory Review. */
 
@@ -33,9 +34,9 @@ export default function InventoryScreen() {
     [move.rooms, recommendation.rawCuFt],
   );
 
+  // StepNav owns the navigation; this is only the status change that goes with it.
   function advance() {
     dispatch({ type: 'setStatus', status: 'truckAndPrice' });
-    router.push('/truck');
   }
 
   return (
@@ -148,18 +149,16 @@ export default function InventoryScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
-        {!canAdvance && totals.items > 0 ? (
-          <Text style={styles.footerHint}>
-            {unresolved} {unresolved === 1 ? 'item still needs' : 'items still need'} a quick check
-          </Text>
-        ) : null}
-        <PrimaryButton
-          title="See my truck size"
-          onPress={advance}
-          disabled={!canAdvance}
-          accessibilityHint={
-            canAdvance ? undefined : 'Confirm the flagged items before continuing'
+        <StepNav
+          current="/inventory"
+          blockedReason={
+            canAdvance
+              ? null
+              : totals.items === 0
+                ? 'Add at least one item before sizing a truck'
+                : `${unresolved} ${unresolved === 1 ? 'item still needs' : 'items still need'} a quick check`
           }
+          onAdvance={advance}
         />
       </View>
 

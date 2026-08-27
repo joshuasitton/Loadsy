@@ -20,6 +20,7 @@ import type {
 import { buildPackingPlan } from '../domain/packingPlan';
 import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
+import { normaliseMiles } from '../domain/trip';
 import { allItems, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const STORAGE_KEY = 'loadsy.move.v1';
@@ -58,6 +59,7 @@ type Action =
   | { type: 'setBuffer'; pct: number }
   | { type: 'setOriginZip'; zip: string }
   | { type: 'setDestinationZip'; zip: string | null }
+  | { type: 'setTripMiles'; miles: number | null }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
   /**
@@ -76,6 +78,7 @@ function newMove(): Move {
     recommendedTruckSize: 'van',
     originZip: '',
     destinationZip: null,
+    tripMiles: null,
     moveDate: null,
     status: 'inventory',
   };
@@ -185,6 +188,12 @@ function reducer(state: MoveState, action: Action): MoveState {
 
     case 'setDestinationZip':
       return { ...state, move: { ...state.move, destinationZip: action.zip } };
+
+    case 'setTripMiles':
+      // Normalised on the way in rather than at every read: a negative or
+      // non-finite mileage must never reach a quote, where it would produce a
+      // negative fuel line and a total that does not reconcile.
+      return { ...state, move: { ...state.move, tripMiles: normaliseMiles(action.miles) } };
 
     case 'setMoveDate':
       return { ...state, move: { ...state.move, moveDate: action.iso } };

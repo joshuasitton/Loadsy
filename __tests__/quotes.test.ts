@@ -13,7 +13,8 @@ import {
 } from '../src/domain/quotes';
 import { mockQuotes } from '../src/api/mocks/quotes';
 import { TRUCK_SIZES } from '../src/domain/types';
-import { makeQuote, resetIds } from './helpers';
+import { buildTrip, type Trip } from '../src/domain/trip';
+import { makeMove, makeQuote, resetIds } from './helpers';
 
 /** Reads a rendered money string back as a number, the way a user adding up a column does. */
 function readMoney(rendered: string): number {
@@ -22,6 +23,11 @@ function readMoney(rendered: string): number {
 
 const SWEEP_ZIPS = ['94110', '20147', '10001', '90210', '60601'];
 
+/** The sweep runs over origins, so each one becomes an ordinary local trip. */
+function localTrip(originZip: string): Trip {
+  return buildTrip({ ...makeMove([]), originZip, destinationZip: null, tripMiles: null });
+}
+
 test('the breakdown a user can add up reconciles with the total shown above it', () => {
   // totalMatchesLineItems runs at cent precision, so it cannot see a discrepancy
   // that exists only in the rendering. This asserts the DISPLAYED numbers, which
@@ -29,7 +35,7 @@ test('the breakdown a user can add up reconciles with the total shown above it',
   let checked = 0;
   for (const size of TRUCK_SIZES) {
     for (const zip of SWEEP_ZIPS) {
-      for (const quote of mockQuotes(size, zip, '2026-09-12T00:00:00.000Z')) {
+      for (const quote of mockQuotes(size, localTrip(zip), '2026-09-12T00:00:00.000Z')) {
         const shownLines = QUOTE_LINE_ITEM_KEYS.filter((key) => quote[key] != null).map((key) =>
           readMoney(formatUSDPrecise(quote[key] ?? 0)),
         );
@@ -52,7 +58,7 @@ test('whole-dollar formatting is why the breakdown may not use it', () => {
   // mismatch, formatUSD became safe for itemised surfaces and the split can go.
   const offenders = TRUCK_SIZES.flatMap((size) =>
     SWEEP_ZIPS.flatMap((zip) =>
-      mockQuotes(size, zip, '2026-09-12T00:00:00.000Z').filter((quote) => {
+      mockQuotes(size, localTrip(zip), '2026-09-12T00:00:00.000Z').filter((quote) => {
         const lines = QUOTE_LINE_ITEM_KEYS.filter((key) => quote[key] != null).map((key) =>
           readMoney(formatUSD(quote[key] ?? 0)),
         );
@@ -71,7 +77,7 @@ test('CONTRACT 4.2: estimatedTotal is reconstructable from its own line items', 
 });
 
 test('CONTRACT 4.2: the invariant holds for every mock quote the app ships with', () => {
-  const quotes = mockQuotes('20ft', '20147', '2026-09-01');
+  const quotes = mockQuotes('20ft', localTrip('20147'), '2026-09-01');
   assert.ok(quotes.length > 0, 'no mock quotes to assert against');
   for (const quote of quotes) {
     assert.ok(

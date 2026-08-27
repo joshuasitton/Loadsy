@@ -31,6 +31,7 @@ function emptyMove(): Move {
     recommendedTruckSize: 'van',
     originZip: '',
     destinationZip: null,
+    tripMiles: null,
     moveDate: null,
     status: 'inventory',
   };

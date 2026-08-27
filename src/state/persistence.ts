@@ -29,6 +29,7 @@ import type {
   WeightClass,
 } from '../domain/types';
 import { MOVE_STATUS_ORDER, TRUCK_SIZES } from '../domain/types';
+import { normaliseMiles } from '../domain/trip';
 import { clampBuffer, cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const CATEGORIES: readonly ItemCategory[] = ['furniture', 'box', 'appliance', 'fragile', 'other'];
@@ -235,6 +236,9 @@ export function parseStoredState(raw: string): ParsedState | null {
     recommendedTruckSize: oneOf<TruckSize>(storedMove.recommendedTruckSize, TRUCK_SIZES) ?? 'van',
     originZip: typeof storedMove.originZip === 'string' ? storedMove.originZip : '',
     destinationZip: nonEmptyString(storedMove.destinationZip),
+    // Through the same clamp the reducer uses, so a payload hand-edited to a
+    // negative or absurd mileage cannot do what a dispatch is prevented from doing.
+    tripMiles: normaliseMiles(finiteNumber(storedMove.tripMiles)),
     moveDate: nonEmptyString(storedMove.moveDate),
     status: status ?? 'inventory',
   };

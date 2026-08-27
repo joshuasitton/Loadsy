@@ -11,6 +11,7 @@ import { allItems, roomCubicFeet } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
 import { colors, space, type } from '../src/ui/theme';
+import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 5 — Packing Plan. Two tabs: Load Plan and By Room. */
 
@@ -74,6 +75,7 @@ export default function PackingScreen() {
           onPress={() => router.push('/layout-view')}
           disabled={!packingPlan}
         />
+        <StepNav current="/packing" />
       </View>
     </Screen>
   );

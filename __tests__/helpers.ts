@@ -44,6 +44,7 @@ export function makeMove(rooms: Room[], overrides: Partial<Move> = {}): Move {
     recommendedTruckSize: '15ft',
     originZip: '20147',
     destinationZip: null,
+    tripMiles: null,
     moveDate: null,
     status: 'inventory',
     ...overrides,

@@ -22,6 +22,15 @@ function respondWith(body: unknown, ok = true, status = 200) {
     Promise.resolve({ ok, status, json: () => Promise.resolve(body) } as Response);
 }
 
+/** An ordinary local trip: the live path only needs a well-formed one. */
+const LOCAL_TRIP = {
+  originZip: '20147',
+  destinationZip: null,
+  kind: 'local',
+  distanceMiles: 40,
+  isEstimated: true,
+} as const;
+
 const REQUEST = {
   roomId: 'room-1',
   roomName: 'Living Room',
@@ -59,6 +68,7 @@ test('a detected item with no cubicFeet cannot reach the truck recommendation', 
     recommendedTruckSize: 'van' as const,
     originZip: '94110',
     destinationZip: null,
+    tripMiles: null,
     moveDate: null,
     status: 'inventory' as const,
   };
@@ -138,7 +148,7 @@ test('quotes with NaN distance or an unreadable date never reach the price list'
     ],
   });
 
-  const quotes = await fetchQuotes('15ft', '20147', '2026-09-12T00:00:00.000Z');
+  const quotes = await fetchQuotes('15ft', LOCAL_TRIP, '2026-09-12T00:00:00.000Z');
   assert.deepEqual(quotes.map((q) => q.id), ['uhaul-15ft']);
   for (const quote of quotes) {
     assert.ok(Number.isFinite(quote.distanceMiles));
@@ -152,7 +162,7 @@ test('a 200 response that is not a quote list throws rather than reading as no c
   const { fetchQuotes } = await import('../src/api/rentals');
   respondWith({ error: 'rate limited' });
   await assert.rejects(
-    () => fetchQuotes('15ft', '20147', '2026-09-12T00:00:00.000Z'),
+    () => fetchQuotes('15ft', LOCAL_TRIP, '2026-09-12T00:00:00.000Z'),
     /no quote list/,
   );
 });

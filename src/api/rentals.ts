@@ -1,4 +1,5 @@
 import { TRUCK_SIZES, type RentalQuote, type TruckSize } from '../domain/types';
+import type { Trip } from '../domain/trip';
 import { totalMatchesLineItems, VENDOR_LABEL } from '../domain/quotes';
 import {
   isoDateString,
@@ -19,16 +20,26 @@ export interface QuotesResponse {
 
 export async function fetchQuotes(
   truckSize: TruckSize,
-  originZip: string,
+  trip: Trip,
   isoDate: string,
 ): Promise<RentalQuote[]> {
   let quotes: RentalQuote[];
   if (USE_MOCKS) {
-    quotes = await mockDelay(mockQuotes(truckSize, originZip, isoDate));
+    quotes = await mockDelay(mockQuotes(truckSize, trip, isoDate));
   } else {
-    const response = await apiFetch<unknown>(
-      `/v1/quotes?truckSize=${encodeURIComponent(truckSize)}&originZip=${encodeURIComponent(originZip)}&date=${encodeURIComponent(isoDate)}`,
-    );
+    // The destination and the mileage go up with the request, not just the
+    // origin. A vendor cannot price a one-way drop or a 300-mile haul from the
+    // pickup ZIP alone, and asking it to guess is how every quote came back
+    // priced for a trip across town.
+    const params = new URLSearchParams({
+      truckSize,
+      originZip: trip.originZip,
+      date: isoDate,
+      tripKind: trip.kind,
+      distanceMiles: String(trip.distanceMiles),
+    });
+    if (trip.destinationZip) params.set('destinationZip', trip.destinationZip);
+    const response = await apiFetch<unknown>(`/v1/quotes?${params.toString()}`);
     // A 200 shaped {"error":"rate limited"} made .quotes undefined and threw on
     // .filter below; the screen then reported it as "no rates for your ZIP".
     const raw = isRecord(response) && Array.isArray(response.quotes) ? response.quotes : null;

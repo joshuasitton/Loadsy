@@ -74,6 +74,12 @@ export interface Move {
   recommendedTruckSize: TruckSize;
   originZip: string;
   destinationZip: string | null;
+  /**
+   * Road miles for the move, as entered by the user. Null means "use the
+   * estimate" — see src/domain/trip.ts, which owns that fallback so no screen
+   * has to decide what an absent distance means.
+   */
+  tripMiles: number | null;
   /** ISO-8601 string; Date is not JSON-serialisable across the API boundary. */
   moveDate: string | null;
   status: MoveStatus;
