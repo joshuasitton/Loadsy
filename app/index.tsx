@@ -1,12 +1,15 @@
 import { Link, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { canLeaveInventory, confidenceBannerCopy, unresolvedCount } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
 import { DemoBar } from '../src/demo/DemoBar';
+import { useHistory } from '../src/state/historyStore';
 import { useMove } from '../src/state/moveStore';
 import { Card, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
+import { formatDateTime } from '../src/ui/format';
 import { colors, radius, space, type } from '../src/ui/theme';
 
 /** Screen 7 — My Move dashboard. 5-step progress tracker bound to MoveStatus. */
@@ -86,9 +89,23 @@ const ROWS: StepRow[] = [
 
 export default function MyMoveScreen() {
   const ctx = useMove();
+  const { history, complete } = useHistory();
   const router = useRouter();
   const currentIndex = MOVE_STATUS_ORDER.indexOf(ctx.move.status);
   const itemCount = allItems(ctx.move).length;
+
+  // Two taps rather than a system alert: finishing a move clears the inventory,
+  // and Alert.alert is a no-op on react-native-web, where this app's demo runs.
+  const [confirmingFinish, setConfirmingFinish] = useState(false);
+
+  async function finishMove() {
+    // Archive first, reset second. The other order would wipe the inventory and
+    // then try to summarise the empty move that replaced it.
+    await complete(ctx.move, ctx.recommendation.size);
+    ctx.dispatch({ type: 'reset' });
+    setConfirmingFinish(false);
+    router.push('/history');
+  }
 
   return (
     <Screen>
@@ -170,6 +187,83 @@ export default function MyMoveScreen() {
         <Link href="/inventory" style={styles.link}>
           <Text style={styles.linkText}>Or add items by hand →</Text>
         </Link>
+
+        <Card style={styles.keeping}>
+          <View style={styles.keepingHead}>
+            <Text style={styles.keepingTitle}>Progress saved</Text>
+            <Text style={styles.keepingWhen}>
+              {ctx.lastSavedAt ? formatDateTime(ctx.lastSavedAt) : 'Nothing to save yet'}
+            </Text>
+          </View>
+          <Text style={styles.keepingBody}>
+            Every change is written to this device as it happens. Close the app, come back
+            days later, and your rooms, items and plan are where you left them. There is no
+            account behind it yet, so it stays on this phone — and nobody else can see it.
+          </Text>
+
+          {/*
+            Surfaced, not swallowed. When storage cannot be read, the app runs on a
+            fresh move and deliberately does NOT write — otherwise a transient read
+            failure would overwrite an intact save. The user has to know that the
+            work in front of them is not being kept.
+          */}
+          {!ctx.persistable ? (
+            <Text style={styles.keepingWarn} accessibilityRole="alert">
+              Storage could not be read this launch, so nothing is being saved right now.
+              Anything you had saved before is untouched — reopen the app to try again.
+            </Text>
+          ) : null}
+
+          {itemCount > 0 ? (
+            confirmingFinish ? (
+              <View style={styles.confirmRow}>
+                <Pressable
+                  onPress={() => void finishMove()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Yes, file this move as complete"
+                  style={({ pressed }) => [styles.confirmYes, pressed && styles.pressed]}
+                >
+                  <Text style={styles.confirmYesText}>File it and start fresh</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setConfirmingFinish(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Keep working on this move"
+                  style={({ pressed }) => [styles.confirmNo, pressed && styles.pressed]}
+                >
+                  <Text style={styles.confirmNoText}>Not yet</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setConfirmingFinish(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Mark this move complete"
+                accessibilityHint="Files it under past moves and starts a new, empty move"
+                style={({ pressed }) => [styles.confirmNo, pressed && styles.pressed]}
+              >
+                <Text style={styles.confirmNoText}>Mark this move complete</Text>
+              </Pressable>
+            )
+          ) : null}
+
+          <Pressable
+            onPress={() => router.push('/history')}
+            accessibilityRole="button"
+            accessibilityLabel={
+              history.length === 0
+                ? 'Past moves. None yet'
+                : `Past moves. ${history.length} completed`
+            }
+            style={({ pressed }) => [styles.historyLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkText}>
+              {history.length === 0
+                ? 'Past moves →'
+                : `Past moves (${history.length}) →`}
+            </Text>
+          </Pressable>
+        </Card>
       </ScrollView>
     </Screen>
   );
@@ -218,4 +312,32 @@ const styles = StyleSheet.create({
   ctaBody: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   link: { alignSelf: 'center', paddingVertical: space.sm },
   linkText: { ...type.body, color: colors.accent },
+  keeping: { gap: space.md },
+  keepingHead: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  keepingTitle: { ...type.heading, color: colors.text, flex: 1 },
+  keepingWhen: { ...type.caption, color: colors.textMuted },
+  keepingBody: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
+  keepingWarn: { ...type.caption, color: colors.amber, lineHeight: 19 },
+  confirmRow: { flexDirection: 'row', gap: space.sm },
+  confirmYes: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentDim,
+    paddingVertical: space.md,
+  },
+  confirmYesText: { ...type.caption, color: colors.text, fontWeight: '600' },
+  confirmNo: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: space.md,
+  },
+  confirmNoText: { ...type.caption, color: colors.textMuted },
+  pressed: { opacity: 0.7 },
+  historyLink: { alignSelf: 'center', paddingVertical: space.xs },
 });

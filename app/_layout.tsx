@@ -5,7 +5,9 @@ import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth/authStore';
 import { DEMO_MODE } from '../src/demo/mode';
+import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
+import { SignOutButton } from '../src/ui/SignOutButton';
 import { colors } from '../src/ui/theme';
 
 /**
@@ -65,8 +67,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <MoveProvider>
-          <StatusBar style="light" />
-          <RootNavigator />
+          <HistoryProvider>
+            <StatusBar style="light" />
+            <RootNavigator />
+          </HistoryProvider>
         </MoveProvider>
       </AuthProvider>
     </SafeAreaProvider>
@@ -84,6 +88,10 @@ function RootNavigator() {
         headerTitleStyle: { fontWeight: '600' },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },
+        // Set once, for every screen with a header, so it cannot go missing from
+        // the one screen somebody happens to be stuck on. It renders nothing when
+        // signed out, so unauthenticated routes are unaffected.
+        headerRight: () => <SignOutButton />,
       }}
     >
       <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -94,6 +102,7 @@ function RootNavigator() {
       <Stack.Screen name="prices" options={{ title: 'Local Prices' }} />
       <Stack.Screen name="packing" options={{ title: 'Packing Plan' }} />
       <Stack.Screen name="layout-view" options={{ title: 'Truck Layout' }} />
+      <Stack.Screen name="history" options={{ title: 'Past Moves' }} />
       <Stack.Screen
         name="quote/[id]"
         options={{ title: 'Price Breakdown', presentation: 'modal' }}

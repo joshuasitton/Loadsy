@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type ReactNode,
 } from 'react';
 import type {
@@ -203,6 +204,8 @@ function reducer(state: MoveState, action: Action): MoveState {
 interface MoveContextValue extends MoveState {
   /** Derived from the inventory on every change. Null when there is nothing to load. */
   packingPlan: PackingPlan | null;
+  /** ISO-8601 of the last successful write to this device, or null if never. */
+  lastSavedAt: string | null;
   dispatch: React.Dispatch<Action>;
   recommendation: ReturnType<typeof buildRecommendation>;
   previewSize: (size: TruckSize) => void;
@@ -212,6 +215,15 @@ const MoveContext = createContext<MoveContextValue | null>(null);
 
 export function MoveProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  /**
+   * When the move was last written to this device, ISO-8601.
+   *
+   * Deliberately outside the reducer: it is a fact about storage, not about the
+   * move, and putting a timestamp in reducer state would make every action
+   * non-deterministic and untestable. It also must not be a dependency of the
+   * persist effect below, or writing it would schedule another write.
+   */
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,6 +250,7 @@ export function MoveProvider({ children }: { children: ReactNode }) {
         if (__DEV__ && parsed.repairs.length > 0) {
           console.warn('[loadsy] repaired stored move:', parsed.repairs.join('; '));
         }
+        setLastSavedAt(parsed.savedAt);
         dispatch({
           type: 'hydrate',
           // parsed.packingPlan is deliberately ignored. Plans are derived from the
@@ -259,12 +272,14 @@ export function MoveProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!state.hydrated || !state.persistable) return;
-    AsyncStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ move: state.move }),
-    ).catch(() => {
-      // Persistence is best-effort; losing it must never interrupt the user.
-    });
+    const savedAt = new Date().toISOString();
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ move: state.move, savedAt }))
+      .then(() => setLastSavedAt(savedAt))
+      .catch(() => {
+        // Persistence is best-effort; losing it must never interrupt the user.
+        // Leaving lastSavedAt on its previous value is the honest outcome: the
+        // last successful save really was the one it already names.
+      });
   }, [state.move, state.hydrated, state.persistable]);
 
   const recommendation = useMemo(() => buildRecommendation(state.move), [state.move]);
@@ -283,8 +298,8 @@ export function MoveProvider({ children }: { children: ReactNode }) {
   const previewSize = useCallback((_size: TruckSize) => {}, []);
 
   const value = useMemo(
-    () => ({ ...state, packingPlan, dispatch, recommendation, previewSize }),
-    [state, packingPlan, recommendation, previewSize],
+    () => ({ ...state, packingPlan, lastSavedAt, dispatch, recommendation, previewSize }),
+    [state, packingPlan, lastSavedAt, recommendation, previewSize],
   );
 
   return <MoveContext.Provider value={value}>{children}</MoveContext.Provider>;

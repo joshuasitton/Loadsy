@@ -140,3 +140,19 @@ test('a low-confidence item always arrives with a reason (contract 4.1)', () => 
   assert.equal(item?.confidence, 'low');
   assert.ok(item?.confidenceReason && item.confidenceReason.length > 0);
 });
+
+test('the save timestamp round-trips, and a missing one is not an error', () => {
+  // Only ever displayed. A payload written by a build that predates the field
+  // must still load — it is somebody's move, and a caption is not worth losing it for.
+  const move = { id: 'm', rooms: [], packingBufferPct: 0.2, recommendedTruckSize: 'van',
+    originZip: '', destinationZip: null, moveDate: null, status: 'inventory' };
+
+  const withStamp = parseStoredState(
+    JSON.stringify({ move, savedAt: '2026-08-27T15:04:05.000Z' }),
+  );
+  assert.equal(withStamp?.savedAt, '2026-08-27T15:04:05.000Z');
+
+  assert.equal(parseStoredState(JSON.stringify({ move }))?.savedAt, null);
+  assert.equal(parseStoredState(JSON.stringify({ move, savedAt: 42 }))?.savedAt, null);
+  assert.equal(parseStoredState(JSON.stringify({ move, savedAt: '  ' }))?.savedAt, null);
+});

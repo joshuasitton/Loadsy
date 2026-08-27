@@ -38,6 +38,12 @@ const CONFIDENCES: readonly DetectionConfidence[] = ['high', 'low'];
 export interface ParsedState {
   move: Move;
   packingPlan: PackingPlan | null;
+  /**
+   * When this payload was written, ISO-8601, or null for a payload from a build
+   * that predates the field. Only ever shown to the user — nothing is decided
+   * from it, so an absent or nonsensical value costs a line of text and no more.
+   */
+  savedAt: string | null;
   /** What had to be dropped or corrected. Empty means the payload was already valid. */
   repairs: string[];
 }
@@ -233,5 +239,10 @@ export function parseStoredState(raw: string): ParsedState | null {
     status: status ?? 'inventory',
   };
 
-  return { move, packingPlan: parsePackingPlan(payload.packingPlan, repairs), repairs };
+  return {
+    move,
+    packingPlan: parsePackingPlan(payload.packingPlan, repairs),
+    savedAt: nonEmptyString(payload.savedAt),
+    repairs,
+  };
 }
