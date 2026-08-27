@@ -12,6 +12,10 @@ import assert from 'node:assert/strict';
 // react-native injects this global; the modules under test read it for dev logging.
 (globalThis as Record<string, unknown>).__DEV__ = false;
 process.env.EXPO_PUBLIC_USE_MOCKS = 'false';
+// apiFetch refuses to build a relative URL when there is no page origin to be
+// relative to, which is the situation under node. A base makes these the same
+// live path a native build takes; the stubbed fetch ignores the host itself.
+process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.test.invalid';
 
 function respondWith(body: unknown, ok = true, status = 200) {
   (globalThis as Record<string, unknown>).fetch = () =>

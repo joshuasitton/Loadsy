@@ -8,17 +8,25 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": { "simulator": true },
-      "env": { "EXPO_PUBLIC_USE_MOCKS": "true" }
+      "env": {
+        "EXPO_PUBLIC_USE_MOCKS": "true",
+        "EXPO_PUBLIC_DEMO_MODE": "true"
+      }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "env": { "EXPO_PUBLIC_USE_MOCKS": "true" }
+      "env": {
+        "EXPO_PUBLIC_USE_MOCKS": "true",
+        "EXPO_PUBLIC_DEMO_MODE": "true"
+      }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_USE_MOCKS": "true" }
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://loadsy.expo.app"
+      }
     }
   },
   "submit": {

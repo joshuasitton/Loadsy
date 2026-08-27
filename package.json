@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "start": "expo start",
+    "demo": "EXPO_PUBLIC_DEMO_MODE=true EXPO_PUBLIC_USE_MOCKS=true expo start --web",
+    "demo:export": "EXPO_PUBLIC_DEMO_MODE=true EXPO_PUBLIC_USE_MOCKS=true expo export -p web",
+    "demo:deploy": "npm run demo:export && npx eas-cli@latest deploy --prod",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "test": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs --test \"__tests__/**/*.test.ts\"",

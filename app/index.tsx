@@ -4,6 +4,7 @@ import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { canLeaveInventory, confidenceBannerCopy, unresolvedCount } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
+import { DemoBar } from '../src/demo/DemoBar';
 import { useMove } from '../src/state/moveStore';
 import { Card, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -98,6 +99,8 @@ export default function MyMoveScreen() {
             Photograph your rooms and Loadsy works out how much truck you actually need.
           </Text>
         </View>
+
+        <DemoBar />
 
         <View style={styles.progressTrack} accessibilityRole="progressbar"
           accessibilityValue={{ min: 1, max: 5, now: currentIndex + 1 }}

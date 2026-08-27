@@ -37,7 +37,42 @@ If `npm install` complains about SDK version mismatches, let Expo resolve them i
 npx expo install --fix
 ```
 
-The app runs entirely on mocked API responses out of the box — no backend needed.
+The app runs on mocked API responses in development out of the box — no backend
+needed. `EXPO_PUBLIC_USE_MOCKS` overrides that in either direction; unset, the
+answer is "mocks in development, live everywhere else".
+
+### The hosted demo
+
+Live at **<https://loadsy.expo.app>**, deployed with:
+
+```bash
+npm run demo:deploy
+```
+
+That exports with `EXPO_PUBLIC_DEMO_MODE=true` and promotes it to the production
+alias, so the URL is stable and can be handed to someone in a meeting. To run the
+same build locally instead:
+
+```bash
+npm run demo
+```
+
+Demo mode adds one control to the dashboard and changes nothing else. It is off
+unless `EXPO_PUBLIC_DEMO_MODE` is exactly `"true"`, so a store build cannot carry
+it by accident.
+
+Behind it are four prepared inventories in `src/demo/scenarios.ts` — studio,
+1-bedroom, 2-bedroom, 3-bedroom house — which between them recommend four
+different trucks. They are ordinary app state loaded through the same action
+hydration uses, so sizing, prices, load steps and zone diagrams are all computed
+from them exactly as they would be from photographs; nothing downstream is
+stubbed. `__tests__/demoScenarios.test.ts` asserts the truck each one lands on, so
+a change to capacities or the safety reserve fails the suite rather than quietly
+reshuffling what the demo shows.
+
+A live capture is the better demo when it works. This exists because it depends on
+a camera, a network, a model call and a room worth photographing, and in a meeting
+one of those is usually missing.
 
 ### The backend
 
@@ -62,12 +97,20 @@ npx eas-cli@latest env:create --name VISION_API_KEY --scope project --visibility
 Then point the app at the deployment and turn the mocks off:
 
 ```bash
-npx eas-cli@latest env:create --name EXPO_PUBLIC_API_BASE_URL --value https://your-deployment.expo.app
+npx eas-cli@latest env:create --name EXPO_PUBLIC_API_BASE_URL --value https://loadsy.expo.app
 ```
 
-`EXPO_PUBLIC_USE_MOCKS` is pinned to `true` on every build profile in `eas.json`.
-Remove it from `production` when the endpoint is live, or the store build will
-quietly serve the mock furniture catalogue.
+Web builds do not need that: `/v1/detect` is served by this same app, so an unset
+base URL resolves same-origin. Native has no origin to be relative to and must be
+told, which is why the `production` profile in `eas.json` sets it explicitly. A
+native build that omits it fails with a message naming the variable rather than a
+bare "Network request failed".
+
+`EXPO_PUBLIC_USE_MOCKS` is set to `true` on the `development` and `preview`
+profiles and deliberately absent from `production`, which therefore runs live. The
+default is not "mock" — a release build that simply forgot the variable used to
+ship the fixture furniture catalogue to real users and size a truck around
+somebody else's sofa.
 
 **Privacy.** The route is a strict pass-through: the image is forwarded, the result
 returned, and neither is written to disk or into a log. That is what keeps the

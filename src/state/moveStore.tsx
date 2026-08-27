@@ -59,6 +59,12 @@ type Action =
   | { type: 'setDestinationZip'; zip: string | null }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
+  /**
+   * Replace the whole move with one built elsewhere. Demo scenarios use this, and
+   * it is deliberately the same path hydration takes — a loaded scenario is
+   * ordinary state, indistinguishable downstream from a photographed move.
+   */
+  | { type: 'loadMove'; move: Move }
   | { type: 'reset' };
 
 function newMove(): Move {
@@ -184,6 +190,9 @@ function reducer(state: MoveState, action: Action): MoveState {
 
     case 'setStatus':
       return { ...state, move: { ...state.move, status: action.status } };
+
+    case 'loadMove':
+      return { move: withRecommendation(action.move), hydrated: true, persistable: true };
 
     case 'reset':
       // An explicit user-initiated wipe is always safe to persist.
