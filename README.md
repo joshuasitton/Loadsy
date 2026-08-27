@@ -74,6 +74,25 @@ A live capture is the better demo when it works. This exists because it depends 
 a camera, a network, a model call and a room worth photographing, and in a meeting
 one of those is usually missing.
 
+**The sign-in is not real.** Demo mode puts a login screen in front of the app —
+`demo@loadsy.app` / `moveday`, pre-filled, overridable with
+`EXPO_PUBLIC_DEMO_EMAIL` and `EXPO_PUBLIC_DEMO_PASSWORD`. Those credentials are
+compiled into the bundle every visitor downloads, so they protect nothing and the
+screen says so. Read `src/auth/demoCredentials.ts` before putting anything behind
+it. The gate exists so a demo link opens where a product opens, and so a URL
+passed around a room does not drop the next person into the last person's
+half-finished move; it is off entirely when `EXPO_PUBLIC_DEMO_MODE` is not `"true"`,
+because a bundled password in a shipped build is theatre.
+
+"Continue with Google" is a placeholder that completes locally and never contacts
+Google — real OAuth needs a Google Cloud client ID per platform, redirect URIs
+registered against each, and `expo-auth-session` to carry the exchange. Swapping it
+in is a change to one function.
+
+Testers get the loop closed: the login screen resets the demo and starts a
+walkthrough with any scenario in one tap, and the demo bar on the dashboard signs
+back out.
+
 ### The backend
 
 One endpoint, `app/v1/detect+api.ts`, deployed with the app itself.
