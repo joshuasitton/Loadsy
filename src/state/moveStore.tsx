@@ -21,6 +21,7 @@ import { buildPackingPlan } from '../domain/packingPlan';
 import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
 import { normaliseMiles } from '../domain/trip';
+import { isEmptyAddress, normaliseAddress, zipFor, type Address } from '../domain/address';
 import { allItems, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const STORAGE_KEY = 'loadsy.move.v1';
@@ -57,8 +58,17 @@ type Action =
   | { type: 'updateItem'; item: InventoryItem }
   | { type: 'removeItem'; itemId: string }
   | { type: 'setBuffer'; pct: number }
-  | { type: 'setOriginZip'; zip: string }
-  | { type: 'setDestinationZip'; zip: string | null }
+  /**
+   * The ONLY way either end of the trip is written.
+   *
+   * The ZIP fields are derived here rather than set independently. Two writers
+   * for the same fact is how a move ends up quoted for one ZIP and displayed
+   * with another, and with the address on screen the divergence would be
+   * invisible — the street line would look right while the price came from
+   * somewhere else entirely.
+   */
+  | { type: 'setOriginAddress'; address: Address | null }
+  | { type: 'setDestinationAddress'; address: Address | null }
   | { type: 'setTripMiles'; miles: number | null }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
@@ -76,6 +86,8 @@ function newMove(): Move {
     rooms: [],
     packingBufferPct: DEFAULT_PACKING_BUFFER_PCT,
     recommendedTruckSize: 'van',
+    originAddress: null,
+    destinationAddress: null,
     originZip: '',
     destinationZip: null,
     tripMiles: null,
@@ -183,11 +195,36 @@ function reducer(state: MoveState, action: Action): MoveState {
     case 'setBuffer':
       return { ...state, move: withRecommendation({ ...state.move, packingBufferPct: action.pct }) };
 
-    case 'setOriginZip':
-      return { ...state, move: { ...state.move, originZip: action.zip } };
+    /*
+     * A partial address is stored as typed; only the derived ZIP is strict.
+     *
+     * The screens render straight from here rather than from a local copy, so
+     * dropping half-typed addresses would delete the street line the moment it
+     * was entered — most people write the street before the ZIP. Keeping the
+     * partial costs nothing: the ZIP stays empty until there is a real one, and
+     * that is the only field a quote is ever built from.
+     */
+    case 'setOriginAddress': {
+      const address = action.address === null ? null : normaliseAddress(action.address);
+      const kept = address === null || isEmptyAddress(address) ? null : address;
+      return {
+        ...state,
+        move: { ...state.move, originAddress: kept, originZip: zipFor(kept) },
+      };
+    }
 
-    case 'setDestinationZip':
-      return { ...state, move: { ...state.move, destinationZip: action.zip } };
+    case 'setDestinationAddress': {
+      const address = action.address === null ? null : normaliseAddress(action.address);
+      const kept = address === null || isEmptyAddress(address) ? null : address;
+      return {
+        ...state,
+        move: {
+          ...state.move,
+          destinationAddress: kept,
+          destinationZip: zipFor(kept) || null,
+        },
+      };
+    }
 
     case 'setTripMiles':
       // Normalised on the way in rather than at every read: a negative or

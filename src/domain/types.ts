@@ -5,6 +5,8 @@
  * pure functions in the modules that own them, so the models stay serialisable.
  */
 
+import type { Address } from './address';
+
 export type ItemCategory = 'furniture' | 'box' | 'appliance' | 'fragile' | 'other';
 export type DetectionConfidence = 'high' | 'low';
 export type WeightClass = 'light' | 'medium' | 'heavy';
@@ -72,6 +74,17 @@ export interface Move {
   /** Spec §6 Q1 (resolved): locked at 0.20, mid-range of the 0.15–0.30 band. */
   packingBufferPct: number;
   recommendedTruckSize: TruckSize;
+  /**
+   * Where the move starts and ends.
+   *
+   * The ZIP fields below are derived from these and kept in step by the reducer,
+   * which is the only writer of either. They stay on the model because every
+   * rate lookup, distance estimate and history record is keyed on the ZIP alone
+   * — the street lines are for the user and for a routing service that does not
+   * exist yet. See src/domain/address.ts, including the privacy note.
+   */
+  originAddress: Address | null;
+  destinationAddress: Address | null;
   originZip: string;
   destinationZip: string | null;
   /**

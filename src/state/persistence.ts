@@ -29,6 +29,7 @@ import type {
   WeightClass,
 } from '../domain/types';
 import { MOVE_STATUS_ORDER, TRUCK_SIZES } from '../domain/types';
+import { parseAddress, zipFor } from '../domain/address';
 import { normaliseMiles } from '../domain/trip';
 import { clampBuffer, cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
@@ -229,13 +230,23 @@ export function parseStoredState(raw: string): ParsedState | null {
   const status = oneOf<MoveStatus>(storedMove.status, MOVE_STATUS_ORDER);
   if (status === null) repairs.push('unknown move status reset');
 
+  // A payload written before addresses existed has none, and keeps its ZIPs.
+  const originAddress = parseAddress(storedMove.originAddress);
+  const destinationAddress = parseAddress(storedMove.destinationAddress);
+
   const move: Move = {
     id: nonEmptyString(storedMove.id) ?? `move-recovered`,
     rooms,
     packingBufferPct: clampBuffer(storedBuffer ?? DEFAULT_PACKING_BUFFER_PCT),
     recommendedTruckSize: oneOf<TruckSize>(storedMove.recommendedTruckSize, TRUCK_SIZES) ?? 'van',
-    originZip: typeof storedMove.originZip === 'string' ? storedMove.originZip : '',
-    destinationZip: nonEmptyString(storedMove.destinationZip),
+    originZip:
+      zipFor(originAddress) ||
+      (typeof storedMove.originZip === 'string' ? storedMove.originZip : ''),
+    // Addresses first: the ZIPs below are derived from them so the two can never
+    // come back out of storage disagreeing with each other.
+    originAddress,
+    destinationAddress,
+    destinationZip: zipFor(destinationAddress) || nonEmptyString(storedMove.destinationZip),
     // Through the same clamp the reducer uses, so a payload hand-edited to a
     // negative or absurd mileage cannot do what a dispatch is prevented from doing.
     tripMiles: normaliseMiles(finiteNumber(storedMove.tripMiles)),

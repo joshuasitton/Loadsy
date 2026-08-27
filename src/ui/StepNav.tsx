@@ -103,9 +103,15 @@ export function StepNav({
 
       {blockedReason ? <Text style={styles.reason}>{blockedReason}</Text> : null}
 
+      {/*
+        "Setup", not "Step". The dashboard already shows "Step 1 of 5" for the
+        five stages of a move — which run past booking to moving day — and two
+        counters both reading "of 5" while counting different things is worse
+        than no counter at all.
+      */}
       {position ? (
         <Text style={styles.position}>
-          Step {position.position} of {position.total}
+          Setup step {position.position} of {position.total}
         </Text>
       ) : null}
     </View>

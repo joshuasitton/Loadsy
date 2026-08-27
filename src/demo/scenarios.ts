@@ -18,6 +18,7 @@
  * a real room — the detector flags what it is unsure of.
  */
 
+import { normaliseAddress, type Address } from '../domain/address';
 import type { InventoryItem, ItemCategory, Move, Room, WeightClass } from '../domain/types';
 import { cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
@@ -46,13 +47,23 @@ export interface DemoScenario {
   label: string;
   /** One line under the label — what this move is, in plain words. */
   blurb: string;
-  originZip: string;
+  origin: Address;
   /**
    * Where the move ends. Null on the smaller scenarios so the local case — the
    * one where a one-way fee must NOT be charged — is what most of them show.
    */
-  destinationZip: string | null;
+  destination: Address | null;
   rooms: RoomTemplate[];
+}
+
+function addr(
+  line1: string,
+  line2: string,
+  city: string,
+  state: string,
+  postalCode: string,
+): Address {
+  return normaliseAddress({ line1, line2, city, state, postalCode });
 }
 
 const SOFA: ItemTemplate = { name: '3-Seat Sofa', category: 'furniture', lengthIn: 84, widthIn: 36, heightIn: 34, weight: 'heavy' };
@@ -68,8 +79,8 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     id: 'studio',
     label: 'Studio',
     blurb: 'One room and a kitchenette — the smallest move worth a truck',
-    originZip: '78704',
-    destinationZip: null,
+    origin: addr('1100 S Congress Ave', 'Apt 214', 'Austin', 'TX', '78704'),
+    destination: null,
     rooms: [
       {
         name: 'Main Room',
@@ -109,8 +120,8 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     id: 'one-bed',
     label: '1-Bedroom',
     blurb: 'The most common apartment move in the country',
-    originZip: '78704',
-    destinationZip: null,
+    origin: addr('2300 S Lamar Blvd', 'Unit 8', 'Austin', 'TX', '78704'),
+    destination: null,
     rooms: [
       {
         name: 'Living Room',
@@ -162,8 +173,8 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     id: 'two-bed',
     label: '2-Bedroom',
     blurb: 'Two bedrooms, a desk in the spare room, and no garage photographed',
-    originZip: '78704',
-    destinationZip: '78745',
+    origin: addr('1601 Bluebonnet Ln', '', 'Austin', 'TX', '78704'),
+    destination: addr('5400 Manchaca Rd', '', 'Austin', 'TX', '78745'),
     rooms: [
       {
         name: 'Living Room',
@@ -221,8 +232,8 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
     id: 'three-bed-house',
     label: '3-Bed House',
     blurb: 'A full house — the move where getting the truck wrong really hurts',
-    originZip: '78704',
-    destinationZip: '75201',
+    origin: addr('704 Live Oak St', '', 'Austin', 'TX', '78704'),
+    destination: addr('1919 McKinney Ave', 'Apt 1204', 'Dallas', 'TX', '75201'),
     rooms: [
       {
         name: 'Living Room',
@@ -329,8 +340,12 @@ export function buildDemoMove(scenario: DemoScenario): Move {
     packingBufferPct: DEFAULT_PACKING_BUFFER_PCT,
     // Overwritten by the store's withRecommendation on load. Never trusted from here.
     recommendedTruckSize: 'van',
-    originZip: scenario.originZip,
-    destinationZip: scenario.destinationZip,
+    originAddress: scenario.origin,
+    destinationAddress: scenario.destination,
+    // Derived from the addresses, exactly as the reducer derives them, so a
+    // loaded scenario is indistinguishable from one entered by hand.
+    originZip: scenario.origin.postalCode,
+    destinationZip: scenario.destination?.postalCode ?? null,
     tripMiles: null,
     moveDate: null,
     // Deliberately the first step. A scenario supplies the inventory and stops —

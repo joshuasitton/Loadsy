@@ -98,6 +98,7 @@ function RootNavigator() {
       <Stack.Screen name="index" options={{ title: 'My Move' }} />
       <Stack.Screen name="capture" options={{ title: 'Capture Room' }} />
       <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
+      <Stack.Screen name="trip" options={{ title: 'Your Trip' }} />
       <Stack.Screen name="truck" options={{ title: 'Truck Size' }} />
       <Stack.Screen name="prices" options={{ title: 'Local Prices' }} />
       <Stack.Screen name="packing" options={{ title: 'Packing Plan' }} />

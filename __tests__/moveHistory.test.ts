@@ -29,6 +29,8 @@ function emptyMove(): Move {
     rooms: [],
     packingBufferPct: DEFAULT_PACKING_BUFFER_PCT,
     recommendedTruckSize: 'van',
+    originAddress: null,
+    destinationAddress: null,
     originZip: '',
     destinationZip: null,
     tripMiles: null,

@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { normaliseAddress, type Address } from '../domain/address';
 
 /**
  * Resolving the user's origin ZIP from the device, so the prices screen can start
@@ -14,7 +15,12 @@ import * as Location from 'expo-location';
  */
 
 export type DeviceZipResult =
-  | { status: 'ok'; zip: string }
+  /**
+   * `address` carries whatever the OS geocoder could resolve — often the street
+   * and city as well as the ZIP. The trip screen fills the whole form from it;
+   * callers that only want the ZIP can keep reading `zip`.
+   */
+  | { status: 'ok'; zip: string; address: Address }
   /** The user said no. Never ask again in the same session; show manual entry. */
   | { status: 'denied' }
   /** Location is off, unsupported (web has no geocoder), or the lookup failed. */
@@ -59,11 +65,23 @@ export async function getDeviceZip({ request = false } = {}): Promise<DeviceZipR
       longitude: position.coords.longitude,
     });
 
-    // ZIP+4 sometimes comes back as "94110-1234"; we only store the five.
-    const zip = places.map((place) => place.postalCode?.split('-')[0]?.trim()).find((code) => code && US_ZIP.test(code));
+    // ZIP+4 sometimes comes back as "94110-1234"; normaliseAddress keeps the five.
+    const place = places.find((p) => {
+      const code = p.postalCode?.split('-')[0]?.trim();
+      return code && US_ZIP.test(code);
+    });
 
-    if (!zip) return { status: 'unavailable', reason: 'no postal code for this location' };
-    return { status: 'ok', zip };
+    if (!place) return { status: 'unavailable', reason: 'no postal code for this location' };
+
+    const address = normaliseAddress({
+      // `name` is the street number and `street` the road; together they are the
+      // line a person would write. Either can be absent, and the join drops blanks.
+      line1: [place.streetNumber ?? place.name, place.street].filter(Boolean).join(' '),
+      city: place.city ?? '',
+      state: place.region ?? '',
+      postalCode: place.postalCode ?? '',
+    });
+    return { status: 'ok', zip: address.postalCode, address };
   } catch (error) {
     // reverseGeocodeAsync throws outright on web, and getCurrentPositionAsync
     // throws when Location Services are switched off device-wide.

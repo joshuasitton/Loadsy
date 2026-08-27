@@ -1,4 +1,5 @@
 import type { InventoryItem, ItemCategory, Move, RentalQuote, Room, WeightClass } from '../src/domain/types';
+import { normaliseAddress } from '../src/domain/address';
 
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}-${String(++seq).padStart(3, '0')}`;
@@ -42,6 +43,8 @@ export function makeMove(rooms: Room[], overrides: Partial<Move> = {}): Move {
     rooms,
     packingBufferPct: 0.2,
     recommendedTruckSize: '15ft',
+    originAddress: normaliseAddress({ city: 'Ashburn', state: 'VA', postalCode: '20147' }),
+    destinationAddress: null,
     originZip: '20147',
     destinationZip: null,
     tripMiles: null,

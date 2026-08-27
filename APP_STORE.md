@@ -36,6 +36,19 @@ not retain it. The honest answer is still "Data Not Collected" for Loadsy's own
 collection, but if a reviewer asks about Precise Location, that is the explanation.
 Background location is explicitly disabled in the plugin config.
 
+**Addresses — entered by the user, stored on device, never transmitted**
+
+`app/trip.tsx` collects a street address for each end of the move. This is the
+most personal thing Loadsy holds — where somebody lives and where they are about
+to live — and it never leaves the device. The quote request carries the ZIP and
+the mileage and nothing else; no vendor, model or analytics service sees the
+street line. Only the ZIP is required, so a user who does not want to enter an
+address does not have to.
+
+That keeps the nutrition label at "Data Not Collected". **The moment a geocoding
+or routing service is added, the address crosses the network and this answer
+changes** — see the privacy note at the top of `src/domain/address.ts`.
+
 **"Estimated" language on every price surface**
 
 Not just the breakdown sheet. Every price renders through the `EstimateTag` component,

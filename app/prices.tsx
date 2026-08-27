@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,15 +21,8 @@ import {
   type QuoteFilter,
 } from '../src/domain/quotes';
 import type { RentalQuote } from '../src/domain/types';
-import {
-  buildTrip,
-  describeTrip,
-  estimateTripMiles,
-  isValidZip,
-  LONG_HAUL_MILES,
-} from '../src/domain/trip';
+import { buildTrip, describeTrip, LONG_HAUL_MILES } from '../src/domain/trip';
 import { TRUCK_LABEL } from '../src/domain/truck';
-import { getDeviceZip, hasLocationPermission } from '../src/location/deviceZip';
 import { useMove } from '../src/state/moveStore';
 import {
   Banner,
@@ -53,27 +45,7 @@ export default function PricesScreen() {
   const router = useRouter();
   const { move, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
-  const [zipDraft, setZipDraft] = useState(move.originZip);
-  const [destinationDraft, setDestinationDraft] = useState(move.destinationZip ?? '');
-  /**
-   * Blank means "use the estimate". Kept as text rather than a number so a
-   * half-typed "12" is not read as twelve miles and requoted on every keystroke.
-   */
-  const [milesDraft, setMilesDraft] = useState(
-    move.tripMiles === null ? '' : String(move.tripMiles),
-  );
-  /**
-   * Forces the ZIP card back open after one has been set.
-   *
-   * The card rendered only while the stored ZIP was under 5 digits, and nothing in
-   * the app dispatched setOriginZip anywhere else — so a single fat-fingered entry
-   * locked every quote, distance and depot lookup to the wrong metro for the life
-   * of the install, recoverable only by deleting app data.
-   */
-  const [editingZip, setEditingZip] = useState(false);
   /** null while idle; a message when a location attempt could not produce a ZIP. */
-  const [locating, setLocating] = useState(false);
-  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [filter, setFilter] = useState<QuoteFilter>('bestMatch');
   /** The last result, tagged with the request it actually answered. */
   const [result, setResult] = useState<{
@@ -86,47 +58,6 @@ export default function PricesScreen() {
 
   const zip = move.originZip;
 
-  /**
-   * Default the ZIP from the device — but only when permission is ALREADY granted.
-   *
-   * Requesting on first paint would put a system location prompt in front of a user
-   * who has not yet been told why Loadsy wants it, which is both poor practice and
-   * a reliable App Store review note. Users who have not granted get the explicit
-   * button below instead, next to the copy explaining the reason.
-   */
-  useEffect(() => {
-    if (move.originZip.length === 5) return;
-    let cancelled = false;
-    (async () => {
-      if (!(await hasLocationPermission())) return;
-      const result = await getDeviceZip();
-      if (cancelled || result.status !== 'ok') return;
-      setZipDraft(result.zip);
-      dispatch({ type: 'setOriginZip', zip: result.zip });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [move.originZip, dispatch]);
-
-  async function fillZipFromLocation() {
-    setLocating(true);
-    setLocationNote(null);
-    const result = await getDeviceZip({ request: true });
-    setLocating(false);
-    if (result.status === 'ok') {
-      setZipDraft(result.zip);
-      dispatch({ type: 'setOriginZip', zip: result.zip });
-      setEditingZip(false);
-      return;
-    }
-    // Never a blocking error: the text field beside this is the real path.
-    setLocationNote(
-      result.status === 'denied'
-        ? 'Location is off for Loadsy. Enter your ZIP below instead.'
-        : "Couldn't read your location. Enter your ZIP below instead.",
-    );
-  }
   // Must be memoised. `new Date()` on every render would give the effect below a
   // new date every render, and it would refetch forever.
   const isoDate = useMemo(() => move.moveDate ?? new Date().toISOString(), [move.moveDate]);
@@ -190,112 +121,32 @@ export default function PricesScreen() {
     }
   }
 
-  // Computed from the DRAFTS, not the saved move: this card is showing what the
-  // user is typing, and a suggestion that lags a field behind is worse than none.
-  const draftKind = isValidZip(destinationDraft) && destinationDraft !== zipDraft ? 'oneWay' : 'local';
-  const draftMilesPlaceholder = isValidZip(zipDraft)
-    ? estimateTripMiles(zipDraft, isValidZip(destinationDraft) ? destinationDraft : null)
-    : null;
-
-  if (zip.length < 5 || editingZip) {
+  // The trip is a step of its own now. This screen prices whatever that step
+  // captured, and sends the user back there to change it rather than carrying a
+  // second copy of the same form — two places to edit one address is how the
+  // quote ends up built from a ZIP the user cannot see on screen.
+  if (zip.length < 5) {
     return (
       <Screen>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.content}>
           <Card style={styles.zipCard}>
-            <SectionLabel>WHERE ARE YOU MOVING FROM?</SectionLabel>
+            <SectionLabel>WHERE ARE YOU MOVING?</SectionLabel>
             <Text style={styles.zipBody}>
-              Rental rates and availability are local. Your ZIP stays on your device — we only use
-              it to look up nearby depots.
+              Rental rates and availability are local, so Loadsy needs the pickup ZIP
+              before it can compare anything. Where you are going matters too — it decides
+              whether the vendors add a one-way drop fee.
             </Text>
-            <TextInput
-              value={zipDraft}
-              onChangeText={(v) => setZipDraft(v.replace(/\D/g, '').slice(0, 5))}
-              keyboardType="number-pad"
-              placeholder="20147"
-              placeholderTextColor={colors.textDim}
-              style={styles.zipInput}
-              accessibilityLabel="Origin ZIP code"
-              maxLength={5}
-            />
-            <SecondaryButton
-              title={locating ? 'Finding you…' : 'Use my current location'}
-              onPress={() => {
-                void fillZipFromLocation();
-              }}
-              disabled={locating}
-              accessibilityLabel="Fill in my ZIP code from my current location"
-            />
-            {locationNote ? <Text style={styles.zipNote}>{locationNote}</Text> : null}
-
-            <SectionLabel>AND WHERE TO?</SectionLabel>
-            <Text style={styles.zipBody}>
-              Leave this blank for a local move. It decides two things that change the
-              ranking, not just the totals: how far the truck is metered, and whether
-              vendors add a one-way drop fee at all.
-            </Text>
-            <TextInput
-              value={destinationDraft}
-              onChangeText={(v) => setDestinationDraft(v.replace(/\D/g, '').slice(0, 5))}
-              keyboardType="number-pad"
-              placeholder="Same town"
-              placeholderTextColor={colors.textDim}
-              style={styles.zipInput}
-              accessibilityLabel="Destination ZIP code, optional"
-              maxLength={5}
-            />
-
-            <SectionLabel>HOW FAR IS THE DRIVE?</SectionLabel>
-            <Text style={styles.zipBody}>
-              {draftMilesPlaceholder === null
-                ? 'Enter both ZIPs and Loadsy will suggest a distance.'
-                : `Blank uses about ${draftMilesPlaceholder} miles${
-                    draftKind === 'local' ? ' for the round trip' : ''
-                  } — a rough guess from your ZIPs, not a route. If you know the real figure, it is worth typing: mileage and fuel are what separate the vendors on a long move.`}
-            </Text>
-            <TextInput
-              value={milesDraft}
-              onChangeText={(v) => setMilesDraft(v.replace(/\D/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              placeholder={draftMilesPlaceholder === null ? 'Miles' : String(draftMilesPlaceholder)}
-              placeholderTextColor={colors.textDim}
-              style={styles.zipInput}
-              accessibilityLabel="Distance in miles, optional"
-              maxLength={4}
-            />
-
             <PrimaryButton
-              title="Compare local prices"
-              disabled={zipDraft.length < 5}
-              onPress={() => {
-                dispatch({ type: 'setOriginZip', zip: zipDraft });
-                dispatch({
-                  type: 'setDestinationZip',
-                  zip: isValidZip(destinationDraft) ? destinationDraft : null,
-                });
-                // Blank means "keep using the estimate", which is null rather
-                // than zero — zero would be a claim that the truck does not move.
-                dispatch({
-                  type: 'setTripMiles',
-                  miles: milesDraft.trim() === '' ? null : Number(milesDraft),
-                });
-                setEditingZip(false);
-              }}
+              title="Enter your trip"
+              onPress={() => router.replace('/trip')}
+              accessibilityHint="Opens the trip step, where the pickup and drop-off go"
             />
-            {zip.length === 5 ? (
-              <SecondaryButton
-                title="Cancel"
-                onPress={() => {
-                  setZipDraft(zip);
-                  setEditingZip(false);
-                }}
-                accessibilityLabel={`Keep the current ZIP code, ${zip}`}
-              />
-            ) : null}
           </Card>
         </ScrollView>
       </Screen>
     );
   }
+
 
   return (
     <Screen>
@@ -306,12 +157,7 @@ export default function PricesScreen() {
               {TRUCK_LABEL[recommendation.size]} near {zip}
             </Text>
             <Pressable
-              onPress={() => {
-                setZipDraft(zip);
-                setDestinationDraft(move.destinationZip ?? '');
-                setMilesDraft(move.tripMiles === null ? '' : String(move.tripMiles));
-                setEditingZip(true);
-              }}
+              onPress={() => router.replace('/trip')}
               accessibilityRole="button"
               accessibilityLabel={`Change the trip. Currently ${describeTrip(trip)}`}
               hitSlop={8}
@@ -324,7 +170,7 @@ export default function PricesScreen() {
             <Text style={styles.headerWarn}>
               That distance is a guess from your ZIP codes. On a drive this long, mileage
               and fuel decide which vendor is cheapest — tap Change and enter the real
-              figure before you trust the ranking.
+              figure on the trip step before you trust the ranking.
             </Text>
           ) : null}
           <Text style={styles.headerSubtitle}>

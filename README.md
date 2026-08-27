@@ -106,8 +106,22 @@ history the user then has to unwind.
 
 ### Where the move starts and ends
 
-`src/domain/trip.ts` turns an origin ZIP, an optional destination ZIP and an
-optional user-entered mileage into the trip a quote is built from. Two things
+Its own step, `app/trip.tsx`, between Inventory and Truck Size — full street
+addresses for both ends, plus the distance.
+
+**Only the ZIP is required.** Everything Loadsy computes from a location is
+ZIP-level: rates, availability and depot coverage are published that way, and the
+distance estimate reads ZIPs too. Someone who knows they are moving to 78745 but
+has not signed a lease can still get a truck size and a comparison. Half-typed
+addresses are stored as typed — street first, ZIP last is how most people write
+one — while the ZIP a quote is built from stays empty until it is real.
+
+**The address never leaves the device.** The quote request carries the ZIP and
+the mileage, nothing else. `APP_STORE.md`'s "Data Not Collected" answer depends
+on that, so adding a geocoding service is the moment the privacy label changes.
+
+`src/domain/trip.ts` turns those two ends and an optional user-entered mileage
+into the trip a quote is built from. Two things
 depend on it, and both change the ranking rather than only the totals:
 
 - **The one-way drop fee** applies only when the truck is left somewhere else.
