@@ -25,18 +25,43 @@ const BED_DIMENSIONS: Record<TruckSize, { lengthFt: number; widthFt: number }> =
 };
 
 /**
- * Retuned as one set so every zone carries its white label at AA. Zone 2 measured
- * 2.92:1 and zone 5 4.09:1 — the labels inside those blocks were effectively
- * unreadable — while zones 1 and 3 sat on the 4.5 line with no margin.
+ * The five load zones, as a blue-to-green ramp that runs in load order — deep
+ * teal at the cab end, lighter green at the door. The sequence is the point: the
+ * diagram is read left to right as the order things go in, and a ramp says that
+ * where five unrelated hues did not.
+ *
+ * They stay this dark on a white page for one reason: the zone label is printed
+ * INSIDE the block, so the fill is the label's background and has to clear AA
+ * against white text. A pale mint block would read beautifully and lose its
+ * label. `__tests__/contrast.test.ts` holds that line — an earlier set shipped
+ * with zone 2 at 2.92:1, effectively unreadable.
+ *
+ * Exported for that test: these fills are backgrounds, not decoration.
  */
-/** Exported for the contrast test: these fills are backgrounds for white labels. */
 export const STEP_COLORS_FOR_TEST: Record<LoadStepOrder, string> = {
-  1: '#9C3F2A',
-  2: '#8A5A0B',
-  3: '#3F6480',
-  4: '#63467F',
-  5: '#2E6B48',
+  1: '#134E63',
+  2: '#146A72',
+  3: '#0F6E63',
+  4: '#166B4C',
+  5: '#2C6B33',
 };
+
+/**
+ * The diagram's own furniture, as opposed to its zones: the cab block, the
+ * hairlines that outline the truck bed, and the small captions around it.
+ *
+ * Exported so the contrast test can hold them to the same bar as the rest of the
+ * palette. They are drawn on whatever surface the diagram sits on — the page, a
+ * card, or a raised block — so each has to clear its threshold against all three.
+ */
+export const DIAGRAM_COLORS_FOR_TEST = {
+  /** Small captions: "CAB", "loaded first", the view heading. Text, so 4.5:1. */
+  caption: '#41606F',
+  /** The cab block fill. Outlined, because a pale fill alone is 1.27:1 on white. */
+  cab: '#D7E7EF',
+  /** Truck bed outline and zone separators. Non-text, so 3:1. */
+  hairline: '#6F8D9D',
+} as const;
 
 const STEP_LABELS: Record<LoadStepOrder, string> = {
   1: 'Heavy',
@@ -140,8 +165,8 @@ export function renderZoneSVG(
   const bedHeight = Math.min(48, Math.max(34, bedWidth * (bed.widthFt / bed.lengthFt)));
 
   const parts: string[] = [
-    `<rect x="${pad}" y="${bedY + bedHeight * 0.15}" width="${cabWidth}" height="${round(bedHeight * 0.7)}" rx="4" fill="#2B3B52"/>`,
-    `<text x="${pad + cabWidth / 2}" y="${round(bedY + bedHeight / 2 + 3)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" fill="#8A94A6">CAB</text>`,
+    `<rect x="${pad}" y="${bedY + bedHeight * 0.15}" width="${cabWidth}" height="${round(bedHeight * 0.7)}" rx="4" fill="#D7E7EF" stroke="#6F8D9D" stroke-width="1"/>`,
+    `<text x="${pad + cabWidth / 2}" y="${round(bedY + bedHeight / 2 + 3)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" fill="#41606F">CAB</text>`,
   ];
 
   let cursor = bedX;
@@ -152,14 +177,14 @@ export function renderZoneSVG(
     parts.push(
       isFocus
         ? `<rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="${zone.color}" opacity="0.92"/>`
-        : `<rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="${zone.color}" opacity="0.28"/><rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="none" stroke="#0F1B2D" stroke-width="1"/>`,
+        : `<rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="${zone.color}" opacity="0.28"/><rect x="${round(cursor)}" y="${bedY}" width="${round(width)}" height="${round(bedHeight)}" fill="none" stroke="#6F8D9D" stroke-width="1"/>`,
     );
     if (isFocus) focus = { x: cursor, width, zone };
     cursor += width;
   }
 
   parts.push(
-    `<rect x="${bedX}" y="${bedY}" width="${round(bedWidth)}" height="${round(bedHeight)}" fill="none" stroke="#0F1B2D" stroke-width="1.5" rx="3"/>`,
+    `<rect x="${bedX}" y="${bedY}" width="${round(bedWidth)}" height="${round(bedHeight)}" fill="none" stroke="#6F8D9D" stroke-width="1.5" rx="3"/>`,
   );
 
   if (focus) {
@@ -178,8 +203,8 @@ export function renderZoneSVG(
   }
 
   parts.push(
-    `<text x="${bedX}" y="${bedY - 7}" font-family="system-ui,sans-serif" font-size="8" fill="#8A94A6">← loaded first</text>`,
-    `<text x="${bedX + bedWidth}" y="${bedY - 7}" text-anchor="end" font-family="system-ui,sans-serif" font-size="8" fill="#8A94A6">door →</text>`,
+    `<text x="${bedX}" y="${bedY - 7}" font-family="system-ui,sans-serif" font-size="8" fill="#41606F">← loaded first</text>`,
+    `<text x="${bedX + bedWidth}" y="${bedY - 7}" text-anchor="end" font-family="system-ui,sans-serif" font-size="8" fill="#41606F">door →</text>`,
   );
 
   return [
@@ -219,10 +244,10 @@ function renderTopDown(zones: LoadZone[], bed: { lengthFt: number; widthFt: numb
 
   const parts: string[] = [
     `<rect x="0" y="0" width="${CANVAS.width}" height="${CANVAS.height}" fill="none"/>`,
-    `<text x="${pad}" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#8A94A6">TOP VIEW · LOAD ORDER, BACK TO FRONT</text>`,
+    `<text x="${pad}" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#41606F">TOP VIEW · LOAD ORDER, BACK TO FRONT</text>`,
     // cab
-    `<rect x="${pad}" y="${bedY + bedHeight * 0.15}" width="${cabWidth}" height="${bedHeight * 0.7}" rx="5" fill="#2B3B52"/>`,
-    `<text x="${pad + cabWidth / 2}" y="${bedY + bedHeight / 2 + 3}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8A94A6">CAB</text>`,
+    `<rect x="${pad}" y="${bedY + bedHeight * 0.15}" width="${cabWidth}" height="${bedHeight * 0.7}" rx="5" fill="#D7E7EF" stroke="#6F8D9D" stroke-width="1"/>`,
+    `<text x="${pad + cabWidth / 2}" y="${bedY + bedHeight / 2 + 3}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#41606F">CAB</text>`,
   ];
 
   let cursor = bedX;
@@ -241,9 +266,9 @@ function renderTopDown(zones: LoadZone[], bed: { lengthFt: number; widthFt: numb
   }
 
   parts.push(
-    `<rect x="${bedX}" y="${bedY}" width="${round(bedWidth)}" height="${round(bedHeight)}" fill="none" stroke="#0F1B2D" stroke-width="1.5" rx="3"/>`,
-    `<text x="${bedX}" y="${bedY + bedHeight + 16}" font-family="system-ui,sans-serif" font-size="9" fill="#8A94A6">← loaded first</text>`,
-    `<text x="${bedX + bedWidth}" y="${bedY + bedHeight + 16}" text-anchor="end" font-family="system-ui,sans-serif" font-size="9" fill="#8A94A6">loaded last (door) →</text>`,
+    `<rect x="${bedX}" y="${bedY}" width="${round(bedWidth)}" height="${round(bedHeight)}" fill="none" stroke="#6F8D9D" stroke-width="1.5" rx="3"/>`,
+    `<text x="${bedX}" y="${bedY + bedHeight + 16}" font-family="system-ui,sans-serif" font-size="9" fill="#41606F">← loaded first</text>`,
+    `<text x="${bedX + bedWidth}" y="${bedY + bedHeight + 16}" text-anchor="end" font-family="system-ui,sans-serif" font-size="9" fill="#41606F">loaded last (door) →</text>`,
   );
 
   return parts.join('');
@@ -258,7 +283,7 @@ function renderIsometric(zones: LoadZone[], truckSize: TruckSize): string {
   const depth = 30;
 
   const parts: string[] = [
-    `<text x="16" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#8A94A6">3D VIEW · ${capacity.min}–${capacity.max} FT³ CAPACITY</text>`,
+    `<text x="16" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#41606F">3D VIEW · ${capacity.min}–${capacity.max} FT³ CAPACITY</text>`,
   ];
 
   let cursor = originX;
@@ -282,9 +307,9 @@ function renderIsometric(zones: LoadZone[], truckSize: TruckSize): string {
   }
 
   parts.push(
-    `<line x1="${originX}" y1="${originY}" x2="${round(cursor)}" y2="${originY}" stroke="#0F1B2D" stroke-width="2"/>`,
-    `<text x="${originX}" y="${originY + 18}" font-family="system-ui,sans-serif" font-size="9" fill="#8A94A6">cab end</text>`,
-    `<text x="${round(cursor)}" y="${originY + 18}" text-anchor="end" font-family="system-ui,sans-serif" font-size="9" fill="#8A94A6">door end</text>`,
+    `<line x1="${originX}" y1="${originY}" x2="${round(cursor)}" y2="${originY}" stroke="#6F8D9D" stroke-width="2"/>`,
+    `<text x="${originX}" y="${originY + 18}" font-family="system-ui,sans-serif" font-size="9" fill="#41606F">cab end</text>`,
+    `<text x="${round(cursor)}" y="${originY + 18}" text-anchor="end" font-family="system-ui,sans-serif" font-size="9" fill="#41606F">door end</text>`,
   );
 
   return parts.join('');

@@ -155,7 +155,19 @@ export default function MyMoveScreen() {
                 style={({ pressed }) => [styles.row, pressed && !isStub && styles.rowPressed]}
               >
                 <View style={[styles.rowBadge, state === 'done' && styles.rowBadgeDone, state === 'current' && styles.rowBadgeCurrent]}>
-                  <Text style={[styles.rowBadgeText, state !== 'todo' && styles.rowBadgeTextActive]}>
+                  {/*
+                    Two active colours, not one. The done badge is a pale tint and
+                    the current badge is solid accent, so a single "active" colour
+                    has to be legible on both — which on a light palette it cannot
+                    be. Under the old dark theme they happened to share one.
+                  */}
+                  <Text
+                    style={[
+                      styles.rowBadgeText,
+                      state === 'done' && styles.rowBadgeTextDone,
+                      state === 'current' && styles.rowBadgeTextCurrent,
+                    ]}
+                  >
                     {state === 'done' ? '✓' : index + 1}
                   </Text>
                 </View>
@@ -301,7 +313,8 @@ const styles = StyleSheet.create({
   rowBadgeDone: { backgroundColor: colors.accentDim },
   rowBadgeCurrent: { backgroundColor: colors.accent },
   rowBadgeText: { ...type.caption, fontWeight: '700', color: colors.textDim },
-  rowBadgeTextActive: { color: colors.text },
+  rowBadgeTextDone: { color: colors.accent },
+  rowBadgeTextCurrent: { color: colors.accentText },
   rowBody: { flex: 1, gap: 2 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   rowTitle: { ...type.heading, color: colors.text },
@@ -334,7 +347,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     paddingVertical: space.md,
   },
   confirmNoText: { ...type.caption, color: colors.textMuted },

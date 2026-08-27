@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "loadsy",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,
@@ -13,7 +13,7 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere — you can always type the ZIP in instead."
+        "NSLocationWhenInUseUsageDescription": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere \u2014 you can always type the ZIP in instead."
       }
     },
     "plugins": [
@@ -24,7 +24,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0F1B2D"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [
@@ -38,7 +38,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere — you can always type the ZIP in instead.",
+          "locationWhenInUsePermission": "Loadsy uses your location only to fill in your ZIP code, so it can look up truck rental rates near you. Your location is never stored or sent anywhere \u2014 you can always type the ZIP in instead.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }
@@ -78,6 +78,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/0354a3bd-76ac-4a62-8aee-bfb81004f9df"
-    }
+    },
+    "backgroundColor": "#FFFFFF"
   }
 }

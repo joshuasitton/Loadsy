@@ -68,7 +68,7 @@ export default function RootLayout() {
       <AuthProvider>
         <MoveProvider>
           <HistoryProvider>
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
             <RootNavigator />
           </HistoryProvider>
         </MoveProvider>

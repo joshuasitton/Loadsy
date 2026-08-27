@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     paddingVertical: space.md,
   },
   cancelText: { ...type.caption, color: colors.textMuted },

@@ -26,7 +26,7 @@ export default function Root({ children }: PropsWithChildren) {
           name="description"
           content="Photograph your rooms and Loadsy works out how much truck you actually need, what it costs nearby, and the order to load it in."
         />
-        <meta name="theme-color" content="#0F1B2D" />
+        <meta name="theme-color" content="#FFFFFF" />
 
         <meta property="og:type" content="website" />
         <meta property="og:title" content="Loadsy" />
@@ -42,8 +42,9 @@ export default function Root({ children }: PropsWithChildren) {
         */}
         <ScrollViewStyleReset />
 
-        {/* Paint the page the app's own background before React mounts, so a slow
-            load shows the app's dark canvas rather than a white flash. */}
+        {/* Paint the page the app's own background before React mounts. The app is
+            white now, so this no longer hides a flash — it keeps the ground from
+            being whatever the browser defaults to, which is not always white. */}
         <style dangerouslySetInnerHTML={{ __html: BACKGROUND }} />
       </head>
       <body>{children}</body>
@@ -51,4 +52,4 @@ export default function Root({ children }: PropsWithChildren) {
   );
 }
 
-const BACKGROUND = `body { background-color: #0F1B2D; }`;
+const BACKGROUND = `body { background-color: #FFFFFF; }`;

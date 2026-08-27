@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     padding: space.md,
     alignItems: 'center',
   },
