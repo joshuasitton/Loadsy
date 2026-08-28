@@ -130,9 +130,11 @@ history the user then has to unwind.
 People load in the order the plan is printed, which makes the sequence a set of
 instructions rather than a grouping. Two consequences shape `src/domain/packing.ts`:
 
-- **The groups are positions in the truck**, back wall to door — not categories
-  that happen to be listed in a sensible order. An area rug is not heavy, not
-  furniture and not a box; it goes at the back because that is where a rug goes.
+- **The groups are tiers, named for when they are loaded** — "Load first — the
+  heavy base", not "Against the Back Wall". A group is a section of the deck
+  filled in one pass, several items deep; only the first two or three pieces
+  touch the wall behind the cab, so naming the group after that wall promised
+  something visibly untrue of the rest.
 - **Placement is a property of the item**, owned by the guidance rule that also
   writes the sentence describing it. It used to be decided twice — by category
   and weight here, and in prose in `itemGuidance.ts` — with nothing keeping the
@@ -143,8 +145,7 @@ instructions rather than a grouping. Two consequences shape `src/domain/packing.
 `__tests__/packing.test.ts` reads each rule's own sentence and fails if it
 contradicts the zone it assigns, which is how that class of bug stays fixed.
 
-Within a zone: anything that lies flat on the deck first, then biggest to
-smallest, id as the tiebreak so the plan stays deterministic.
+Within a tier: biggest first, id as the tiebreak so the plan stays deterministic.
 
 ### Where the move starts and ends
 

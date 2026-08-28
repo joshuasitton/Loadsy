@@ -1,8 +1,16 @@
-import { guidanceZoneFor, loadsFirstInZone } from './itemGuidance';
+import { guidanceZoneFor } from './itemGuidance';
 import type { InventoryItem, LoadStep, WeightClass } from './types';
 
 /**
  * The load plan, ordered by WHERE each piece rides — back wall to door.
+ *
+ * ## The groups are tiers, not walls
+ *
+ * A group is a section of the deck loaded in one pass — several items deep, not a
+ * single row. Naming them after walls ("Against the Back Wall") claimed something
+ * the truck cannot deliver: only the first two or three pieces touch that wall,
+ * and the rest are behind them. They are named for WHEN they are loaded instead,
+ * because that is the only thing that is true of every item in the group.
  *
  * ## The plan is an order of operations, not a filing system
  *
@@ -44,33 +52,33 @@ interface StepDefinition {
 const STEP_DEFINITIONS: Record<LoadStepOrder, StepDefinition> = {
   1: {
     order: 1,
-    title: 'Against the Back Wall',
+    title: 'Load first — the heavy base',
     instruction:
-      'Everything here goes in first, tight against the wall behind the cab. Heaviest low and centred over the axle — and anything that lies flat, like a rolled rug, goes down before the rest so it is not trapped on top.',
+      'The heaviest pieces go in first and fill the front section of the deck, starting against the wall behind the cab and working back. Keep the weight low and centred over the axle; smaller solid pieces fill the gaps between them.',
   },
   2: {
     order: 2,
-    title: 'Along the Side Walls',
+    title: 'Load second — long and tall',
     instruction:
-      'Stand sofas, mattresses and table tops on edge against the walls, working forward from what is already loaded. Strap them to the tie rails so nothing shifts on the first turn.',
+      'Sofas, mattresses, table tops and anything rolled go on edge or on end against the side walls, working back from what is already in. Strap them to the tie rails so nothing shifts on the first turn.',
   },
   3: {
     order: 3,
-    title: 'Boxes and Fill',
+    title: 'Load third — the box wall',
     instruction:
-      'Build a square wall of boxes from the floor up, heaviest on the bottom, lightest on top. Fill the gaps around what is already in so the stack cannot lean.',
+      'Build a square wall of boxes from the deck up, heaviest on the bottom and lightest on top. Fill the gaps around what is already loaded so the stack cannot lean.',
   },
   4: {
     order: 4,
-    title: 'Fragile and Awkward',
+    title: 'Load fourth — fragile and awkward',
     instruction:
-      'Mirrors, lamps, TVs and anything oddly shaped ride here, wedged between soft items near the front of the load. Never stack anything on top of these.',
+      'Mirrors, lamps, TVs and anything oddly shaped go in last of the packed load, wedged between soft items. Never stack anything on top of these.',
   },
   5: {
     order: 5,
-    title: 'Last On, First Off',
+    title: 'Load last — by the door',
     instruction:
-      'By the door: the box you want first at the new place, plus anything that must come off early — tools, chargers, bedding, coffee, and fuel-powered kit that should not sit sealed in the middle of the load.',
+      'The final few feet, nearest the door: what you want first at the other end, and anything that must come off early — tools, chargers, bedding, coffee, and fuel-powered kit that should not sit sealed in the middle of the load.',
   },
 };
 
@@ -91,7 +99,12 @@ export function stepForItem(item: InventoryItem): LoadStepOrder {
   // Fragile always overrides — a heavy mirror still must not be buried.
   if (item.isFragile || item.category === 'fragile') return 4;
 
-  if (item.category === 'appliance') return 1;
+  // Weight, not the word "appliance". A vacuum cleaner and a refrigerator share a
+  // category and belong nowhere near each other in the load: one is the base, the
+  // other fills a gap in the box wall.
+  if (item.category === 'appliance') {
+    return item.estimatedWeightClass === 'heavy' ? 1 : 3;
+  }
 
   if (item.category === 'box') {
     // The distinction the spec calls out: books vs. linens.
@@ -123,12 +136,11 @@ function weightOnlyStep(weight: WeightClass): LoadStepOrder {
  * Deterministic given the same item set: nothing reads a clock, a random source,
  * or the order the items arrived in.
  *
- * Within a zone: anything that lies flat on the deck first, then biggest to
- * smallest. Same reasoning as the zones themselves — the list is an order of
- * operations. The large pieces go against the wall before the small ones fill in
- * around them, and a rug goes under all of it. Sorting by id, as this did, put
- * items in whatever order their ids happened to fall, which for a capture is the
- * order the detector emitted them.
+ * Within a tier, biggest first. Same reasoning as the tiers themselves — the list
+ * is an order of operations, and the large pieces have to be placed before the
+ * small ones fill in around them. Sorting by id, as this did, put items in
+ * whatever order their ids happened to fall, which for a capture is the order the
+ * detector emitted them.
  *
  * The id is the tiebreak, so two items of identical volume still sort stably.
  */
@@ -143,12 +155,7 @@ export function buildLoadSteps(items: InventoryItem[]): LoadStep[] {
   return LOAD_STEP_ORDER.map((order) => {
     const def = STEP_DEFINITIONS[order];
     const inZone = [...buckets.get(order)!].sort(
-      (a, b) =>
-        // Anything that lies flat on the deck goes down before the rest of its
-        // zone is stacked on top of it.
-        Number(loadsFirstInZone(b.name)) - Number(loadsFirstInZone(a.name)) ||
-        b.cubicFeet - a.cubicFeet ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      (a, b) => b.cubicFeet - a.cubicFeet || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     );
     return {
       id: `step-${order}`,

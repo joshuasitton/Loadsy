@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLoadSteps, stepForItem } from '../src/domain/packing';
 import { buildPackingPlan } from '../src/domain/packingPlan';
-import { guidanceFor, loadsFirstInZone } from '../src/domain/itemGuidance';
+import { guidanceFor } from '../src/domain/itemGuidance';
 import { buildDemoMove, DEMO_SCENARIOS } from '../src/demo/scenarios';
 import { allItems } from '../src/domain/volume';
 import { makeItem, resetIds } from './helpers';
@@ -198,23 +198,75 @@ test('a derived plan always covers exactly the inventory it was built from', () 
  * contradict is worse than saying nothing.
  */
 
-test('an area rug loads against the back wall, where its own guidance says', () => {
-  // The bug this closes, reported from a real 1-bedroom plan. The rug's guidance
-  // read "at the very back, under everything else" while placement was decided
-  // separately by weight — 'other' + medium landed it in group 4 of 5, three
-  // quarters of the way to the door. Anyone following the plan as printed put
-  // the rug on top of their furniture.
+test('an area rug is placed by its own rule, and stands on end', () => {
+  // Two bugs, one after the other. First the rug's guidance said "at the very
+  // back, under everything else" while placement was decided separately by
+  // weight, landing it in group 4 of 5 — the plan contradicting itself. Then the
+  // guidance itself turned out to be wrong: a rug laid flat on the deck is walked
+  // on, and it pins the floor space the fridge and the heavy furniture need.
+  // Rolled and stood on end in a corner it costs almost no floor at all.
   const rug = makeItem({
     name: 'Area Rug',
     category: 'other',
     estimatedWeightClass: 'medium',
     cubicFeet: 8,
   });
-  assert.equal(stepForItem(rug), 1);
+  assert.equal(stepForItem(rug), 2, 'a rolled rug stands with the long and tall pieces');
 
   const guidance = guidanceFor(rug);
   assert.ok(guidance, 'the rug should still carry its own guidance');
-  assert.match(guidance.orientation, /back/i);
+  assert.match(guidance.orientation, /on end/i);
+  assert.doesNotMatch(guidance.orientation, /under everything/i);
+});
+
+test('a wardrobe box is a box, not an armoire', () => {
+  // /\bwardrobe\b/ caught "Wardrobe Box", so a tall cardboard box with a hanging
+  // rail was given a solid-oak armoire's instructions and loaded into the first
+  // tier with the appliances — while the plan had a section for boxes sitting
+  // right there. The specific rule has to come first.
+  const box = makeItem({ name: 'Wardrobe Box', category: 'box', estimatedWeightClass: 'medium' });
+  assert.equal(stepForItem(box), 3, 'a wardrobe box belongs in the box wall');
+  assert.match(guidanceFor(box)!.orientation, /box wall/i);
+
+  // The furniture it was being mistaken for still loads as furniture.
+  const armoire = makeItem({ name: 'Armoire', category: 'furniture', estimatedWeightClass: 'heavy' });
+  assert.equal(stepForItem(armoire), 1);
+  assert.match(guidanceFor(armoire)!.orientation, /strapped at two heights/i);
+});
+
+test('a light appliance is not part of the heavy base', () => {
+  // A vacuum cleaner and a refrigerator share a category and belong nowhere near
+  // each other in the load.
+  const vacuum = makeItem({ name: 'Vacuum Cleaner', category: 'appliance', estimatedWeightClass: 'light' });
+  const fridge = makeItem({ name: 'Refrigerator', category: 'appliance', estimatedWeightClass: 'heavy' });
+  assert.equal(stepForItem(vacuum), 3);
+  assert.equal(stepForItem(fridge), 1);
+});
+
+test('no section title claims a wall the truck cannot deliver', () => {
+  // A group is a section of the deck loaded in one pass, several items deep. Only
+  // the first two or three pieces touch the wall behind the cab; naming the group
+  // after that wall promised something visibly untrue of the other six.
+  const steps = buildLoadSteps(
+    Array.from({ length: 5 }, (_, i) =>
+      makeItem({
+        id: `i${i}`,
+        category: (['furniture', 'box', 'fragile', 'other', 'appliance'] as const)[i]!,
+        estimatedWeightClass: (['heavy', 'light', 'light', 'medium', 'heavy'] as const)[i]!,
+        isFragile: i === 2,
+      }),
+    ),
+  );
+  for (const step of steps) {
+    // "the box wall" is fine — that is a stack you build, not a wall of the
+    // truck. What the titles must not claim is a surface the load cannot reach.
+    assert.doesNotMatch(
+      step.title,
+      /back wall|side wall|front wall|against the wall/i,
+      `"${step.title}" names a wall of the truck`,
+    );
+    assert.match(step.title, /^Load /, `"${step.title}" should say when it is loaded`);
+  }
 });
 
 test('INVARIANT: no guidance rule places an item where its own words deny', () => {
@@ -241,11 +293,11 @@ test('INVARIANT: no guidance rule places an item where its own words deny', () =
 });
 
 test('a named rule outranks the category-and-weight fallback', () => {
-  // A rug is not heavy, is not furniture and is not a box. It goes at the back
-  // because that is where a rug goes, and no combination of category and weight
-  // could have expressed that.
+  // A rug is not heavy, is not furniture and is not a box. It stands on end with
+  // the long and tall pieces because that is what a rolled rug does, and no
+  // combination of category and weight could have expressed that.
   const asBox = makeItem({ name: 'Area Rug', category: 'box', estimatedWeightClass: 'light' });
-  assert.equal(stepForItem(asBox), 1, 'the rule should win over the box heuristic');
+  assert.equal(stepForItem(asBox), 2, 'the rule should win over the box heuristic');
 
   const anonymous = makeItem({ category: 'box', estimatedWeightClass: 'light' });
   assert.equal(stepForItem(anonymous), 5, 'an unnamed light box still follows the fallback');
@@ -274,43 +326,36 @@ test('equal-sized items still sort stably, so the plan stays deterministic', () 
   assert.deepEqual(buildLoadSteps([...items].reverse())[0]?.itemIds, ['a', 'b']);
 });
 
-test('the 1-bedroom demo lists nothing after the rug that belongs beneath it', () => {
-  // End to end, on the inventory the report came from.
-  const scenario = DEMO_SCENARIOS.find((s) => s.id === 'one-bed')!;
-  const move = buildDemoMove(scenario);
+test('the 1-bedroom demo reads as a sequence somebody could actually follow', () => {
+  // End to end, on the inventory the reports came from.
+  const move = buildDemoMove(DEMO_SCENARIOS.find((s) => s.id === 'one-bed')!);
   const items = allItems(move);
   const steps = buildLoadSteps(items);
   const byId = new Map(items.map((i) => [i.id, i]));
+  const zoneOf = (name: string) =>
+    steps.find((s) => s.itemIds.some((id) => byId.get(id)?.name === name))?.order;
 
-  const rugStep = steps.find((s) => s.itemIds.some((id) => byId.get(id)?.name === 'Area Rug'));
-  assert.ok(rugStep, 'the rug should be in the plan');
-  assert.equal(rugStep.order, 1, 'the rug should be in the first group loaded');
+  assert.equal(zoneOf('Area Rug'), 2, 'the rolled rug stands with the long and tall pieces');
+  assert.equal(zoneOf('Wardrobe Box'), 3, 'wardrobe boxes belong in the box wall');
+  assert.equal(zoneOf('Refrigerator'), 1, 'the fridge is the heavy base');
+  assert.equal(zoneOf('Vacuum Cleaner'), 3, 'a vacuum is not part of the heavy base');
 
-  // And the groups themselves are printed back-to-front, which is the order
-  // somebody will physically carry things in.
+  // And the groups are printed in load order, which is the order somebody will
+  // physically carry things in.
   assert.deepEqual(
     steps.map((s) => s.order),
     [...steps.map((s) => s.order)].sort((a, b) => a - b),
   );
 });
 
-test('anything that goes under the load is listed before what goes on top of it', () => {
-  // Zone alone was not enough. It put the rug in the first group, correctly, and
-  // then the group's biggest-first ordering printed it after the fridge and the
-  // bookshelf — after the very things it is supposed to be underneath.
-  resetIds();
-  const steps = buildLoadSteps([
-    makeItem({ id: 'fridge', name: 'Refrigerator', cubicFeet: 46.7 }),
-    makeItem({ id: 'rug', name: 'Area Rug', category: 'other', cubicFeet: 8 }),
-    makeItem({ id: 'shelf', name: 'Bookshelf', cubicFeet: 16 }),
-  ]);
-  assert.deepEqual(steps[0]?.itemIds, ['rug', 'fridge', 'shelf']);
-});
-
-test('INVARIANT: a rule saying "under everything" is loaded first in its zone', () => {
+test('INVARIANT: no rule tells a piece to go under the load', () => {
+  // Nothing in the plan can be loaded beneath what is already on the deck,
+  // because the plan is read top to bottom and the deck fills as you go. An
+  // instruction to put something "under everything else" is either wrong about
+  // the item or wrong about the order; the rug was the first and it was both.
   const failures = NAMED_ITEMS.filter((name) => {
     const guidance = guidanceFor(makeItem({ name, category: 'other' }));
-    return guidance !== null && /under everything/i.test(guidance.orientation) && !loadsFirstInZone(name);
+    return guidance !== null && /under everything/i.test(guidance.orientation);
   });
-  assert.deepEqual(failures, [], `these say "under everything" but are not loaded first: ${failures}`);
+  assert.deepEqual(failures, [], `these ask to be loaded under the load: ${failures}`);
 });

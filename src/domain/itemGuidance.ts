@@ -44,15 +44,6 @@ interface GuidanceRule {
    * the furniture.
    */
   readonly zone: LoadStepOrder;
-  /**
-   * Goes down flat on the deck before anything else in its zone is stacked.
-   *
-   * The zone alone was not enough for a rug. It puts the rug in the first group,
-   * which is right, but the group is then listed biggest-first — so a rug whose
-   * instructions say "under everything else" was printed after the fridge and
-   * the bookshelf, i.e. after the things it is supposed to be under.
-   */
-  readonly loadFirst?: true;
   readonly guidance: ItemGuidance;
 }
 
@@ -224,6 +215,22 @@ const RULES: readonly GuidanceRule[] = [
     },
   },
   {
+    /*
+     * Before the wardrobe rule, and that ordering is the whole point: a wardrobe
+     * box is a tall cardboard box with a hanging rail, and /\bwardrobe\b/ caught
+     * it — so it was given a solid-oak armoire's instructions and loaded into the
+     * first tier with the appliances, while the plan had a section for boxes
+     * sitting right there.
+     */
+    match: /\bwardrobe box(es)?\b/i,
+    zone: 3,
+    guidance: {
+      orientation: 'Upright in the box wall, never on its side — everything inside slides off the rail if it goes over.',
+      prep: 'Leave the clothes hanging and use the floor of the box for shoes and light bedding.',
+      caution: null,
+    },
+  },
+  {
     match: /\b(wardrobe|armoire)\b/i,
     zone: 1,
     guidance: {
@@ -243,12 +250,12 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(rug|carpet)\b/i,
-    zone: 1,
-    loadFirst: true,
+    zone: 2,
     guidance: {
-      orientation: 'Rolled, laid along the floor at the very back, under everything else.',
+      orientation: 'Rolled and standing on end in a corner, tied to a rail — it takes almost no floor that way.',
       prep: 'Roll it face-in and tape the roll in three places.',
-      caution: null,
+      caution:
+        'Laid flat on the deck it gets walked on, and it pins the floor space the fridge and the heavy furniture need.',
     },
   },
   {
@@ -261,11 +268,6 @@ const RULES: readonly GuidanceRule[] = [
     },
   },
 ];
-
-/** True when this piece goes down before anything else in its zone. */
-export function loadsFirstInZone(name: string): boolean {
-  return RULES.find((rule) => rule.match.test(name))?.loadFirst === true;
-}
 
 /**
  * The load zone a named rule assigns, or null when no rule matches.

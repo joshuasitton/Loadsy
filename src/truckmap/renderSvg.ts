@@ -64,16 +64,18 @@ export const DIAGRAM_COLORS_FOR_TEST = {
 } as const;
 
 /**
- * Short zone names for the diagram. Positions in the truck, not kinds of object —
- * zone 1 holds a rolled rug as well as the fridge, and calling it "Heavy" made
- * the diagram disagree with the list beside it.
+ * Short names for the diagram's blocks.
+ *
+ * These say WHAT is in each block; the block's position in the drawing already
+ * says where. The section titles beside the diagram say WHEN — naming both after
+ * walls was how the plan came to promise a back wall wide enough for eight items.
  */
 const STEP_LABELS: Record<LoadStepOrder, string> = {
-  1: 'Back wall',
-  2: 'Side walls',
+  1: 'Heaviest',
+  2: 'Long & tall',
   3: 'Boxes',
   4: 'Fragile',
-  5: 'By the door',
+  5: 'Last in',
 };
 
 const CANVAS = { width: 320, height: 200 };
