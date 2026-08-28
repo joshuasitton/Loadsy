@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  loadSequence,
   planLoad,
   poseFootprint,
   project,
@@ -18,6 +19,11 @@ import { buildDemoMove, DEMO_SCENARIOS } from '../src/demo/scenarios';
 import { makeItem, resetIds } from './helpers';
 
 const EPS = 1e-6;
+
+/** Do two intervals overlap by more than a rounding error? */
+function overlap(aStart: number, aSize: number, bStart: number, bSize: number): boolean {
+  return aStart < bStart + bSize - EPS && bStart < aStart + aSize - EPS;
+}
 
 function intersects(a: Placement, b: Placement): boolean {
   return (
@@ -307,4 +313,77 @@ test('every truck bed is a plausible box for its published capacity', () => {
     assert.ok(bed.lengthIn > bed.widthIn, `${size}: a truck is longer than it is wide`);
     assert.ok(boxCuFt > 100, `${size}: ${boxCuFt} ft³ is not a truck`);
   }
+});
+
+test('GUARANTEE: the load sequence never asks for the impossible', () => {
+  // Two rules, and they are the two anybody carrying a sofa would state: you
+  // cannot stack onto something that is not there yet, and you cannot walk a
+  // piece past one already in the way.
+  for (const { id, plan } of everyScenario()) {
+    const sequence = loadSequence(plan);
+    assert.equal(sequence.length, plan.placements.length, `${id}: the sequence lost a piece`);
+
+    const placedSoFar: Placement[] = [];
+    for (const piece of sequence) {
+      if (piece.zIn > EPS) {
+        assert.ok(
+          supportedFraction(piece, placedSoFar) >= 0.7 - 1e-3,
+          `${id}: ${piece.name} is loaded onto something that is not in the truck yet`,
+        );
+      }
+      for (const already of placedSoFar) {
+        const sameLane = overlap(piece.yIn, piece.acrossIn, already.yIn, already.acrossIn);
+        const sameHeight = overlap(piece.zIn, piece.tallIn, already.zIn, already.tallIn);
+        assert.ok(
+          !(sameLane && sameHeight && piece.xIn + piece.alongIn <= already.xIn + EPS),
+          `${id}: ${piece.name} has to be carried past ${already.name}, already loaded`,
+        );
+      }
+      placedSoFar.push(piece);
+    }
+  }
+});
+
+test('the load sweeps from the cab towards the door', () => {
+  // Not strictly monotone, and should not be: a piece riding on top of a stack
+  // cannot go in until the stack exists, so the sequence walks forward again for
+  // it. What must hold is that those are the exception rather than the shape.
+  for (const { id, plan } of everyScenario()) {
+    const sequence = loadSequence(plan);
+    if (sequence.length < 5) continue;
+
+    let frontier = -1;
+    let backwards = 0;
+    for (const piece of sequence) {
+      if (piece.xIn < frontier - EPS) backwards++;
+      frontier = Math.max(frontier, piece.xIn);
+    }
+    assert.ok(
+      backwards <= sequence.length * 0.2,
+      `${id}: ${backwards} of ${sequence.length} pieces go backwards — that is a scatter, not a sweep`,
+    );
+  }
+});
+
+test('within one slice of the truck, the load builds upward', () => {
+  // The other half of "front to back, bottom to top". Two pieces at the same
+  // distance from the cab go in low one first.
+  for (const { id, plan } of everyScenario()) {
+    const sequence = loadSequence(plan);
+    for (let i = 1; i < sequence.length; i++) {
+      const previous = sequence[i - 1]!;
+      const current = sequence[i]!;
+      if (Math.abs(previous.xIn - current.xIn) > EPS) continue;
+      assert.ok(
+        current.zIn >= previous.zIn - EPS,
+        `${id}: ${current.name} loads below ${previous.name} at the same point in the truck`,
+      );
+    }
+  }
+});
+
+test('the sequence is deterministic', () => {
+  const move = buildDemoMove(DEMO_SCENARIOS.find((s) => s.id === 'two-bed')!);
+  const plan = planLoad(allItems(move), buildRecommendation(move).size);
+  assert.deepEqual(loadSequence(plan), loadSequence(plan));
 });

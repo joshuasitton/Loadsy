@@ -153,7 +153,7 @@ Three tabs on Screen 6. Two are the zone summaries; **Load It** is a solved 3D
 load, played back one piece at a time in the order the plan prescribes.
 
 `src/truckmap/layout.ts` is a small bin-packing solver. Packing boxes into a box
-optimally is NP-hard, so it does the achievable thing instead: try eight
+optimally is NP-hard, so it does the achievable thing instead: try six
 deterministic arrangements and keep the best. Within a pass it turns each piece
 both ways on the deck, lays down anything that will not stand, and settles every
 placement down-then-forward-then-to-a-wall until it touches something.
@@ -170,8 +170,21 @@ knob. Pose is constrained by the guidance rule that writes the instruction, with
 flatter poses as fallbacks rather than alternatives.
 
 Scoring, in order: most pieces placed, then the shortest load, then the lowest
-centre of mass — two loads of equal length are not equally good if one is stacked
-tall and the other is not.
+centre of mass, then agreement with the printed group order — two loads of equal
+length are not equally good if one is stacked tall, or if it puts the box wall in
+front of the wardrobe while the plan says otherwise.
+
+**The playback order is derived, not the order the solver placed things.** The
+solver works group by group and fills where it can, so its own sequence hops
+between lanes; `project` sorts back to front so nearer pieces paint over further
+ones. Both are right for what they do and neither is a load order. `loadSequence`
+derives one — front to back, bottom to top — under two rules that cannot be
+broken: a piece goes in after whatever holds it up, and after anything already
+blocking its way. A test walks the sequence piece by piece and fails if either is
+violated.
+
+The occasional step back towards the cab is the second rule working: a television
+riding on top of a stack cannot go in until the stack is there.
 
 **Two views of one solve**, the convention of any engineering drawing: from the
 side for the stacking, from above for which wall a piece is against. A side

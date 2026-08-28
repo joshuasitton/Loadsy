@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { STEP_COLORS, STEP_LABELS } from '../truckmap/renderSvg';
 import {
+  loadSequence,
   POSE_LABEL,
   project,
   sideOfTruck,
@@ -46,6 +47,13 @@ import { colors, radius, space, type } from './theme';
  * throws away is at least visible. Both play the same load in the same order at
  * the same time; the tab only changes where you are standing.
  *
+ * ## Order
+ *
+ * Front to back, bottom to top. The occasional step back towards the cab is the
+ * second rule doing its job: a television that rides on top of a stack cannot go
+ * in until the stack is there, so you walk it forward again. `loadSequence` owns
+ * the rules.
+ *
  * ## Motion
  *
  * Honoured against the OS reduce-motion setting. With it on, the load appears
@@ -76,14 +84,20 @@ export function TruckLoadAnimation({
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
 
   /*
-   * Ordered by when each piece is loaded, not by the projection's paint order.
+   * The order to carry things in — front to back, bottom to top — which is
+   * neither the order the solver placed them nor the order a view paints them.
    *
-   * `project` sorts back to front so nearer pieces paint over further ones, which
-   * is right for drawing and wrong for playback — following it would load the
-   * truck from the far wall inwards. The two orders are reconciled here: the
-   * animation walks the load order, and each view keeps its own paint order.
+   * The solver works group by group and fills where it can, so its sequence hops
+   * between lanes. `project` sorts back to front so nearer pieces paint over
+   * further ones. Both are right for what they do and neither is a load order,
+   * so `loadSequence` derives one: a piece goes in after whatever holds it up and
+   * after anything already blocking its way, and among what is left the nearest
+   * to the cab goes first.
    */
-  const order = useMemo(() => plan.placements.map((placement) => placement.itemId), [plan]);
+  const order = useMemo(
+    () => loadSequence(plan).map((placement) => placement.itemId),
+    [plan],
+  );
   const rects = useMemo(() => project(plan, view), [plan, view]);
   const rectById = useMemo(
     () => new Map(rects.map((rect) => [rect.itemId, rect])),

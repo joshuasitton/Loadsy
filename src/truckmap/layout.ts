@@ -32,6 +32,20 @@
  * that rule the packer suspends a mattress in mid-air over a gap, which looks
  * like a solution and is not one.
  *
+ * ## Buildability is a question about the ORDER, not the arrangement
+ *
+ * "Can you actually get each piece to its spot" was tried here first, as a
+ * constraint on where the solver may place things: no filling a gap that is
+ * already walled in behind the load or roofed over by it. It works, and it is
+ * the wrong place for it. Forbidding the solver from ever backfilling cost two
+ * items across the demo inventories — including a sectional sofa — and doubled
+ * the solve time, to buy a handful of fewer steps backwards in the playback.
+ *
+ * The arrangement does not have to be built front to back; the SEQUENCE does.
+ * `loadSequence` derives one that is, and a test walks it piece by piece
+ * checking that nothing is ever carried past something already loaded or stacked
+ * onto something not yet in the truck. Same guarantee, at no cost to the fit.
+ *
  * ## What the drawings are
  *
  * One 3D solve, two orthographic projections — the convention of any engineering
@@ -218,26 +232,14 @@ const byFlattest = (items: InventoryItem[]) =>
 const frontLowLeft = (a: Box, b: Box) => a.x - b.x || a.z - b.z || a.y - b.y;
 /** Forward first, then hug a wall, then stack. Builds the sides before the middle. */
 const frontLeftLow = (a: Box, b: Box) => a.x - b.x || a.y - b.y || a.z - b.z;
-/** Lowest first. Fills the deck before stacking anything on it. */
-const lowFrontLeft = (a: Box, b: Box) => a.z - b.z || a.x - b.x || a.y - b.y;
 
 const STRATEGIES: readonly Strategy[] = [
-  { name: "front-low, biggest first", order: byVolume, prefer: frontLowLeft },
-  { name: "front-wall, biggest first", order: byVolume, prefer: frontLeftLow },
-  { name: "deck-first, biggest first", order: byVolume, prefer: lowFrontLeft },
-  { name: "front-low, longest first", order: byLongest, prefer: frontLowLeft },
-  { name: "front-wall, longest first", order: byLongest, prefer: frontLeftLow },
-  { name: "deck-first, longest first", order: byLongest, prefer: lowFrontLeft },
-  {
-    name: "front-low, flattest first",
-    order: byFlattest,
-    prefer: frontLowLeft,
-  },
-  {
-    name: "front-wall, flattest first",
-    order: byFlattest,
-    prefer: frontLeftLow,
-  },
+  { name: 'front-low, biggest first', order: byVolume, prefer: frontLowLeft },
+  { name: 'front-wall, biggest first', order: byVolume, prefer: frontLeftLow },
+  { name: 'front-low, longest first', order: byLongest, prefer: frontLowLeft },
+  { name: 'front-wall, longest first', order: byLongest, prefer: frontLeftLow },
+  { name: 'front-low, flattest first', order: byFlattest, prefer: frontLowLeft },
+  { name: 'front-wall, flattest first', order: byFlattest, prefer: frontLeftLow },
 ];
 
 /**
@@ -283,7 +285,7 @@ function emptyPlan(bed: BedDimensions): LoadPlan {
     placements: [],
     overflow: [],
     usedLengthIn: 0,
-    strategy: { name: "nothing to load", tried: STRATEGIES.length },
+    strategy: { name: 'nothing to load', tried: STRATEGIES.length },
   };
 }
 
@@ -675,6 +677,85 @@ export function project(plan: LoadPlan, view: ProjectionView): ProjectedRect[] {
 
   // Furthest first, so nearer pieces paint over them.
   return rects.sort((a, b) => b.depth - a.depth || cmp(a.itemId, b.itemId));
+}
+
+/**
+ * The order to carry things in: front to back, bottom to top.
+ *
+ * NOT the order the solver happened to place them in. The solver works group by
+ * group and fills where it can, so its own sequence hops between lanes — load
+ * the left wall to the back, come forward again for the right wall. Every one of
+ * those hops is physically fine, and watching it is baffling: the truck fills in
+ * a scatter rather than a sweep.
+ *
+ * So the sequence is derived spatially, with two rules that cannot be broken:
+ *
+ *   - a piece comes after everything holding it up, and
+ *   - a piece comes after anything already blocking its way in.
+ *
+ * Among whatever is available at each step, the nearest to the cab goes first,
+ * then the lowest, then the left. Which is front to back, bottom to top.
+ *
+ * A greedy topological walk rather than a plain sort: sorting by position alone
+ * can put a piece before the thing it rests on, whenever the supporter starts
+ * further back and overhangs forward.
+ */
+export function loadSequence(plan: LoadPlan): Placement[] {
+  const remaining = [...plan.placements];
+  const out: Placement[] = [];
+
+  while (remaining.length > 0) {
+    const ready = remaining.filter((candidate) =>
+      remaining.every((other) => other === candidate || !mustPrecede(other, candidate)),
+    );
+
+    // Nothing free to go next would mean a cycle. It cannot happen — both
+    // relations point strictly forward or strictly downward — but falling back to
+    // position order beats looping for ever if it ever does.
+    const pool = ready.length > 0 ? ready : remaining;
+    let next = pool[0]!;
+    for (const candidate of pool) if (earlier(candidate, next) < 0) next = candidate;
+
+    out.push(next);
+    remaining.splice(remaining.indexOf(next), 1);
+  }
+  return out;
+}
+
+/** Nearest the cab first, then lowest, then leftmost. Id last, for determinism. */
+function earlier(a: Placement, b: Placement): number {
+  return a.xIn - b.xIn || a.zIn - b.zIn || a.yIn - b.yIn || cmp(a.itemId, b.itemId);
+}
+
+/**
+ * Must `first` be loaded before `second`?
+ *
+ * Two reasons, and they are the two the user notices: you cannot stack onto
+ * something that is not there yet, and you cannot carry a piece past one that is
+ * already in the way. x is measured from the CAB, so the smaller x is the one
+ * further inside the truck — and therefore the one that has to go in first.
+ */
+function mustPrecede(first: Placement, second: Placement): boolean {
+  const sameLane = spans(second.yIn, second.acrossIn, first.yIn, first.acrossIn);
+  if (!sameLane) return false;
+
+  // `first` is holding `second` up.
+  if (
+    Math.abs(first.zIn + first.tallIn - second.zIn) < 1e-3 &&
+    spans(second.xIn, second.alongIn, first.xIn, first.alongIn)
+  ) {
+    return true;
+  }
+
+  // `first` is further inside the truck, in the same lane and at the same
+  // height: once `second` is in, there is no way past it to reach `first`.
+  if (
+    spans(second.zIn, second.tallIn, first.zIn, first.tallIn) &&
+    first.xIn + first.alongIn <= second.xIn + EPS
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** Plain-language name for a pose, for the caption under a highlighted piece. */
