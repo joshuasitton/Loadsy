@@ -16,6 +16,20 @@
 import type { LoadStepOrder } from './packing';
 import type { InventoryItem } from './types';
 
+/**
+ * How a piece is turned when it travels.
+ *
+ * - `upright` — the way it sits in a room.
+ * - `onEdge`  — tipped onto its long side. A mattress, a table top, a mirror.
+ * - `onEnd`   — stood on its smallest face, tall. A sofa, a rolled rug.
+ * - `flat`    — lying down deliberately, which for geometry is `upright`.
+ *
+ * The distinction is not cosmetic. A queen mattress laid flat is 80 × 60 on the
+ * deck and holds nothing up; on its long edge it is 80 × 12 and the bed frame
+ * fits beside it. That difference is a truck size.
+ */
+export type TravelPose = 'upright' | 'onEdge' | 'onEnd' | 'flat';
+
 export interface ItemGuidance {
   /** How the piece sits in the truck. */
   readonly orientation: string;
@@ -44,6 +58,15 @@ interface GuidanceRule {
    * the furniture.
    */
   readonly zone: LoadStepOrder;
+  /**
+   * How the piece is turned when it goes in.
+   *
+   * Structured, not parsed back out of the sentence beside it — the same lesson
+   * the zone taught. The truck layout draws each item at the size this pose
+   * gives it, so "on its long edge" has to be a value the drawing can read, or
+   * the picture and the instruction drift apart exactly as placement did.
+   */
+  readonly pose: TravelPose;
   readonly guidance: ItemGuidance;
 }
 
@@ -61,6 +84,7 @@ export const LARGE_ITEM_CUBIC_FEET = 15;
 const RULES: readonly GuidanceRule[] = [
   {
     match: /\b(grill|barbecue|bbq)\b/i,
+    pose: 'upright',
     zone: 5,
     guidance: {
       orientation: 'Upright, near the door where it can come off first.',
@@ -70,6 +94,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(lawn ?mower|mower|generator|chainsaw|trimmer)\b/i,
+    pose: 'upright',
     zone: 5,
     guidance: {
       orientation: 'Upright on the floor near the door, away from anything upholstered.',
@@ -79,6 +104,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(refrigerator|fridge|freezer)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright against the wall behind the cab, strapped. Never on its back or side.',
@@ -88,6 +114,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(washer|washing machine)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright, against the wall behind the cab, strapped.',
@@ -97,6 +124,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dryer|tumble dryer|dishwasher|range|oven|stove|cooker)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright against the wall behind the cab, strapped.',
@@ -106,6 +134,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(mattress|box spring)\b/i,
+    pose: 'onEdge',
     zone: 2,
     guidance: {
       orientation: 'On its long edge, flat against a side wall, running the length of the truck.',
@@ -115,6 +144,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(sectional|sofa|couch|loveseat|settee)\b/i,
+    pose: 'onEnd',
     zone: 2,
     guidance: {
       orientation: 'On end, arm down, against a side wall — it takes a third of the floor that way.',
@@ -124,6 +154,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dining table|desk|table)\b/i,
+    pose: 'onEdge',
     zone: 2,
     guidance: {
       orientation: 'Top on edge against a side wall, legs bundled beside it.',
@@ -133,6 +164,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bed frame|bedstead|bed base|headboard)\b/i,
+    pose: 'onEdge',
     zone: 2,
     guidance: {
       orientation: 'Rails and boards flat against a side wall, behind the mattresses.',
@@ -144,6 +176,7 @@ const RULES: readonly GuidanceRule[] = [
     // Ahead of the television rule, which \btv\b would otherwise claim: a TV STAND
     // is a wooden cabinet, and telling its owner the screen might crack is nonsense.
     match: /\b(tv stand|media console|entertainment (unit|centre|center))\b/i,
+    pose: 'upright',
     zone: 2,
     guidance: {
       orientation: 'Upright against a wall, strapped.',
@@ -153,6 +186,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(tv|television)\b/i,
+    pose: 'onEdge',
     zone: 4,
     guidance: {
       orientation: 'Upright on its edge, never flat, wedged between two soft items.',
@@ -162,6 +196,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(mirror|painting|framed|artwork|glass top)\b/i,
+    pose: 'onEdge',
     zone: 4,
     guidance: {
       orientation: 'On edge in a picture box, slotted between two mattresses.',
@@ -171,6 +206,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(piano|organ)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Against the wall behind the cab, on a board, strapped at two heights.',
@@ -180,6 +216,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(treadmill|exercise bike|elliptical|weight bench)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Folded and locked, upright against a wall, strapped.',
@@ -189,6 +226,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bicycle|bike)\b/i,
+    pose: 'upright',
     zone: 4,
     guidance: {
       orientation: 'Upright against a wall, or hung from the tie rail by the frame.',
@@ -198,6 +236,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bookshelf|bookcase|shelving|china cabinet|hutch|display cabinet)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright against a wall, strapped — it will rack and loosen if laid down.',
@@ -207,6 +246,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dresser|chest of drawers|nightstand|sideboard|buffet|credenza|filing cabinet)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright, drawers facing a wall so they cannot slide open.',
@@ -223,6 +263,7 @@ const RULES: readonly GuidanceRule[] = [
      * sitting right there.
      */
     match: /\bwardrobe box(es)?\b/i,
+    pose: 'upright',
     zone: 3,
     guidance: {
       orientation: 'Upright in the box wall, never on its side — everything inside slides off the rail if it goes over.',
@@ -232,6 +273,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(wardrobe|armoire)\b/i,
+    pose: 'upright',
     zone: 1,
     guidance: {
       orientation: 'Upright against a wall, strapped at two heights.',
@@ -241,6 +283,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(lamp|chandelier)\b/i,
+    pose: 'upright',
     zone: 4,
     guidance: {
       orientation: 'Boxed, loaded late, with nothing on top.',
@@ -250,6 +293,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(rug|carpet)\b/i,
+    pose: 'onEnd',
     zone: 2,
     guidance: {
       orientation: 'Rolled and standing on end in a corner, tied to a rail — it takes almost no floor that way.',
@@ -260,6 +304,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(plant|tree)\b/i,
+    pose: 'upright',
     zone: 5,
     guidance: {
       orientation: 'Not in the truck — carry it in the car.',
@@ -268,6 +313,28 @@ const RULES: readonly GuidanceRule[] = [
     },
   },
 ];
+
+/** How this item travels: a named rule if there is one, or a shape-based guess. */
+export function poseForItem(item: InventoryItem): TravelPose {
+  const named = RULES.find((rule) => rule.match.test(item.name))?.pose;
+  if (named) return named;
+
+  const { lengthIn, widthIn, heightIn } = item.dimensions;
+  /*
+   * A slab goes on edge; everything else stands up.
+   *
+   * "Slab" means noticeably thinner than it is wide — a table top, a headboard, a
+   * framed picture. Laying one of those flat wastes the deck under it, and it is
+   * the mistake the guidance rules exist to correct for the pieces we can name.
+   * The threshold is deliberately conservative: guessing `onEdge` for something
+   * that should stand up draws it tipped over, which looks wrong to anybody who
+   * has loaded a truck, so it only fires when the shape is unmistakable.
+   */
+  const thinnest = Math.min(lengthIn, widthIn, heightIn);
+  const widest = Math.max(lengthIn, widthIn, heightIn);
+  if (heightIn === thinnest && widest > 0 && thinnest < widest * 0.35) return 'onEdge';
+  return 'upright';
+}
 
 /**
  * The load zone a named rule assigns, or null when no rule matches.

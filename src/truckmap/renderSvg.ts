@@ -36,9 +36,10 @@ const BED_DIMENSIONS: Record<TruckSize, { lengthFt: number; widthFt: number }> =
  * label. `__tests__/contrast.test.ts` holds that line — an earlier set shipped
  * with zone 2 at 2.92:1, effectively unreadable.
  *
- * Exported for that test: these fills are backgrounds, not decoration.
+ * Exported for that test — and for the animated layout, which draws every item
+ * in its step's colour so the diagram and the printed plan read as one thing.
  */
-export const STEP_COLORS_FOR_TEST: Record<LoadStepOrder, string> = {
+export const STEP_COLORS: Record<LoadStepOrder, string> = {
   1: '#134E63',
   2: '#146A72',
   3: '#0F6E63',
@@ -70,7 +71,10 @@ export const DIAGRAM_COLORS_FOR_TEST = {
  * says where. The section titles beside the diagram say WHEN — naming both after
  * walls was how the plan came to promise a back wall wide enough for eight items.
  */
-const STEP_LABELS: Record<LoadStepOrder, string> = {
+/** The name the contrast test knows it by. Same object. */
+export const STEP_COLORS_FOR_TEST = STEP_COLORS;
+
+export const STEP_LABELS: Record<LoadStepOrder, string> = {
   1: 'Heaviest',
   2: 'Long & tall',
   3: 'Boxes',
@@ -136,7 +140,7 @@ export function computeZones(items: InventoryItem[]): LoadZone[] {
     .map((step) => ({
       step,
       label: STEP_LABELS[step],
-      color: STEP_COLORS_FOR_TEST[step],
+      color: STEP_COLORS[step],
       cubicFeet: Math.round((totals.get(step) ?? 0) * 100) / 100,
       fraction: (totals.get(step) ?? 0) / loaded,
     }));

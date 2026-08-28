@@ -6,7 +6,7 @@ import { SvgXml } from 'react-native-svg';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import type { InventoryItem } from '../src/domain/types';
 import { allItems } from '../src/domain/volume';
-import { guidanceFor } from '../src/domain/itemGuidance';
+import { guidanceFor, poseForItem } from '../src/domain/itemGuidance';
 import { buildLoadSteps, type LoadStepOrder } from '../src/domain/packing';
 import {
   computeZones,
@@ -14,6 +14,8 @@ import {
   truckMapAriaLabel,
   type TruckView,
 } from '../src/truckmap/renderSvg';
+import { elevationRects, planLoad, POSE_LABEL } from '../src/truckmap/layout';
+import { TruckLoadAnimation } from '../src/ui/TruckLoadAnimation';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -24,7 +26,17 @@ const FILE_NAME = 'loadsy-truck-plan.svg';
 
 export default function LayoutViewScreen() {
   const { move, packingPlan, recommendation } = useMove();
-  const [view, setView] = useState<TruckView>('top');
+  /**
+   * 'load' is the item-level animation; the other two are the zone summaries.
+   *
+   * It is the default because it is the one that answers the question people
+   * arrive with — where does THIS go and which way round — while the zone views
+   * answer "roughly how much of the truck does each group take", which the
+   * packing plan already said in words.
+   */
+  const [view, setView] = useState<'load' | TruckView>('load');
+  /** The piece the user tapped in the animation, if any. */
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   /** The zone the user has opened. Null until they ask — the diagram reads fine closed. */
   const [openStep, setOpenStep] = useState<LoadStepOrder | null>(null);
@@ -37,11 +49,30 @@ export default function LayoutViewScreen() {
   const items = useMemo(() => allItems(move), [move]);
   // Unlabelled on purpose — see `a11y` below. The saved/shared file is rendered
   // separately, with its label embedded, because it has to stand on its own.
+  /**
+   * The zone diagram. Falls back to 'top' while the load animation is showing —
+   * the SVG renderer only knows the two zone views, and Save Plan still has to
+   * produce a file whichever tab happens to be open.
+   */
+  const svgView: TruckView = view === '3d' ? '3d' : 'top';
   const svg = useMemo(
-    () => renderTruckMapSVG(items, recommendation.size, view, { labelled: false }),
-    [items, recommendation.size, view],
+    () => renderTruckMapSVG(items, recommendation.size, svgView, { labelled: false }),
+    [items, recommendation.size, svgView],
   );
   const zones = useMemo(() => computeZones(items), [items]);
+
+  // The item-level layout. Derived, like everything else on this screen, so it
+  // cannot describe an inventory the user has since edited.
+  const loadPlan = useMemo(() => planLoad(items, recommendation.size), [items, recommendation.size]);
+  const loadRects = useMemo(() => elevationRects(loadPlan), [loadPlan]);
+  const loadKey = useMemo(
+    () => `${recommendation.size}:${items.map((item) => item.id).join(',')}`,
+    [items, recommendation.size],
+  );
+  const openItem = useMemo(
+    () => items.find((item) => item.id === openItemId) ?? null,
+    [items, openItemId],
+  );
   // Derived from `zones`, never from recommendation.rawCuFt: the header states the
   // figure the legend below it adds up to, so the two cannot drift apart on rounding.
   const zonedCuFt = useMemo(
@@ -69,7 +100,7 @@ export default function LayoutViewScreen() {
    * an accessible name, so it needs the label embedded.
    */
   function exportSvg(): string {
-    return renderTruckMapSVG(items, recommendation.size, view);
+    return renderTruckMapSVG(items, recommendation.size, svgView);
   }
 
   /** Writes the diagram and hands back its file:// URI. */
@@ -168,6 +199,12 @@ export default function LayoutViewScreen() {
 
         <View style={styles.tabs}>
           <Chip
+            label="Load It"
+            active={view === 'load'}
+            onPress={() => setView('load')}
+            accessibilityLabel="Watch the truck being loaded piece by piece"
+          />
+          <Chip
             label="Top View"
             active={view === 'top'}
             onPress={() => setView('top')}
@@ -182,7 +219,24 @@ export default function LayoutViewScreen() {
         </View>
 
         <Card style={styles.diagramCard}>
-          {view === 'top' ? (
+          {view === 'load' ? (
+            <View style={styles.loadView}>
+              <Text style={styles.loadIntro}>
+                Side view, cab on the left. Each piece is drawn as tall as it stands in the
+                position it travels in, and as wide as the truck length it uses — so the
+                area of a block is its share of the load. Tap one for its instructions.
+              </Text>
+              <TruckLoadAnimation
+                // Keyed on the inventory: a different item set is a different
+                // load, and remounting is how playback resets.
+                key={loadKey}
+                plan={loadPlan}
+                rects={loadRects}
+                selectedId={openItemId}
+                onSelect={setOpenItemId}
+              />
+            </View>
+          ) : view === 'top' ? (
             /*
              * Laid out with flex rather than the SVG, so each zone is a real
              * pressable with its own hit area and accessibility node. Overlaying
@@ -256,7 +310,9 @@ export default function LayoutViewScreen() {
           )}
         </Card>
 
-        {openStep !== null ? <ZoneDetail step={openStep} items={items} /> : null}
+        {view === 'load' && openItem ? <ItemDetail item={openItem} /> : null}
+
+        {view !== 'load' && openStep !== null ? <ZoneDetail step={openStep} items={items} /> : null}
 
         <Card style={styles.legend}>
           {zones.map((zone) => (
@@ -283,9 +339,15 @@ export default function LayoutViewScreen() {
           ))}
         </Card>
 
+        {/*
+          The caveat has to match the tab. "Not a piece-by-piece packing
+          solution" was true of the zone diagrams and became false the moment
+          one of the tabs started drawing every piece individually.
+        */}
         <Text style={styles.caveat}>
-          This is a load-zone diagram, not a piece-by-piece packing solution. It shows where each
-          group belongs and how much of the truck it takes up.
+          {view === 'load'
+            ? 'An illustration, not a solver. A real loader turns things and slides a box into a gap; this places each piece in the order the plan prescribes, as far forward as it will go. Trust the truck size — it is worked out from volume with a 15% reserve.'
+            : 'This is a load-zone diagram, not a piece-by-piece packing solution. It shows where each group belongs and how much of the truck it takes up.'}
         </Text>
 
         {problem ? (
@@ -317,6 +379,8 @@ const styles = StyleSheet.create({
   subtitle: { ...type.caption, color: colors.textMuted },
   subtitleDim: { ...type.caption, color: colors.textDim },
   tabs: { flexDirection: 'row', gap: space.sm },
+  loadView: { gap: space.md },
+  loadIntro: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   diagramCard: { padding: space.sm, backgroundColor: colors.surfaceRaised },
   stripHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   stripEnd: { ...type.caption, color: colors.textDim, fontSize: 11 },
@@ -359,6 +423,43 @@ const styles = StyleSheet.create({
  * even before a plan has been fetched — the load order is a pure function of the
  * inventory, and re-deriving it costs nothing next to a network round trip.
  */
+/**
+ * One piece, opened from the animation.
+ *
+ * The same guidance the packing plan prints, shown against the block the user
+ * just tapped — so the picture and the instructions are visibly the same thing
+ * rather than two descriptions that have to be reconciled by the reader.
+ */
+function ItemDetail({ item }: { item: InventoryItem }) {
+  const guidance = guidanceFor(item);
+  const { lengthIn, widthIn, heightIn } = item.dimensions;
+
+  return (
+    <Card style={styles.detail}>
+      <Text style={styles.detailTitle}>{item.name}</Text>
+      <Text style={styles.detailInstruction}>
+        {Math.round(lengthIn)} × {Math.round(widthIn)} × {Math.round(heightIn)} in ·{' '}
+        {item.cubicFeet} ft³ · {POSE_LABEL[poseForItem(item)].toLowerCase()}
+      </Text>
+      {guidance ? (
+        <View style={styles.detailItem}>
+          <Text style={styles.detailItemGuidance}>{guidance.orientation}</Text>
+          {guidance.prep ? (
+            <Text style={styles.detailItemGuidance}>First: {guidance.prep}</Text>
+          ) : null}
+          {guidance.caution ? (
+            <Text style={styles.detailItemCaution}>{guidance.caution}</Text>
+          ) : null}
+        </View>
+      ) : (
+        <Text style={styles.detailItemGuidance}>
+          Nothing special about this one — it goes where it fits.
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 function ZoneDetail({ step, items }: { step: LoadStepOrder; items: InventoryItem[] }) {
   const loadStep = buildLoadSteps(items).find((entry) => entry.order === step);
   if (!loadStep) return null;

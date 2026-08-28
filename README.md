@@ -147,6 +147,41 @@ contradicts the zone it assigns, which is how that class of bug stays fixed.
 
 Within a tier: biggest first, id as the tiebreak so the plan stays deterministic.
 
+### The truck layout
+
+Three tabs on Screen 6. Two are the zone summaries; **Load It** is an item-level
+side elevation that plays the load back one piece at a time.
+
+`src/truckmap/layout.ts` owns the geometry, and one property makes the picture
+worth reading rather than merely worth looking at: a block's **area is exactly
+proportional to the item's volume**. Its height is how tall the piece stands in
+the pose it travels in; its width is how much truck *length* it consumes — its
+depth scaled by the share of the truck's width it uses. Two nightstands side by
+side occupy one slice of truck, so each is drawn with half the depth it would
+alone. `__tests__/truckLayout.test.ts` asserts the drawn area matches the true
+volumetric fill to within half a percent.
+
+A plan view of the floor would have been the wrong drawing: it ignores the six or
+seven feet of height every load uses, and would show most real moves as "not
+fitting".
+
+Placement is a skyline packer that prefers the position **furthest forward**, then
+lowest. Lowest-first is the textbook rule and it draws a bar chart — every piece
+takes a fresh patch of deck, because the deck is always the lowest thing
+available. Preferring the smallest x reproduces how a truck is really loaded:
+build the front floor-to-ceiling, then start the next slice behind it.
+
+Poses come from the same guidance rule that writes the instruction, so the picture
+and the words cannot drift. Where the truck will not take the ideal pose — a
+96-inch rolled rug cannot stand under a 7'2" roof — the packer lays the piece down
+and the detail panel says it did, rather than printing "stand it on end" beside a
+picture of it lying flat.
+
+Bed dimensions are U-Haul's published interiors. They deliberately do **not**
+replace `TRUCK_CAPACITY`, which is what sizing decisions are made from: the 10'
+capacity counts an over-cab compartment the deck does not describe, and the larger
+trucks lose deck to wheel wells.
+
 ### Where the move starts and ends
 
 Its own step, `app/trip.tsx`, between Inventory and Truck Size — full street
