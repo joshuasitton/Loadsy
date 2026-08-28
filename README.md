@@ -125,6 +125,27 @@ Forward navigates with `replace`, not `push`. These are steps in one flow rather
 than a stack of pages, so walking forward and back a few times should not build a
 history the user then has to unwind.
 
+### The load plan is an order of operations
+
+People load in the order the plan is printed, which makes the sequence a set of
+instructions rather than a grouping. Two consequences shape `src/domain/packing.ts`:
+
+- **The groups are positions in the truck**, back wall to door — not categories
+  that happen to be listed in a sensible order. An area rug is not heavy, not
+  furniture and not a box; it goes at the back because that is where a rug goes.
+- **Placement is a property of the item**, owned by the guidance rule that also
+  writes the sentence describing it. It used to be decided twice — by category
+  and weight here, and in prose in `itemGuidance.ts` — with nothing keeping the
+  two in step. They diverged: a rug was told to go "at the very back, under
+  everything else" while being listed fourth of five, so anyone following the
+  plan put the rug on top of their furniture.
+
+`__tests__/packing.test.ts` reads each rule's own sentence and fails if it
+contradicts the zone it assigns, which is how that class of bug stays fixed.
+
+Within a zone: anything that lies flat on the deck first, then biggest to
+smallest, id as the tiebreak so the plan stays deterministic.
+
 ### Where the move starts and ends
 
 Its own step, `app/trip.tsx`, between Inventory and Truck Size — full street

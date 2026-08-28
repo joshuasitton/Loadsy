@@ -13,6 +13,7 @@
  * the fuel" gets skipped too.
  */
 
+import type { LoadStepOrder } from './packing';
 import type { InventoryItem } from './types';
 
 export interface ItemGuidance {
@@ -29,6 +30,29 @@ export interface ItemGuidance {
 
 interface GuidanceRule {
   readonly match: RegExp;
+  /**
+   * Where in the truck this piece rides, 1 at the wall behind the cab to 5 at
+   * the door.
+   *
+   * It lives on the same rule that writes the sentence, and that is the whole
+   * point. Placement used to be decided twice — once here in prose and once by a
+   * category-and-weight rule in packing.ts — and the two could disagree without
+   * anything noticing. They did: an area rug was told to go "at the very back,
+   * under everything else" while being listed in the fourth group, three
+   * quarters of the way to the door. People load in the order the plan is
+   * printed, so that is not a wording problem; it is the rug ending up on top of
+   * the furniture.
+   */
+  readonly zone: LoadStepOrder;
+  /**
+   * Goes down flat on the deck before anything else in its zone is stacked.
+   *
+   * The zone alone was not enough for a rug. It puts the rug in the first group,
+   * which is right, but the group is then listed biggest-first — so a rug whose
+   * instructions say "under everything else" was printed after the fridge and
+   * the bookshelf, i.e. after the things it is supposed to be under.
+   */
+  readonly loadFirst?: true;
   readonly guidance: ItemGuidance;
 }
 
@@ -46,6 +70,7 @@ export const LARGE_ITEM_CUBIC_FEET = 15;
 const RULES: readonly GuidanceRule[] = [
   {
     match: /\b(grill|barbecue|bbq)\b/i,
+    zone: 5,
     guidance: {
       orientation: 'Upright, near the door where it can come off first.',
       prep: 'Take the propane cylinder off and transport it yourself, outside the truck.',
@@ -54,14 +79,16 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(lawn ?mower|mower|generator|chainsaw|trimmer)\b/i,
+    zone: 5,
     guidance: {
-      orientation: 'Upright on the floor, away from anything upholstered.',
+      orientation: 'Upright on the floor near the door, away from anything upholstered.',
       prep: 'Run the fuel tank dry, or drain it, and disconnect the spark plug lead.',
       caution: 'Petrol fumes in a sealed truck are a fire risk, and a leak ruins whatever it soaks into.',
     },
   },
   {
     match: /\b(refrigerator|fridge|freezer)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright against the wall behind the cab, strapped. Never on its back or side.',
       prep: 'Empty and defrost a day ahead, then tape the doors shut and coil the cable inside.',
@@ -70,6 +97,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(washer|washing machine)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright, against the wall behind the cab, strapped.',
       prep: 'Fit the transit bolts, drain the hoses, and tape the door and cable.',
@@ -78,6 +106,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dryer|tumble dryer|dishwasher|range|oven|stove|cooker)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright against the wall behind the cab, strapped.',
       prep: 'Tape the door shut and coil the cable or hose inside.',
@@ -86,6 +115,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(mattress|box spring)\b/i,
+    zone: 2,
     guidance: {
       orientation: 'On its long edge, flat against a side wall, running the length of the truck.',
       prep: 'Bag it — a mattress picks up dirt from the truck wall in minutes.',
@@ -94,6 +124,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(sectional|sofa|couch|loveseat|settee)\b/i,
+    zone: 2,
     guidance: {
       orientation: 'On end, arm down, against a side wall — it takes a third of the floor that way.',
       prep: 'Take the cushions off and pack them separately; unscrew the feet if they come off.',
@@ -102,6 +133,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dining table|desk|table)\b/i,
+    zone: 2,
     guidance: {
       orientation: 'Top on edge against a side wall, legs bundled beside it.',
       prep: 'Take the legs off, bag the hardware, and tape the bag underneath the top.',
@@ -110,6 +142,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bed frame|bedstead|bed base|headboard)\b/i,
+    zone: 2,
     guidance: {
       orientation: 'Rails and boards flat against a side wall, behind the mattresses.',
       prep: 'Break it down, bundle the rails together, and tape the bagged bolts to one of them.',
@@ -120,6 +153,7 @@ const RULES: readonly GuidanceRule[] = [
     // Ahead of the television rule, which \btv\b would otherwise claim: a TV STAND
     // is a wooden cabinet, and telling its owner the screen might crack is nonsense.
     match: /\b(tv stand|media console|entertainment (unit|centre|center))\b/i,
+    zone: 2,
     guidance: {
       orientation: 'Upright against a wall, strapped.',
       prep: 'Empty it and tape or remove any glass doors and loose shelves.',
@@ -128,6 +162,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(tv|television)\b/i,
+    zone: 4,
     guidance: {
       orientation: 'Upright on its edge, never flat, wedged between two soft items.',
       prep: 'Use the original box if you kept it, or a TV box with corner blocks.',
@@ -136,6 +171,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(mirror|painting|framed|artwork|glass top)\b/i,
+    zone: 4,
     guidance: {
       orientation: 'On edge in a picture box, slotted between two mattresses.',
       prep: 'Tape a cross over the glass so a crack cannot travel.',
@@ -144,6 +180,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(piano|organ)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Against the wall behind the cab, on a board, strapped at two heights.',
       prep: 'This is the one item worth hiring specialists for.',
@@ -152,6 +189,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(treadmill|exercise bike|elliptical|weight bench)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Folded and locked, upright against a wall, strapped.',
       prep: 'Engage the transport lock, or take the deck off if it has no lock.',
@@ -160,6 +198,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bicycle|bike)\b/i,
+    zone: 4,
     guidance: {
       orientation: 'Upright against a wall, or hung from the tie rail by the frame.',
       prep: 'Turn the handlebars in line with the frame and take the pedals off.',
@@ -168,6 +207,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(bookshelf|bookcase|shelving|china cabinet|hutch|display cabinet)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright against a wall, strapped — it will rack and loosen if laid down.',
       prep: 'Empty it, take the loose shelves out, and tape or remove any glass doors.',
@@ -176,6 +216,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(dresser|chest of drawers|nightstand|sideboard|buffet|credenza|filing cabinet)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright, drawers facing a wall so they cannot slide open.',
       prep: 'Leave clothes in the drawers to save boxes, but take out anything heavy or breakable.',
@@ -184,6 +225,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(wardrobe|armoire)\b/i,
+    zone: 1,
     guidance: {
       orientation: 'Upright against a wall, strapped at two heights.',
       prep: 'Empty it, remove or tape the doors, and take out any internal rail.',
@@ -192,6 +234,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(lamp|chandelier)\b/i,
+    zone: 4,
     guidance: {
       orientation: 'Boxed, loaded late, with nothing on top.',
       prep: 'Separate the shade, bulb and base and pack the shade on its own.',
@@ -200,6 +243,8 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(rug|carpet)\b/i,
+    zone: 1,
+    loadFirst: true,
     guidance: {
       orientation: 'Rolled, laid along the floor at the very back, under everything else.',
       prep: 'Roll it face-in and tape the roll in three places.',
@@ -208,6 +253,7 @@ const RULES: readonly GuidanceRule[] = [
   },
   {
     match: /\b(plant|tree)\b/i,
+    zone: 5,
     guidance: {
       orientation: 'Not in the truck — carry it in the car.',
       prep: 'Water it lightly the day before, not on the day.',
@@ -215,6 +261,25 @@ const RULES: readonly GuidanceRule[] = [
     },
   },
 ];
+
+/** True when this piece goes down before anything else in its zone. */
+export function loadsFirstInZone(name: string): boolean {
+  return RULES.find((rule) => rule.match.test(name))?.loadFirst === true;
+}
+
+/**
+ * The load zone a named rule assigns, or null when no rule matches.
+ *
+ * `stepForItem` asks this first, so an item with guidance is placed by the same
+ * rule that describes how it travels. Only unnamed items fall through to the
+ * category-and-weight heuristic.
+ *
+ * Type-only import of LoadStepOrder above, so this does not create a runtime
+ * cycle with packing.ts.
+ */
+export function guidanceZoneFor(name: string): LoadStepOrder | null {
+  return RULES.find((rule) => rule.match.test(name))?.zone ?? null;
+}
 
 /** The rule matching this item's name, or null when none applies. */
 export function guidanceRuleFor(name: string): ItemGuidance | null {

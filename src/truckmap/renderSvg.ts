@@ -63,12 +63,17 @@ export const DIAGRAM_COLORS_FOR_TEST = {
   hairline: '#6F8D9D',
 } as const;
 
+/**
+ * Short zone names for the diagram. Positions in the truck, not kinds of object —
+ * zone 1 holds a rolled rug as well as the fridge, and calling it "Heavy" made
+ * the diagram disagree with the list beside it.
+ */
 const STEP_LABELS: Record<LoadStepOrder, string> = {
-  1: 'Heavy',
-  2: 'Furniture',
+  1: 'Back wall',
+  2: 'Side walls',
   3: 'Boxes',
   4: 'Fragile',
-  5: 'Essentials',
+  5: 'By the door',
 };
 
 const CANVAS = { width: 320, height: 200 };

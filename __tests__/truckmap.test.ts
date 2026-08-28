@@ -106,8 +106,8 @@ test('the accessible name describes the zones actually drawn', () => {
   ];
   const label = truckMapAriaLabel(computeZones(items), '20ft');
   assert.match(label, /20ft truck/);
-  assert.match(label, /Heavy 75 percent/);
-  assert.match(label, /Essentials 25 percent/);
+  assert.match(label, /Back wall 75 percent/);
+  assert.match(label, /By the door 25 percent/);
   assert.equal(truckMapAriaLabel([], 'van'), 'Empty truck diagram — no items in your inventory yet');
 });
 

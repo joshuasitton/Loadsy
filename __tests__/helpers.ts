@@ -12,7 +12,15 @@ export function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem 
   const id = overrides.id ?? nextId('item');
   return {
     id,
-    name: 'Sofa',
+    /*
+     * Deliberately a name no guidance rule matches.
+     *
+     * A named rule now decides load placement outright, so a default of "Sofa"
+     * meant every test that did not care about the name was quietly exercising
+     * the sofa rule instead of the category-and-weight fallback it meant to
+     * test. Tests that want a named piece pass the name.
+     */
+    name: 'Unlabelled Thing',
     category: 'furniture' as ItemCategory,
     roomId: 'room-001',
     dimensions: { lengthIn: 84, widthIn: 36, heightIn: 34, isEstimated: true },
