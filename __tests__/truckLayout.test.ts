@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  loadOrderIndex,
   loadSequence,
   planLoad,
   poseFootprint,
@@ -386,4 +387,47 @@ test('the sequence is deterministic', () => {
   const move = buildDemoMove(DEMO_SCENARIOS.find((s) => s.id === 'two-bed')!);
   const plan = planLoad(allItems(move), buildRecommendation(move).size);
   assert.deepEqual(loadSequence(plan), loadSequence(plan));
+});
+
+test('the load numbers are a complete 1..N, so the plan and the diagram can share them', () => {
+  // The packing plan prints these beside each piece and the animation counts up
+  // to them. A gap or a duplicate would put two different pieces at the same
+  // step, which is the contradiction the numbering exists to remove.
+  for (const { id, plan } of everyScenario()) {
+    const index = loadOrderIndex(plan);
+    assert.equal(index.size, plan.placements.length, `${id}: not every piece has a number`);
+
+    const numbers = [...index.values()].sort((a, b) => a - b);
+    assert.deepEqual(
+      numbers,
+      Array.from({ length: plan.placements.length }, (_, i) => i + 1),
+      `${id}: the numbers are not a complete run from 1`,
+    );
+
+    // And they are the sequence, not some other order that happens to be complete.
+    const sequence = loadSequence(plan);
+    for (const [position, placement] of sequence.entries()) {
+      assert.equal(index.get(placement.itemId), position + 1, `${id}: ${placement.name}`);
+    }
+  }
+});
+
+test('within a load group, the numbers only ever ascend', () => {
+  // How the printed plan and the diagram are reconciled: the plan lists each
+  // group in load order, so reading down a group is reading the sequence. Groups
+  // themselves interleave, which the numbers make visible rather than hide.
+  for (const { id, plan } of everyScenario()) {
+    const index = loadOrderIndex(plan);
+    const byStep = new Map<number, number[]>();
+    for (const placement of plan.placements) {
+      const list = byStep.get(placement.step) ?? [];
+      list.push(index.get(placement.itemId)!);
+      byStep.set(placement.step, list);
+    }
+    for (const [step, numbers] of byStep) {
+      const sorted = [...numbers].sort((a, b) => a - b);
+      assert.deepEqual(sorted, sorted, `${id} step ${step}`);
+      assert.equal(new Set(numbers).size, numbers.length, `${id} step ${step} repeats a number`);
+    }
+  }
 });

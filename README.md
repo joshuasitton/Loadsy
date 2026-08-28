@@ -186,6 +186,13 @@ violated.
 The occasional step back towards the cab is the second rule working: a television
 riding on top of a stack cannot go in until the stack is there.
 
+**The printed plan and the diagram share that sequence.** Every row on the
+packing screen carries its load number, the animation counts up to the same
+numbers, and each group lists its pieces in that order. Groups still interleave —
+the solver sometimes finds a better place for a box than the group order would
+suggest — and the numbers make that visible rather than hiding it, which is the
+point: the number is the thing to follow.
+
 **Two views of one solve**, the convention of any engineering drawing: from the
 side for the stacking, from above for which wall a piece is against. A side
 elevation alone can never answer the second question — half the load is hidden

@@ -758,6 +758,19 @@ function mustPrecede(first: Placement, second: Placement): boolean {
   return false;
 }
 
+/**
+ * Each piece's position in the load sequence, 1-based, keyed by item id.
+ *
+ * What ties the printed plan to the diagram. The plan used to list each group
+ * biggest-first while the animation played the solved sequence, so somebody
+ * reading the plan and somebody watching the truck were being told two different
+ * orders — the same class of contradiction as a rug instructed to go under the
+ * load and printed fourth.
+ */
+export function loadOrderIndex(plan: LoadPlan): Map<string, number> {
+  return new Map(loadSequence(plan).map((placement, index) => [placement.itemId, index + 1]));
+}
+
 /** Plain-language name for a pose, for the caption under a highlighted piece. */
 export const POSE_LABEL: Record<TravelPose, string> = {
   upright: "Upright",

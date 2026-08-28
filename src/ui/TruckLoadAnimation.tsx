@@ -271,7 +271,13 @@ export function TruckLoadAnimation({
         <View style={styles.spotlight}>
           <View style={[styles.swatch, { backgroundColor: STEP_COLORS[spotlight.step] }]} />
           <View style={styles.spotlightBody}>
-            <Text style={styles.spotlightName}>{spotlight.name}</Text>
+            <Text style={styles.spotlightName}>
+              {/* The same number the packing plan prints beside this piece. */}
+              <Text style={styles.spotlightNumber}>
+                {(order.indexOf(spotlight.itemId) + 1) || '—'}.{' '}
+              </Text>
+              {spotlight.name}
+            </Text>
             <Text style={styles.spotlightMeta}>
               {POSE_LABEL[spotlight.pose]} ·{' '}
               {spotlightPlacement ? sideOfTruck(spotlightPlacement, plan.bed) : ''} ·{' '}
@@ -553,6 +559,7 @@ const styles = StyleSheet.create({
   swatch: { width: 12, height: 12, borderRadius: 3, marginTop: 4 },
   spotlightBody: { flex: 1, gap: 2 },
   spotlightName: { ...type.bodyStrong, color: colors.text },
+  spotlightNumber: { color: colors.textMuted, fontWeight: '400' },
   spotlightMeta: { ...type.caption, color: colors.textMuted },
   spotlightNote: { ...type.caption, color: colors.amber, lineHeight: 18, marginTop: 2 },
   overflow: { ...type.caption, fontSize: 12, color: colors.amber, lineHeight: 18 },

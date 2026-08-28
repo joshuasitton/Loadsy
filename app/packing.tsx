@@ -8,6 +8,7 @@ import { renderZoneSVG, zoneAriaLabel } from '../src/truckmap/renderSvg';
 import { stepForItem, type LoadStepOrder } from '../src/domain/packing';
 import type { InventoryItem, LoadStep, TruckSize } from '../src/domain/types';
 import { allItems, roomCubicFeet } from '../src/domain/volume';
+import { loadOrderIndex, planLoad } from '../src/truckmap/layout';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
 import { colors, space, type } from '../src/ui/theme';
@@ -26,6 +27,19 @@ export default function PackingScreen() {
   // Memoised because allItems() builds a fresh array every call, and the diagrams
   // below are keyed on it.
   const items = useMemo(() => allItems(move), [move]);
+
+  /**
+   * The solved load sequence, so this list and the truck diagram tell the same
+   * story in the same order.
+   *
+   * Memoised on the inventory and the truck because the solve is the most
+   * expensive thing either screen does — a few hundred milliseconds for a house
+   * move — and this screen re-renders on every tab press.
+   */
+  const loadOrder = useMemo(
+    () => loadOrderIndex(planLoad(items, recommendation.size)),
+    [items, recommendation.size],
+  );
 
   /*
    * There is no loading state, no retry and no freshness check any more, because
@@ -65,6 +79,7 @@ export default function PackingScreen() {
             steps={packingPlan?.loadSteps ?? []}
             items={items}
             truckSize={recommendation.size}
+            loadOrder={loadOrder}
           />
         )}
       </ScrollView>
@@ -90,21 +105,50 @@ export default function PackingScreen() {
  *
  * Grouped on name AND volume, so two genuinely different dressers stay separate.
  */
+/**
+ * The ids of one group, in the order the truck is actually loaded.
+ *
+ * Anything the solver could not place keeps its position at the end rather than
+ * vanishing — it is still in the plan, and a person still has to decide what to
+ * do with it.
+ */
+function orderBySequence(itemIds: string[], loadOrder: Map<string, number>): string[] {
+  return [...itemIds].sort(
+    (a, b) => (loadOrder.get(a) ?? Infinity) - (loadOrder.get(b) ?? Infinity),
+  );
+}
+
 function groupIdentical(
   itemIds: string[],
   byId: Map<string, InventoryItem>,
-): { item: InventoryItem; count: number; key: string }[] {
-  const groups: { item: InventoryItem; count: number; key: string }[] = [];
+  loadOrder: Map<string, number>,
+): { item: InventoryItem; count: number; key: string; first: number; last: number }[] {
+  const groups: {
+    item: InventoryItem;
+    count: number;
+    key: string;
+    first: number;
+    last: number;
+  }[] = [];
   for (const id of itemIds) {
     const item = byId.get(id);
     // An id the plan references but the inventory no longer has. The plan is
     // rebuilt whenever the item set changes, so this should be unreachable.
     if (!item) continue;
-    const last = groups[groups.length - 1];
-    if (last && last.item.name === item.name && last.item.cubicFeet === item.cubicFeet) {
-      last.count += 1;
+    // 0 for anything the solver could not place: it is still in the plan, and a
+    // person still has to decide what to do with it.
+    const position = loadOrder.get(id) ?? 0;
+    const previous = groups[groups.length - 1];
+    if (
+      previous &&
+      previous.item.name === item.name &&
+      previous.item.cubicFeet === item.cubicFeet
+    ) {
+      previous.count += 1;
+      previous.first = Math.min(previous.first, position);
+      previous.last = Math.max(previous.last, position);
     } else {
-      groups.push({ item, count: 1, key: id });
+      groups.push({ item, count: 1, key: id, first: position, last: position });
     }
   }
   return groups;
@@ -114,9 +158,19 @@ function LoadPlanTab({
   steps,
   items,
   truckSize,
+  loadOrder,
 }: {
   steps: LoadStep[];
   items: InventoryItem[];
+  /**
+   * Each piece's place in the solved load sequence.
+   *
+   * The list is ordered by it, and every row shows its number. Without that the
+   * plan said one order and the truck diagram played another — a person reading
+   * the plan and a person watching the animation were being told two different
+   * things about the same move.
+   */
+  loadOrder: Map<string, number>;
   /** Drives the bed proportions in each step's diagram. */
   truckSize: TruckSize;
 }) {
@@ -130,8 +184,10 @@ function LoadPlanTab({
   return (
     <View style={styles.steps}>
       <Text style={styles.intro}>
-        Load back to front. Each step goes in before the one below it — that order is what keeps the
-        weight over the axle and the fragile things reachable.
+        The numbers are the order to carry things in — they match the truck diagram
+            exactly. The groups are the reasoning: heaviest low and forward, then the long
+            pieces, then the boxes. Where a number lands outside its group, the solver found
+            a better place for that piece and the number is the one to follow.
       </Text>
 
       {steps.map((step) => (
@@ -161,12 +217,22 @@ function LoadPlanTab({
             />
           </View>
           <View style={styles.stepItems}>
-            {groupIdentical(step.itemIds, byId).map(({ item, count, key }) => {
+            {groupIdentical(orderBySequence(step.itemIds, loadOrder), byId, loadOrder).map(
+              ({ item, count, key, first, last }) => {
               const guidance = guidanceFor(item);
               return (
                 <View key={key} style={styles.stepItemBlock}>
                   <View style={styles.stepItem}>
                     <Text style={styles.stepItemName}>
+                      {/*
+                        The same number the truck diagram counts up to, so the two
+                        can be followed side by side. Ranges are not always
+                        contiguous — where the solve interleaves groups, the gap
+                        is the honest picture of it.
+                      */}
+                      <Text style={styles.stepItemNumber}>
+                        {first === 0 ? '—' : first === last ? `${first}` : `${first}–${last}`}.{' '}
+                      </Text>
                       {item.name}
                       {count > 1 ? ` × ${count}` : ''}
                     </Text>
@@ -190,8 +256,9 @@ function LoadPlanTab({
                     </View>
                   ) : null}
                 </View>
-              );
-            })}
+                );
+              },
+            )}
           </View>
         </Card>
       ))}
@@ -260,6 +327,7 @@ const styles = StyleSheet.create({
   },
   guidanceLine: { ...type.caption, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
   guidanceCaution: { ...type.caption, color: colors.amber, fontSize: 12, lineHeight: 17 },
+  stepItemNumber: { color: colors.textDim, fontWeight: '400' },
   stepItemName: { ...type.caption, color: colors.text, flex: 1 },
   stepItemMeta: { ...type.caption, color: colors.textDim, fontSize: 12 },
   rooms: { gap: space.md },
