@@ -57,9 +57,17 @@ same build locally instead:
 npm run demo
 ```
 
-Demo mode adds one control to the dashboard and changes nothing else. It is off
-unless `EXPO_PUBLIC_DEMO_MODE` is exactly `"true"`, so a store build cannot carry
-it by accident.
+Demo mode adds the sign-in screen, the sign-out control in every header, and the
+prepared-inventory bar. It follows the same rule as `EXPO_PUBLIC_USE_MOCKS` — **on
+in development, off in a release, an explicit value winning either way** — so any
+dev server shows the whole experience and a store build still cannot carry a
+bundled password by accident.
+
+It used to be off unless the flag was exactly `"true"`, which meant
+`npx expo start --web` ran with it off. Nothing signs in when it is off, so the
+sign-out control correctly rendered nothing and the app looked like it had lost a
+feature — two dev servers behaving differently for a reason that appeared nowhere
+on screen. To get the old behaviour deliberately: `EXPO_PUBLIC_DEMO_MODE=false`.
 
 Behind it are four prepared inventories in `src/demo/scenarios.ts` — studio,
 1-bedroom, 2-bedroom, 3-bedroom house — which between them recommend four
@@ -92,6 +100,19 @@ in is a change to one function.
 Testers get the loop closed: the login screen resets the demo and starts a
 walkthrough with any scenario in one tap, and the demo bar on the dashboard signs
 back out.
+
+### What is on which screen
+
+Sign out sits in the navigation header of **every** screen that has one, via
+`screenOptions` rather than per-screen, so it cannot go missing from one of them.
+It renders nothing when signed out, which is why it is invisible with demo mode
+off — there is no session to end.
+
+Back/forward `StepNav` is on the **five flow steps only**: Inventory, Your Trip,
+Truck Size, Local Prices, Packing Plan. The dashboard is the hub the flow starts
+from, and Capture, Truck Layout and Past Moves are detours off a step rather than
+steps — all four use the header's back control instead. Putting "Next →" on a
+screen that is not in the flow would have to invent an answer to what comes next.
 
 ### Moving through the flow
 
