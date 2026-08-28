@@ -1,64 +1,63 @@
 /**
- * Where every individual piece ends up in the truck, and which way round.
+ * A three-dimensional load plan: where every piece sits in the truck, and which
+ * way round.
  *
- * The zone diagram answers "roughly how much of the truck does each group take".
- * This answers the question a person standing at the tailgate actually has: where
- * does THIS go, and how is it turned.
+ * ## Why this is a search and not a formula
  *
- * ## What a rectangle means
+ * Packing boxes into a box optimally is NP-hard, so nothing here will find the
+ * best possible load. What it can do is try a lot of *reasonable* loads quickly
+ * and keep the best one, which is a different and achievable goal — and it is
+ * roughly what a good loader does at the tailgate, deciding whether the dresser
+ * goes in upright or turned.
  *
- * The picture is a side elevation — looking through the truck's left wall, cab on
- * the left, tailgate on the right. Each piece is drawn as:
+ * The search is deliberately narrow, because most of the freedom is not ours:
  *
- *   height = how tall it stands **in the pose it travels in**
- *   width  = how much truck LENGTH it consumes, which is its depth scaled by the
- *            share of the truck's width it takes up
+ *   - **Load order between groups is fixed.** The plan prints heavy base, then
+ *     long and tall, then boxes; people load in the order they read. A packer
+ *     that reordered those to save six inches would optimise the wrong thing.
+ *   - **Order WITHIN a group is ours.** Nothing physical says the dresser goes in
+ *     before the bookshelf, so that sequence is a knob.
+ *   - **Pose is constrained by guidance, not free.** A fridge stays upright. But
+ *     a piece that will not fit in its ideal pose gets laid down, as a person
+ *     would, so flatter poses are fallbacks rather than alternatives.
+ *   - **Turning a piece on the deck is free**, so both ways round are always tried.
  *
- * That second one is the part worth stating plainly. Two nightstands side by side
- * occupy the same slice of truck, so each is drawn using half the depth it would
- * alone. The consequence is that a rectangle's AREA is exactly proportional to
- * the item's volume, and the drawn load fills exactly as much of the outline as
- * the real load fills of the truck. The picture is quantitative, not decorative.
+ * Each strategy is a deterministic pass and the best result by `score` wins. No
+ * randomness anywhere, so the same inventory always gives the same plan and Save
+ * Plan round-trips.
  *
- * A plan view of the floor would have been the wrong drawing: it ignores the six
- * or seven feet of height every load uses, and would show most of a real move as
- * "not fitting". An elevation shows the stacking, which is what loading actually
- * is.
+ * ## Support, not floating
  *
- * ## Why the pose matters this much
+ * A piece must rest on the deck or on enough of what is already loaded. Without
+ * that rule the packer suspends a mattress in mid-air over a gap, which looks
+ * like a solution and is not one.
  *
- * A queen mattress laid flat is 80 × 60 on the deck and 12 high — it eats a third
- * of a 15-footer's floor and holds nothing up. On its long edge it is 80 × 12 and
- * 60 tall, and the bed frame fits beside it. That difference is a truck size, and
- * it is why `pose` lives on the same guidance rule that writes the instruction.
+ * ## What the drawings are
+ *
+ * One 3D solve, two orthographic projections — the convention of any engineering
+ * drawing:
+ *
+ *   - **side**: length across, height up. Shows the stacking.
+ *   - **top**: length across, width down. Shows which side of the truck a piece is
+ *     on, which a side view alone can never answer.
+ *
+ * In each view, pieces further from the viewer are drawn behind and dimmer. Two
+ * views of one solve, rather than two pictures that could disagree.
  *
  * ## What the bed numbers are
  *
  * U-Haul's published interior dimensions. They do not multiply out to the
- * published cubic-foot capacities, in both directions, and both discrepancies are
- * real rather than sloppy:
- *
- *   - The 10' quotes 402 ft³ against a box of 377, because the capacity counts the
- *     over-cab compartment the deck dimensions do not describe.
- *   - The 15', 20' and 26' quote LESS than their box, because wheel wells eat into
- *     the deck at the sides.
- *
- * The drawing is the deck. `TRUCK_CAPACITY` in domain/truck.ts stays the number
- * the sizing decision is made from, and this file must not quietly replace it.
- *
- * ## What this is not
- *
- * An illustration, not a solver. A real loader turns things, slides a box into a
- * gap and stands a lamp inside a wardrobe box. This places pieces in the order the
- * plan prescribes, first fit, lowest gap — and says so when one runs past the
- * tailgate rather than pretending otherwise.
+ * published cubic-foot capacities in either direction: the 10' capacity counts an
+ * over-cab compartment the deck does not describe, and the larger trucks lose
+ * deck to wheel wells. `TRUCK_CAPACITY` in domain/truck.ts stays what the sizing
+ * decision is made from, and this file must not quietly replace it.
  *
  * Pure TypeScript, no React and no I/O.
  */
 
-import { poseForItem, type TravelPose } from '../domain/itemGuidance';
-import { buildLoadSteps, type LoadStepOrder } from '../domain/packing';
-import type { InventoryItem, TruckSize } from '../domain/types';
+import { poseForItem, type TravelPose } from "../domain/itemGuidance";
+import { buildLoadSteps, type LoadStepOrder } from "../domain/packing";
+import type { InventoryItem, TruckSize } from "../domain/types";
 
 export interface BedDimensions {
   /** Cab end to tailgate. */
@@ -74,14 +73,26 @@ export const TRUCK_BED: Record<TruckSize, BedDimensions> = {
   // 9'6" x 5'7" x 4'8"
   van: { lengthIn: 114, widthIn: 67, heightIn: 56 },
   // 9'11" x 6'3" x 6'1"
-  '10ft': { lengthIn: 119, widthIn: 75, heightIn: 73 },
+  "10ft": { lengthIn: 119, widthIn: 75, heightIn: 73 },
   // 15' x 7'8" x 7'2"
-  '15ft': { lengthIn: 180, widthIn: 92, heightIn: 86 },
+  "15ft": { lengthIn: 180, widthIn: 92, heightIn: 86 },
   // 19'6" x 7'8" x 7'2"
-  '20ft': { lengthIn: 234, widthIn: 92, heightIn: 86 },
+  "20ft": { lengthIn: 234, widthIn: 92, heightIn: 86 },
   // 26'2" x 8'2" x 8'3"
-  '26ft': { lengthIn: 314, widthIn: 98, heightIn: 99 },
+  "26ft": { lengthIn: 314, widthIn: 98, heightIn: 99 },
 };
+
+/**
+ * How much of a piece's base has to be held up by something.
+ *
+ * Not 100%: a box straddling two others with a finger's gap between them is
+ * fine, and demanding perfection makes the packer refuse loads a person would
+ * build without thinking. Not 50% either — that tips.
+ */
+const MIN_SUPPORT = 0.7;
+
+/** Ignore sub-thousandth-of-an-inch float noise. */
+const EPS = 1e-6;
 
 export interface Footprint {
   /** Extent along the truck, cab to door. */
@@ -94,19 +105,19 @@ export interface Footprint {
 
 /** The three dimensions of a piece, reordered by how it travels. */
 export function poseFootprint(
-  { lengthIn, widthIn, heightIn }: InventoryItem['dimensions'],
+  { lengthIn, widthIn, heightIn }: InventoryItem["dimensions"],
   pose: TravelPose,
 ): Footprint {
   switch (pose) {
-    // Resting on its length × height face: the long edge is on the deck.
-    case 'onEdge':
+    // Resting on its length x height face: the long edge is on the deck.
+    case "onEdge":
       return { alongIn: lengthIn, acrossIn: heightIn, tallIn: widthIn };
     // Stood on its smallest face, the length pointing at the roof.
-    case 'onEnd':
+    case "onEnd":
       return { alongIn: widthIn, acrossIn: heightIn, tallIn: lengthIn };
     // Sitting the way it sits in a room.
-    case 'upright':
-    case 'flat':
+    case "upright":
+    case "flat":
       return { alongIn: widthIn, acrossIn: lengthIn, tallIn: heightIn };
   }
 }
@@ -114,30 +125,30 @@ export function poseFootprint(
 export interface Placement {
   itemId: string;
   name: string;
-  /** The pose it is actually drawn in, which may not be the one it prefers. */
+  /** The pose it is drawn in, which may not be the one it prefers. */
   pose: TravelPose;
   /**
    * The pose its guidance asks for, when the truck would not take it.
    *
    * A 96-inch rolled rug cannot stand on end under a 7'2" roof, and a nine-foot
    * sectional cannot stand on its arm. Both instructions are right in a room and
-   * impossible in a 15-footer. Rather than declaring the piece unplaceable, the
-   * packer turns it down the way a person would — and says so, because "stand it
-   * on end" printed beside a picture of it lying down is the contradiction this
-   * whole file exists to avoid.
+   * impossible in a 15-footer, so the packer turns the piece down the way a
+   * person would — and records that it did, because "stand it on end" printed
+   * beside a picture of it lying flat is the contradiction this file exists to
+   * avoid.
    */
   posedDownFrom: TravelPose | null;
-  /** Which load step this piece belongs to, 1 nearest the cab. */
   step: LoadStepOrder;
-  /** Inches from the cab wall to the left edge of the drawn rectangle. */
+  /** Inches from the cab wall. */
   xIn: number;
-  /** Inches from the deck to the underside. */
+  /** Inches from the left wall, looking forward from the door. */
   yIn: number;
-  /** Drawn length: depth scaled by the share of the truck's width it uses. */
-  lengthUsedIn: number;
-  /** True standing height in its travel pose. */
-  heightIn: number;
-  footprint: Footprint;
+  /** Inches from the deck. */
+  zIn: number;
+  /** Extents at this placement, already turned. */
+  alongIn: number;
+  acrossIn: number;
+  tallIn: number;
   cubicFeet: number;
 }
 
@@ -145,265 +156,467 @@ export interface LoadPlan {
   bed: BedDimensions;
   placements: Placement[];
   /**
-   * Pieces the drawing could not place.
+   * Pieces the solver could not place.
    *
-   * Reported rather than hidden. The truck recommendation is made from volume with
-   * a 15% safety reserve and is the number to trust; this packer is tidier than a
-   * person but worse than a good loader, so a few items here mean the diagram ran
-   * out of room, not that the move will not fit. Saying so is the honest version
-   * of a picture that cannot show everything.
+   * Reported rather than hidden. The truck recommendation is made from volume
+   * with a 15% safety reserve and remains the number to trust; this is a
+   * heuristic, so a piece here means the search ran out of ideas, not that the
+   * move will not fit.
    */
-  overflow: { itemId: string; name: string; reason: 'tooBig' | 'noRoom' }[];
-  /** Inches of truck length the drawn load reaches. */
+  overflow: { itemId: string; name: string; reason: "tooBig" | "noRoom" }[];
+  /** Inches of truck length the load reaches. */
   usedLengthIn: number;
+  /** Which arrangement won, and how many were tried. */
+  strategy: { name: string; tried: number };
 }
 
-/** One flat-topped run of the skyline: everything from `x` to `x + width` is at `y`. */
-interface Segment {
+interface Box {
   x: number;
-  width: number;
   y: number;
+  z: number;
+  w: number;
+  d: number;
+  h: number;
+}
+
+interface Anchor {
+  x: number;
+  y: number;
+  z: number;
 }
 
 /**
- * Lays the whole inventory out, in the order the packing plan prescribes.
+ * One arrangement to try.
  *
- * A skyline packer: each piece goes at the lowest place it fits, leftmost among
- * ties. That is a fair model of how a truck actually fills — things sit on the
- * deck until the deck is used, then on top of what is already there — and it
- * keeps the order the plan prints, which a smarter packer would have to break.
+ * `order` re-sequences pieces WITHIN a load group — never across groups, which
+ * would break the printed order people load in. `prefer` scores positions.
+ */
+interface Strategy {
+  name: string;
+  order: (items: InventoryItem[]) => InventoryItem[];
+  prefer: (a: Box, b: Box) => number;
+}
+
+const byVolume = (items: InventoryItem[]) =>
+  [...items].sort((a, b) => b.cubicFeet - a.cubicFeet || cmp(a.id, b.id));
+const byLongest = (items: InventoryItem[]) =>
+  [...items].sort(
+    (a, b) =>
+      longestSide(b) - longestSide(a) ||
+      b.cubicFeet - a.cubicFeet ||
+      cmp(a.id, b.id),
+  );
+const byFlattest = (items: InventoryItem[]) =>
+  [...items].sort(
+    (a, b) =>
+      shortestSide(a) - shortestSide(b) ||
+      b.cubicFeet - a.cubicFeet ||
+      cmp(a.id, b.id),
+  );
+
+/** Forward first, then low, then to a wall. The way a truck is actually built. */
+const frontLowLeft = (a: Box, b: Box) => a.x - b.x || a.z - b.z || a.y - b.y;
+/** Forward first, then hug a wall, then stack. Builds the sides before the middle. */
+const frontLeftLow = (a: Box, b: Box) => a.x - b.x || a.y - b.y || a.z - b.z;
+/** Lowest first. Fills the deck before stacking anything on it. */
+const lowFrontLeft = (a: Box, b: Box) => a.z - b.z || a.x - b.x || a.y - b.y;
+
+const STRATEGIES: readonly Strategy[] = [
+  { name: "front-low, biggest first", order: byVolume, prefer: frontLowLeft },
+  { name: "front-wall, biggest first", order: byVolume, prefer: frontLeftLow },
+  { name: "deck-first, biggest first", order: byVolume, prefer: lowFrontLeft },
+  { name: "front-low, longest first", order: byLongest, prefer: frontLowLeft },
+  { name: "front-wall, longest first", order: byLongest, prefer: frontLeftLow },
+  { name: "deck-first, longest first", order: byLongest, prefer: lowFrontLeft },
+  {
+    name: "front-low, flattest first",
+    order: byFlattest,
+    prefer: frontLowLeft,
+  },
+  {
+    name: "front-wall, flattest first",
+    order: byFlattest,
+    prefer: frontLeftLow,
+  },
+];
+
+/**
+ * Tries every arrangement and returns the best.
  *
- * Deterministic for a given item set: it consumes `buildLoadSteps`, which is
- * itself deterministic, and nothing here reads a clock or a random source.
+ * Better means, in order: more pieces placed, then a shorter load, then more of
+ * the weight kept low. The first two are obvious. The third breaks ties in the
+ * direction that matters on the road — two loads of equal length are not equally
+ * good if one of them is stacked tall and the other is not.
  */
 export function planLoad(items: InventoryItem[], size: TruckSize): LoadPlan {
   const bed = TRUCK_BED[size];
+  if (items.length === 0) return emptyPlan(bed);
+
+  let best: LoadPlan | null = null;
+  for (const strategy of STRATEGIES) {
+    const attempt = packWith(items, bed, strategy);
+    if (best === null || score(attempt) < score(best)) best = attempt;
+  }
+  return best ?? emptyPlan(bed);
+}
+
+/** Lower is better. */
+function score(plan: LoadPlan): number {
+  // Placing a piece outranks any amount of tidiness: a plan that leaves the sofa
+  // on the driveway is not a better plan for being compact.
+  const unplaced = plan.overflow.length * 1_000_000;
+  const length = plan.usedLengthIn * 100;
+  const volume = plan.placements.reduce((sum, p) => sum + p.cubicFeet, 0);
+  const centreOfMass =
+    volume === 0
+      ? 0
+      : plan.placements.reduce(
+          (sum, p) => sum + (p.zIn + p.tallIn / 2) * p.cubicFeet,
+          0,
+        ) / volume;
+  return unplaced + length + centreOfMass;
+}
+
+function emptyPlan(bed: BedDimensions): LoadPlan {
+  return {
+    bed,
+    placements: [],
+    overflow: [],
+    usedLengthIn: 0,
+    strategy: { name: "nothing to load", tried: STRATEGIES.length },
+  };
+}
+
+function packWith(
+  items: InventoryItem[],
+  bed: BedDimensions,
+  strategy: Strategy,
+): LoadPlan {
   const byId = new Map(items.map((item) => [item.id, item]));
 
-  // The order the plan prints. Drawing any other order would show a truck nobody
-  // was told how to pack.
-  const ordered = buildLoadSteps(items).flatMap((step) =>
-    step.itemIds.flatMap((id) => {
+  // Groups keep their printed order; only the sequence inside a group is the
+  // strategy's to choose.
+  const ordered = buildLoadSteps(items).flatMap((step) => {
+    const inStep = step.itemIds.flatMap((id) => {
       const item = byId.get(id);
-      return item ? [{ item, step: step.order as LoadStepOrder }] : [];
-    }),
-  );
+      return item ? [item] : [];
+    });
+    return strategy
+      .order(inStep)
+      .map((item) => ({ item, step: step.order as LoadStepOrder }));
+  });
 
-  let skyline: Segment[] = [{ x: 0, width: bed.lengthIn, y: 0 }];
   const placements: Placement[] = [];
-  const overflow: LoadPlan['overflow'] = [];
+  const boxes: Box[] = [];
+  const overflow: LoadPlan["overflow"] = [];
+  // Corners a next piece could start from. Seeded with the front-left of the deck.
+  let anchors: Anchor[] = [{ x: 0, y: 0, z: 0 }];
 
   for (const { item, step } of ordered) {
     const wanted = poseForItem(item);
-    const options = fitPoses(item.dimensions, wanted, bed);
+    const options = poseOptions(item.dimensions, wanted, bed);
 
-    // Nothing about this piece fits under the roof or between the walls in any
-    // pose. Left visible rather than dropped: a mis-measured piece is a
-    // plausibility problem the inventory screen already flags, and quietly
-    // removing it from the drawing would hide the one place somebody might notice.
     if (options.length === 0) {
-      overflow.push({ itemId: item.id, name: item.name, reason: 'tooBig' });
+      overflow.push({ itemId: item.id, name: item.name, reason: "tooBig" });
       continue;
     }
 
-    /*
-     * The preferred pose first, then flatter ones if the gap left will not take it.
-     *
-     * A boxed floor lamp is 60 inches standing and 14 lying down. Late in a load
-     * there is rarely a five-foot clear column left, and a person does the obvious
-     * thing: lays it on top. Refusing to, and reporting the lamp as unplaceable in
-     * a truck the sizing logic says is 44% empty, would be the packer being
-     * pedantic rather than the truck being full.
-     */
-    let placed: { pose: TravelPose; footprint: Footprint; spot: { x: number; y: number } } | null =
-      null;
+    let chosen: { box: Box; pose: TravelPose } | null = null;
     for (const option of options) {
-      const used = (option.footprint.alongIn * option.footprint.acrossIn) / bed.widthIn;
-      const found = lowestFit(skyline, used, option.footprint.tallIn, bed);
-      if (found) {
-        placed = { ...option, spot: found };
+      const spot = bestSpot(option.footprint, anchors, boxes, bed, strategy);
+      if (spot) {
+        chosen = { box: spot, pose: option.pose };
         break;
       }
     }
 
-    if (placed === null) {
-      overflow.push({ itemId: item.id, name: item.name, reason: 'noRoom' });
+    if (chosen === null) {
+      overflow.push({ itemId: item.id, name: item.name, reason: "noRoom" });
       continue;
     }
 
-    const { pose, footprint, spot } = placed;
-    const lengthUsedIn = (footprint.alongIn * footprint.acrossIn) / bed.widthIn;
-
+    boxes.push(chosen.box);
     placements.push({
       itemId: item.id,
       name: item.name,
-      pose,
-      posedDownFrom: pose === wanted ? null : wanted,
+      pose: chosen.pose,
+      posedDownFrom: chosen.pose === wanted ? null : wanted,
       step,
-      xIn: spot.x,
-      yIn: spot.y,
-      lengthUsedIn,
-      heightIn: footprint.tallIn,
-      footprint,
+      xIn: round2(chosen.box.x),
+      yIn: round2(chosen.box.y),
+      zIn: round2(chosen.box.z),
+      alongIn: round2(chosen.box.w),
+      acrossIn: round2(chosen.box.d),
+      tallIn: round2(chosen.box.h),
       cubicFeet: item.cubicFeet,
     });
 
-    skyline = raise(skyline, spot.x, lengthUsedIn, spot.y + footprint.tallIn);
+    anchors = addAnchors(anchors, chosen.box, bed);
   }
 
-  const usedLengthIn = placements.reduce(
-    (max, placement) => Math.max(max, placement.xIn + placement.lengthUsedIn),
-    0,
-  );
-
-  return { bed, placements, overflow, usedLengthIn: round2(usedLengthIn) };
+  return {
+    bed,
+    placements,
+    overflow,
+    usedLengthIn: round2(
+      boxes.reduce((max, box) => Math.max(max, box.x + box.w), 0),
+    ),
+    strategy: { name: strategy.name, tried: STRATEGIES.length },
+  };
 }
 
 /**
- * The pose and turn this piece can actually be loaded in, or null if none.
+ * The poses this piece could travel in, most-preferred first.
  *
- * Two things are tried, in this order, because that is the order a person tries
- * them. First the pose its guidance asks for; then the flatter poses, since
- * anything that will not stand up gets laid down. And within each pose, both
- * ways round on the deck — turning a long piece to run with the truck rather
- * than across it is free, and it is the difference between a rolled rug fitting
- * and a rolled rug being declared impossible.
+ * Its guidance's pose, then the flatter ones — anything that will not stand up
+ * gets laid down, and refusing to would report a boxed floor lamp as unplaceable
+ * in a half-empty truck.
  */
-function fitPoses(
-  dimensions: InventoryItem['dimensions'],
+function poseOptions(
+  dimensions: InventoryItem["dimensions"],
   wanted: TravelPose,
   bed: BedDimensions,
 ): { pose: TravelPose; footprint: Footprint }[] {
-  const order: TravelPose[] = [wanted, 'onEdge', 'upright'];
-  const seen = new Set<TravelPose>();
   const out: { pose: TravelPose; footprint: Footprint }[] = [];
+  const seen = new Set<TravelPose>();
 
-  for (const pose of order) {
+  for (const pose of [wanted, "onEdge", "upright"] as TravelPose[]) {
     if (seen.has(pose)) continue;
     seen.add(pose);
-
-    const base = poseFootprint(dimensions, pose);
-    if (base.tallIn > bed.heightIn) continue;
-
-    // Prefer the turn that uses less of the truck's width, so more fits beside it.
-    const turns: Footprint[] = [
-      { alongIn: base.alongIn, acrossIn: base.acrossIn, tallIn: base.tallIn },
-      { alongIn: base.acrossIn, acrossIn: base.alongIn, tallIn: base.tallIn },
-    ].sort((a, b) => a.acrossIn - b.acrossIn);
-
-    const fits = turns.find((turn) => turn.acrossIn <= bed.widthIn);
-    if (fits) out.push({ pose, footprint: fits });
+    const footprint = poseFootprint(dimensions, pose);
+    if (footprint.tallIn > bed.heightIn + EPS) continue;
+    // Either way round on the deck, one of the two floor dimensions has to fit
+    // between the walls.
+    if (Math.min(footprint.alongIn, footprint.acrossIn) > bed.widthIn + EPS)
+      continue;
+    out.push({ pose, footprint });
   }
   return out;
 }
 
-/** The lowest position a `width × height` piece fits, leftmost among equals. */
-function lowestFit(
-  skyline: readonly Segment[],
-  width: number,
-  height: number,
+/** The best position for this footprint, or null if there is nowhere it fits. */
+function bestSpot(
+  footprint: Footprint,
+  anchors: readonly Anchor[],
+  boxes: readonly Box[],
   bed: BedDimensions,
-): { x: number; y: number } | null {
-  let best: { x: number; y: number } | null = null;
+  strategy: Strategy,
+): Box | null {
+  let best: Box | null = null;
 
-  /*
-   * Both edges of every run, not just the left one.
-   *
-   * Left-aligning only is what a naive skyline does, and it leaves a sliver of
-   * dead width at the right-hand end of every shelf — which on a real inventory
-   * added up to a whole floor lamp that "did not fit" in a truck the sizing
-   * logic said was 44% empty. Trying the right-aligned position too lets a piece
-   * tuck into the end of a run, which is exactly what a person does with the last
-   * box on a shelf.
-   */
-  const candidates: number[] = [];
-  for (const segment of skyline) {
-    candidates.push(segment.x);
-    const rightAligned = segment.x + segment.width - width;
-    if (rightAligned > 0) candidates.push(rightAligned);
-  }
+  // Turning a piece on the deck is free, so both ways round are always tried.
+  const turns: [number, number][] = [
+    [footprint.alongIn, footprint.acrossIn],
+    [footprint.acrossIn, footprint.alongIn],
+  ];
 
-  for (const x of candidates) {
-    if (x < -1e-9 || x + width > bed.lengthIn + 1e-9) continue;
+  for (const anchor of anchors) {
+    for (const [w, d] of turns) {
+      /*
+       * Both walls, not just the left one.
+       *
+       * Anchors advance left to right, so without the mirrored position nothing
+       * is ever placed flush against the right wall — the packer builds one tidy
+       * column down the left and leaves a strip of unusable air down the right.
+       * Offering the right-aligned y at the same corner is the same trick as
+       * trying both ways round, and costs one more candidate.
+       */
+      const rightAligned = bed.widthIn - d;
+      const ys =
+        Math.abs(rightAligned - anchor.y) < EPS
+          ? [anchor.y]
+          : [anchor.y, rightAligned];
 
-    // The piece rests on the highest thing under its whole span, not just on the
-    // segment it starts at — otherwise it would be drawn floating through a
-    // taller neighbour.
-    const y = topUnder(skyline, x, width);
-    if (y + height > bed.heightIn + 1e-9) continue;
+      for (const y of ys) {
+        const start: Box = {
+          x: anchor.x,
+          y,
+          z: anchor.z,
+          w,
+          d,
+          h: footprint.tallIn,
+        };
+        if (!insideBed(start, bed)) continue;
+        if (intersectsAny(start, boxes)) continue;
 
-    /*
-     * Furthest forward first, lowest second — not lowest first.
-     *
-     * Lowest-first is the textbook skyline rule and it draws a bar chart: every
-     * piece takes a fresh patch of deck because the deck is always the lowest
-     * thing available, so the load spreads back along the truck at knee height
-     * and nothing ever stacks. Real loading is the opposite. You build the front
-     * of the truck floor to ceiling, then start the next slice behind it, and
-     * preferring the smallest x reproduces exactly that — a piece goes on top of
-     * what is already at the front if it will fit there, and only moves back when
-     * it will not.
-     */
-    if (best === null || x < best.x - 1e-9 || (Math.abs(x - best.x) < 1e-9 && y < best.y)) {
-      best = { x, y };
+        // Anchors are corners of pieces already loaded, so a box placed at one
+        // often floats above or behind the load with usable space under it.
+        // Settling closes that gap, and it is what raised the packed density from
+        // the mid sixties to the low eighties — the difference between a diagram
+        // that loses two items out of a studio and one that does not.
+        const box = settle(start, boxes);
+        if (!supported(box, boxes)) continue;
+        if (best === null || strategy.prefer(box, best) < 0) best = box;
+      }
     }
   }
   return best;
 }
 
-function topUnder(skyline: readonly Segment[], x: number, width: number): number {
-  let top = 0;
-  for (const segment of skyline) {
-    if (segment.x + segment.width <= x + 1e-9) continue;
-    if (segment.x >= x + width - 1e-9) break;
-    top = Math.max(top, segment.y);
+/**
+ * Slides a box down, then forward, then to the left wall, until each direction
+ * is blocked — gravity plus a shove towards the cab.
+ *
+ * Three passes because the axes interact: dropping a box may open room ahead of
+ * it, and sliding it forward may let it drop further. Three is where the demo
+ * inventories stop changing; a fourth costs time and moves nothing.
+ *
+ * A slide that would leave the piece unsupported is undone. Better to leave a box
+ * resting where it was placed than to slide it into a position where it floats.
+ */
+function settle(box: Box, boxes: readonly Box[]): Box {
+  let current = box;
+  for (let pass = 0; pass < 3; pass++) {
+    current = slide(current, boxes, "z");
+    current = slide(current, boxes, "x");
+    current = slide(current, boxes, "y");
   }
-  return top;
+  return current;
 }
 
-/** Rewrites the skyline so `[x, x + width)` now sits at `y`. */
-function raise(skyline: readonly Segment[], x: number, width: number, y: number): Segment[] {
-  const next: Segment[] = [];
-  for (const segment of skyline) {
-    const start = segment.x;
-    const end = segment.x + segment.width;
-    // Untouched, either side of the new piece.
-    if (end <= x + 1e-9 || start >= x + width - 1e-9) {
-      next.push(segment);
-      continue;
-    }
-    // The part of this segment to the left of the piece survives at its old height.
-    if (start < x) next.push({ x: start, width: x - start, y: segment.y });
-    // And the part to the right.
-    if (end > x + width) {
-      next.push({ x: x + width, width: end - (x + width), y: segment.y });
-    }
-  }
-  next.push({ x, width, y });
-  next.sort((a, b) => a.x - b.x);
+function slide(box: Box, boxes: readonly Box[], axis: "x" | "y" | "z"): Box {
+  // The two axes the box must overlap on for another box to be in its way.
+  const others = boxes.filter((other) => {
+    if (axis !== "x" && !spans(box.x, box.w, other.x, other.w)) return false;
+    if (axis !== "y" && !spans(box.y, box.d, other.y, other.d)) return false;
+    if (axis !== "z" && !spans(box.z, box.h, other.z, other.h)) return false;
+    return true;
+  });
 
-  // Merge equal-height neighbours so the segment list cannot grow without bound
-  // on a large inventory.
-  const merged: Segment[] = [];
-  for (const segment of next) {
-    const last = merged[merged.length - 1];
-    if (last && Math.abs(last.y - segment.y) < 1e-9 && Math.abs(last.x + last.width - segment.x) < 1e-9) {
-      last.width += segment.width;
-    } else {
-      merged.push({ ...segment });
-    }
+  const near = axis === "x" ? box.x : axis === "y" ? box.y : box.z;
+  let stop = 0;
+  for (const other of others) {
+    const far =
+      axis === "x"
+        ? other.x + other.w
+        : axis === "y"
+          ? other.y + other.d
+          : other.z + other.h;
+    if (far <= near + EPS) stop = Math.max(stop, far);
   }
-  return merged;
+  if (stop >= near - EPS) return box;
+
+  const moved: Box = { ...box, [axis]: stop } as Box;
+  if (intersectsAny(moved, boxes)) return box;
+  // Sliding sideways or forward can take a box off whatever was holding it up.
+  if (!supported(moved, boxes)) return box;
+  return moved;
+}
+
+/** Do two intervals overlap by more than a rounding error? */
+function spans(
+  aStart: number,
+  aSize: number,
+  bStart: number,
+  bSize: number,
+): boolean {
+  return aStart < bStart + bSize - EPS && bStart < aStart + aSize - EPS;
+}
+
+function insideBed(box: Box, bed: BedDimensions): boolean {
+  return (
+    box.x >= -EPS &&
+    box.y >= -EPS &&
+    box.z >= -EPS &&
+    box.x + box.w <= bed.lengthIn + EPS &&
+    box.y + box.d <= bed.widthIn + EPS &&
+    box.z + box.h <= bed.heightIn + EPS
+  );
+}
+
+function intersectsAny(box: Box, boxes: readonly Box[]): boolean {
+  return boxes.some(
+    (other) =>
+      box.x < other.x + other.w - EPS &&
+      other.x < box.x + box.w - EPS &&
+      box.y < other.y + other.d - EPS &&
+      other.y < box.y + box.d - EPS &&
+      box.z < other.z + other.h - EPS &&
+      other.z < box.z + box.h - EPS,
+  );
 }
 
 /**
- * The placements as fractions of the bed, ready to scale onto any canvas.
+ * Is enough of this piece's base held up?
  *
- * `y` is measured from the DECK, so a caller drawing top-down has to flip it —
- * which is the one thing about this that is easy to get wrong, and why it is
- * stated here rather than left to be discovered.
+ * On the deck, always. Otherwise the tops directly beneath it have to cover most
+ * of its footprint — without this the packer suspends a mattress over a gap,
+ * which looks like a solution and is not one.
  */
-export interface ElevationRect {
+function supported(box: Box, boxes: readonly Box[]): boolean {
+  if (box.z <= EPS) return true;
+
+  const base = box.w * box.d;
+  if (base <= 0) return false;
+
+  let held = 0;
+  for (const other of boxes) {
+    if (Math.abs(other.z + other.h - box.z) > EPS) continue;
+    const overlapW =
+      Math.min(box.x + box.w, other.x + other.w) - Math.max(box.x, other.x);
+    const overlapD =
+      Math.min(box.y + box.d, other.y + other.d) - Math.max(box.y, other.y);
+    if (overlapW > 0 && overlapD > 0) held += overlapW * overlapD;
+  }
+  return held / base >= MIN_SUPPORT - EPS;
+}
+
+/**
+ * Corners created by placing this box: past it, beside it, and on top of it.
+ *
+ * Capped and de-duplicated. The search is anchors x placed boxes per item, so an
+ * uncapped list takes a sixty-item house move from milliseconds to seconds — on a
+ * screen that recomputes whenever the inventory changes.
+ */
+const MAX_ANCHORS = 300;
+
+function addAnchors(
+  anchors: readonly Anchor[],
+  box: Box,
+  bed: BedDimensions,
+): Anchor[] {
+  const next = [
+    ...anchors,
+    { x: box.x + box.w, y: box.y, z: box.z },
+    { x: box.x, y: box.y + box.d, z: box.z },
+    { x: box.x, y: box.y, z: box.z + box.h },
+  ].filter(
+    (a) =>
+      a.x < bed.lengthIn - EPS &&
+      a.y < bed.widthIn - EPS &&
+      a.z < bed.heightIn - EPS,
+  );
+
+  const seen = new Set<string>();
+  const unique = next.filter((a) => {
+    const key = `${a.x.toFixed(2)}|${a.y.toFixed(2)}|${a.z.toFixed(2)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (unique.length <= MAX_ANCHORS) return unique;
+  // Keep the corners nearest the cab: that is where the next piece wants to go,
+  // and corners further down the truck come back into reach as the load advances.
+  return unique
+    .sort((a, b) => a.x - b.x || a.z - b.z || a.y - b.y)
+    .slice(0, MAX_ANCHORS);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Projections                                                              */
+/* ------------------------------------------------------------------------ */
+
+export type ProjectionView = "side" | "top";
+
+/**
+ * One placement flattened into a drawable rectangle.
+ *
+ * `depth` is 0 for the piece nearest the viewer and 1 for the furthest, so the
+ * caller can dim what is behind. Every value is a fraction of the bed, ready to
+ * scale onto any canvas.
+ */
+export interface ProjectedRect {
   itemId: string;
   name: string;
   pose: TravelPose;
@@ -412,35 +625,89 @@ export interface ElevationRect {
   cubicFeet: number;
   /** 0 at the cab wall, 1 at the tailgate. */
   x: number;
-  /** 0 at the deck, 1 at the roof. */
+  /**
+   * Side view: 0 at the deck, 1 at the roof, measured from the BOTTOM.
+   * Top view: 0 at the left wall, 1 at the right wall, measured from the TOP.
+   *
+   * The two run opposite ways, which is the one thing here that is easy to get
+   * wrong — hence saying so rather than leaving it to be discovered.
+   */
   y: number;
   width: number;
   height: number;
+  depth: number;
 }
 
-export function elevationRects(plan: LoadPlan): ElevationRect[] {
+export function project(plan: LoadPlan, view: ProjectionView): ProjectedRect[] {
   const { bed } = plan;
-  return plan.placements.map((placement) => ({
-    itemId: placement.itemId,
-    name: placement.name,
-    pose: placement.pose,
-    posedDownFrom: placement.posedDownFrom,
-    step: placement.step,
-    cubicFeet: placement.cubicFeet,
-    x: placement.xIn / bed.lengthIn,
-    y: placement.yIn / bed.heightIn,
-    width: placement.lengthUsedIn / bed.lengthIn,
-    height: placement.heightIn / bed.heightIn,
-  }));
+  const rects = plan.placements.map((placement) => {
+    const common = {
+      itemId: placement.itemId,
+      name: placement.name,
+      pose: placement.pose,
+      posedDownFrom: placement.posedDownFrom,
+      step: placement.step,
+      cubicFeet: placement.cubicFeet,
+      x: placement.xIn / bed.lengthIn,
+      width: placement.alongIn / bed.lengthIn,
+    };
+
+    if (view === "side") {
+      return {
+        ...common,
+        y: placement.zIn / bed.heightIn,
+        height: placement.tallIn / bed.heightIn,
+        // Looking in through the left wall, so the left of the truck is nearest.
+        depth: bed.widthIn === 0 ? 0 : placement.yIn / bed.widthIn,
+      };
+    }
+    return {
+      ...common,
+      y: placement.yIn / bed.widthIn,
+      height: placement.acrossIn / bed.widthIn,
+      // Looking down, so the top of the load is nearest.
+      depth:
+        bed.heightIn === 0
+          ? 0
+          : 1 - (placement.zIn + placement.tallIn) / bed.heightIn,
+    };
+  });
+
+  // Furthest first, so nearer pieces paint over them.
+  return rects.sort((a, b) => b.depth - a.depth || cmp(a.itemId, b.itemId));
 }
 
 /** Plain-language name for a pose, for the caption under a highlighted piece. */
 export const POSE_LABEL: Record<TravelPose, string> = {
-  upright: 'Upright',
-  onEdge: 'On its long edge',
-  onEnd: 'On end',
-  flat: 'Laid flat',
+  upright: "Upright",
+  onEdge: "On its long edge",
+  onEnd: "On end",
+  flat: "Laid flat",
 };
+
+/** Which part of the truck's width a piece sits in, in words. */
+export function sideOfTruck(placement: Placement, bed: BedDimensions): string {
+  if (placement.acrossIn >= bed.widthIn * 0.8) return "across the full width";
+  const centre = placement.yIn + placement.acrossIn / 2;
+  const third = bed.widthIn / 3;
+  if (centre < third) return "against the left wall";
+  if (centre > bed.widthIn - third) return "against the right wall";
+  return "down the middle";
+}
+
+function longestSide(item: InventoryItem): number {
+  const { lengthIn, widthIn, heightIn } = item.dimensions;
+  return Math.max(lengthIn, widthIn, heightIn);
+}
+
+function shortestSide(item: InventoryItem): number {
+  const { lengthIn, widthIn, heightIn } = item.dimensions;
+  return Math.min(lengthIn, widthIn, heightIn);
+}
+
+function cmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

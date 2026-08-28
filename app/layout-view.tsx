@@ -14,7 +14,7 @@ import {
   truckMapAriaLabel,
   type TruckView,
 } from '../src/truckmap/renderSvg';
-import { elevationRects, planLoad, POSE_LABEL } from '../src/truckmap/layout';
+import { planLoad, POSE_LABEL } from '../src/truckmap/layout';
 import { TruckLoadAnimation } from '../src/ui/TruckLoadAnimation';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton } from '../src/ui/components';
@@ -64,7 +64,6 @@ export default function LayoutViewScreen() {
   // The item-level layout. Derived, like everything else on this screen, so it
   // cannot describe an inventory the user has since edited.
   const loadPlan = useMemo(() => planLoad(items, recommendation.size), [items, recommendation.size]);
-  const loadRects = useMemo(() => elevationRects(loadPlan), [loadPlan]);
   const loadKey = useMemo(
     () => `${recommendation.size}:${items.map((item) => item.id).join(',')}`,
     [items, recommendation.size],
@@ -222,16 +221,15 @@ export default function LayoutViewScreen() {
           {view === 'load' ? (
             <View style={styles.loadView}>
               <Text style={styles.loadIntro}>
-                Side view, cab on the left. Each piece is drawn as tall as it stands in the
-                position it travels in, and as wide as the truck length it uses — so the
-                area of a block is its share of the load. Tap one for its instructions.
+                A solved 3D load, played back in the order the plan prescribes. Two views of
+                the same solve: from the side to see the stacking, from above to see which
+                wall a piece is against. Tap any piece for its instructions.
               </Text>
               <TruckLoadAnimation
                 // Keyed on the inventory: a different item set is a different
                 // load, and remounting is how playback resets.
                 key={loadKey}
                 plan={loadPlan}
-                rects={loadRects}
                 selectedId={openItemId}
                 onSelect={setOpenItemId}
               />
@@ -346,7 +344,7 @@ export default function LayoutViewScreen() {
         */}
         <Text style={styles.caveat}>
           {view === 'load'
-            ? 'An illustration, not a solver. A real loader turns things and slides a box into a gap; this places each piece in the order the plan prescribes, as far forward as it will go. Trust the truck size — it is worked out from volume with a 15% reserve.'
+            ? 'Packing a truck optimally is a problem nobody solves exactly, so this tries several arrangements and keeps the best — turning pieces, laying down what will not stand, and settling everything against what is already loaded. Nothing overlaps and nothing floats. A person at the tailgate will still beat it, and the truck size is worked out from volume with a 15% reserve either way.'
             : 'This is a load-zone diagram, not a piece-by-piece packing solution. It shows where each group belongs and how much of the truck it takes up.'}
         </Text>
 

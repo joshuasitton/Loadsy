@@ -10,7 +10,14 @@ import {
   View,
 } from 'react-native';
 import { STEP_COLORS, STEP_LABELS } from '../truckmap/renderSvg';
-import { POSE_LABEL, type ElevationRect, type LoadPlan } from '../truckmap/layout';
+import {
+  POSE_LABEL,
+  project,
+  sideOfTruck,
+  type LoadPlan,
+  type ProjectedRect,
+  type ProjectionView,
+} from '../truckmap/layout';
 import { colors, radius, space, type } from './theme';
 
 /**
@@ -24,12 +31,20 @@ import { colors, radius, space, type } from './theme';
  * long pieces stand up against it, the boxes fill the wall. The final frame is
  * identical either way; the sequence is the information.
  *
- * ## What the picture is
+ * ## Two views, because one is not enough
  *
- * A side elevation: cab on the left, tailgate on the right, deck at the bottom.
- * Each piece's HEIGHT is how tall it stands in the pose it travels in, and its
- * WIDTH is how much truck length it consumes. Rectangle area is therefore exactly
- * proportional to volume — see src/truckmap/layout.ts, which owns all of it.
+ * A side elevation shows how the load stacks and says nothing at all about which
+ * side of the truck a piece is on — half the load is hidden behind the other
+ * half. So there are two projections of the same 3D solve, the convention of any
+ * engineering drawing:
+ *
+ *   - **From the side**: cab left, deck at the bottom. Shows the stacking.
+ *   - **From above**: cab left, the truck's width top to bottom. Shows the two
+ *     walls, and which pieces are against which.
+ *
+ * Pieces further from the viewer are drawn dimmer, so the depth the projection
+ * throws away is at least visible. Both play the same load in the same order at
+ * the same time; the tab only changes where you are standing.
  *
  * ## Motion
  *
@@ -50,17 +65,31 @@ const MAX_STEP_MS = 420;
 
 export function TruckLoadAnimation({
   plan,
-  rects,
   selectedId,
   onSelect,
 }: {
   plan: LoadPlan;
-  rects: ElevationRect[];
   selectedId: string | null;
   onSelect: (itemId: string | null) => void;
 }) {
+  const [view, setView] = useState<ProjectionView>('side');
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
-  const [loaded, setLoaded] = useState(rects.length);
+
+  /*
+   * Ordered by when each piece is loaded, not by the projection's paint order.
+   *
+   * `project` sorts back to front so nearer pieces paint over further ones, which
+   * is right for drawing and wrong for playback — following it would load the
+   * truck from the far wall inwards. The two orders are reconciled here: the
+   * animation walks the load order, and each view keeps its own paint order.
+   */
+  const order = useMemo(() => plan.placements.map((placement) => placement.itemId), [plan]);
+  const rects = useMemo(() => project(plan, view), [plan, view]);
+  const rectById = useMemo(
+    () => new Map(rects.map((rect) => [rect.itemId, rect])),
+    [rects],
+  );
+  const [loaded, setLoaded] = useState(plan.placements.length);
   const [playing, setPlaying] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -78,22 +107,22 @@ export function TruckLoadAnimation({
   }, []);
 
   const stepMs = useMemo(
-    () => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, RUN_MS / Math.max(1, rects.length))),
-    [rects.length],
+    () => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, RUN_MS / Math.max(1, order.length))),
+    [order.length],
   );
 
   useEffect(() => {
-    if (!playing || loaded >= rects.length) return;
+    if (!playing || loaded >= order.length) return;
     // Both state writes happen in the timeout, never synchronously in the effect:
     // a synchronous write here re-runs the effect before the frame is painted and
     // the whole load appears at once.
     const timer = setTimeout(() => {
-      const next = Math.min(rects.length, loaded + 1);
+      const next = Math.min(order.length, loaded + 1);
       setLoaded(next);
-      if (next >= rects.length) setPlaying(false);
+      if (next >= order.length) setPlaying(false);
     }, stepMs);
     return () => clearTimeout(timer);
-  }, [playing, loaded, rects.length, stepMs]);
+  }, [playing, loaded, order.length, stepMs]);
 
   const replay = useCallback(() => {
     onSelect(null);
@@ -106,15 +135,22 @@ export function TruckLoadAnimation({
     setCanvas({ width, height: 0 });
   }, []);
 
-  // The drawing keeps the truck's real proportions, so a 26-footer looks like one.
-  const aspect = plan.bed.heightIn / plan.bed.lengthIn;
+  // Real proportions, so a 26-footer looks like one and the top view is visibly
+  // a different shape from the side view rather than the same box relabelled.
+  const acrossIn = view === 'side' ? plan.bed.heightIn : plan.bed.widthIn;
   const bedWidth = Math.max(0, canvas.width - CAB_WIDTH - space.sm);
-  const bedHeight = Math.max(60, Math.min(190, bedWidth * aspect));
+  const bedHeight = Math.max(60, Math.min(210, bedWidth * (acrossIn / plan.bed.lengthIn)));
 
-  const visible = rects.slice(0, loaded);
-  const latest = visible[visible.length - 1] ?? null;
-  const selected = rects.find((rect) => rect.itemId === selectedId) ?? null;
+  // The first `loaded` pieces of the LOAD order, drawn in the view's paint order.
+  const shown = new Set(order.slice(0, loaded));
+  const visible = rects.filter((rect) => shown.has(rect.itemId));
+  const latestId = order[loaded - 1] ?? null;
+  const latest = latestId ? (rectById.get(latestId) ?? null) : null;
+  const selected = selectedId ? (rectById.get(selectedId) ?? null) : null;
   const spotlight = selected ?? latest;
+  const spotlightPlacement = spotlight
+    ? (plan.placements.find((p) => p.itemId === spotlight.itemId) ?? null)
+    : null;
 
   return (
     /*
@@ -126,19 +162,35 @@ export function TruckLoadAnimation({
      * is stretched by its parent and is full width regardless of what is in it.
      */
     <View style={styles.wrap} onLayout={onCanvas}>
+      <View style={styles.viewTabs}>
+        <ViewTab
+          label="From the side"
+          hint="Shows how the load stacks, deck to roof"
+          active={view === 'side'}
+          onPress={() => setView('side')}
+        />
+        <ViewTab
+          label="From above"
+          hint="Shows which side of the truck each piece is on"
+          active={view === 'top'}
+          onPress={() => setView('top')}
+        />
+      </View>
+
       <View style={styles.canvasRow}>
-        <View style={[styles.cab, { height: bedHeight * 0.62 }]}>
+        <View style={[styles.cab, { height: bedHeight * (view === 'side' ? 0.62 : 0.9) }]}>
           <Text style={styles.cabText}>CAB</Text>
         </View>
 
         <View style={[styles.bed, { width: bedWidth, height: bedHeight }]}>
-          {visible.map((rect, index) => (
+          {visible.map((rect) => (
             <LoadedPiece
               key={rect.itemId}
               rect={rect}
+              view={view}
               bedWidth={bedWidth}
               bedHeight={bedHeight}
-              animate={!reduceMotion && index === visible.length - 1 && playing}
+              animate={!reduceMotion && rect.itemId === latestId && playing}
               selected={rect.itemId === selectedId}
               dimmed={selectedId !== null && rect.itemId !== selectedId}
               onPress={() => onSelect(rect.itemId === selectedId ? null : rect.itemId)}
@@ -149,28 +201,30 @@ export function TruckLoadAnimation({
 
       <View style={[styles.ends, { marginLeft: CAB_WIDTH + space.sm }]}>
         <Text style={styles.endLabel}>front of the truck</Text>
-        <Text style={styles.endLabel}>door</Text>
+        <Text style={styles.endLabel}>
+          {view === 'side' ? 'door' : 'door · left wall at the top'}
+        </Text>
       </View>
 
       <View style={styles.progressTrack} accessibilityRole="progressbar"
-        accessibilityValue={{ min: 0, max: rects.length, now: loaded }}
-        accessibilityLabel={`${loaded} of ${rects.length} items loaded`}>
+        accessibilityValue={{ min: 0, max: order.length, now: loaded }}
+        accessibilityLabel={`${loaded} of ${order.length} items loaded`}>
         <View
           style={[
             styles.progressFill,
-            { width: `${rects.length === 0 ? 0 : (loaded / rects.length) * 100}%` },
+            { width: `${order.length === 0 ? 0 : (loaded / order.length) * 100}%` },
           ]}
         />
       </View>
 
       <View style={styles.controls}>
         <Control
-          label={playing ? 'Pause' : loaded >= rects.length ? 'Replay' : 'Play'}
+          label={playing ? 'Pause' : loaded >= order.length ? 'Replay' : 'Play'}
           hint="Loads the truck one piece at a time, in the order the plan prescribes"
           primary
           onPress={() => {
             if (playing) return setPlaying(false);
-            if (loaded >= rects.length) return replay();
+            if (loaded >= order.length) return replay();
             setPlaying(true);
           }}
         />
@@ -186,16 +240,16 @@ export function TruckLoadAnimation({
         <Control
           label="Next"
           hint="Load the next piece"
-          disabled={loaded >= rects.length}
+          disabled={loaded >= order.length}
           onPress={() => {
             setPlaying(false);
-            setLoaded((n) => Math.min(rects.length, n + 1));
+            setLoaded((n) => Math.min(order.length, n + 1));
           }}
         />
       </View>
 
       <Text style={styles.counter}>
-        {loaded} of {rects.length} loaded
+        {loaded} of {order.length} loaded
         {reduceMotion ? ' · motion reduced' : ''}
       </Text>
 
@@ -205,7 +259,9 @@ export function TruckLoadAnimation({
           <View style={styles.spotlightBody}>
             <Text style={styles.spotlightName}>{spotlight.name}</Text>
             <Text style={styles.spotlightMeta}>
-              {POSE_LABEL[spotlight.pose]} · {STEP_LABELS[spotlight.step]} · {spotlight.cubicFeet} ft³
+              {POSE_LABEL[spotlight.pose]} ·{' '}
+              {spotlightPlacement ? sideOfTruck(spotlightPlacement, plan.bed) : ''} ·{' '}
+              {STEP_LABELS[spotlight.step]} · {spotlight.cubicFeet} ft³
             </Text>
             {spotlight.posedDownFrom ? (
               // The one place the picture and the written instruction can differ,
@@ -219,11 +275,15 @@ export function TruckLoadAnimation({
         </View>
       ) : null}
 
+      <Text style={styles.solverNote}>
+        Best of {plan.strategy.tried} arrangements · {plan.strategy.name}
+      </Text>
+
       {plan.overflow.length > 0 ? (
         <Text style={styles.overflow}>
-          {plan.overflow.length} {plan.overflow.length === 1 ? 'item is' : 'items are'} in your plan
-          but not drawn here — this packer is tidier than a person and worse than a good loader.
-          Trust the truck size, which is worked out from volume with a 15% reserve.
+          The solver could not find room for {listNames(plan.overflow.map((o) => o.name))}. It tries{' '}
+          {plan.strategy.tried} arrangements and keeps the best; a person at the tailgate will beat
+          it. The truck size is worked out from volume with a 15% reserve and is the number to trust.
         </Text>
       ) : null}
     </View>
@@ -232,8 +292,44 @@ export function TruckLoadAnimation({
 
 const CAB_WIDTH = 34;
 
+/** "the sofa", "the sofa and the lamp", "the sofa, the lamp and the rug". */
+function listNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? 'one item';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+function ViewTab({
+  label,
+  hint,
+  active,
+  onPress,
+}: {
+  label: string;
+  hint: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ selected: active }}
+      style={({ pressed }) => [
+        styles.viewTab,
+        active && styles.viewTabActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.viewTabText, active && styles.viewTabTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function LoadedPiece({
   rect,
+  view,
   bedWidth,
   bedHeight,
   animate,
@@ -241,7 +337,8 @@ function LoadedPiece({
   dimmed,
   onPress,
 }: {
-  rect: ElevationRect;
+  rect: ProjectedRect;
+  view: ProjectionView;
   bedWidth: number;
   bedHeight: number;
   animate: boolean;
@@ -274,8 +371,23 @@ function LoadedPiece({
 
   const width = Math.max(2, rect.width * bedWidth);
   const height = Math.max(3, rect.height * bedHeight);
-  // The layout measures y from the deck; the canvas measures from the top.
-  const top = (1 - rect.y - rect.height) * bedHeight;
+  /*
+   * The two views measure their second axis in opposite directions.
+   *
+   * From the side, y is height off the DECK and the canvas measures down from
+   * the top, so it flips. From above, y is already distance from the left wall
+   * measured downwards, so it does not. Flipping both, or neither, silently
+   * mirrors one of the drawings — which is exactly the kind of wrong that still
+   * looks plausible.
+   */
+  const top = view === 'side' ? (1 - rect.y - rect.height) * bedHeight : rect.y * bedHeight;
+
+  /*
+   * Depth is what the projection throws away, so it is put back as tone: pieces
+   * further from the viewer sit further back in the stack and read dimmer.
+   * Without it, a top view of a full truck is a solid slab of colour.
+   */
+  const behind = 1 - 0.4 * rect.depth;
 
   return (
     <Animated.View
@@ -285,7 +397,10 @@ function LoadedPiece({
         top,
         width,
         height,
-        opacity: enter.interpolate({ inputRange: [0, 1], outputRange: [0, dimmed ? 0.35 : 1] }),
+        opacity: enter.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, dimmed ? 0.3 : behind],
+        }),
         transform: [
           { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) },
         ],
@@ -295,6 +410,9 @@ function LoadedPiece({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`${rect.name}, ${POSE_LABEL[rect.pose].toLowerCase()}, ${STEP_LABELS[rect.step]}`}
+        // A thin sliver still has to be tappable. Not so much slop that it steals
+        // its neighbour's taps — a wrong answer is worse than no answer.
+        hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
         accessibilityState={{ selected }}
         style={[
           styles.piece,
@@ -349,6 +467,19 @@ function Control({
 
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
+  viewTabs: { flexDirection: 'row', gap: space.sm },
+  viewTab: {
+    flex: 1,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+  },
+  viewTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  viewTabText: { ...type.caption, color: colors.text, fontWeight: '600' },
+  viewTabTextActive: { color: colors.accentText },
+  solverNote: { ...type.caption, fontSize: 11, color: colors.textDim, textAlign: 'center' },
   canvasRow: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm },
   cab: {
     width: CAB_WIDTH,

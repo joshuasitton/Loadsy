@@ -149,33 +149,35 @@ Within a tier: biggest first, id as the tiebreak so the plan stays deterministic
 
 ### The truck layout
 
-Three tabs on Screen 6. Two are the zone summaries; **Load It** is an item-level
-side elevation that plays the load back one piece at a time.
+Three tabs on Screen 6. Two are the zone summaries; **Load It** is a solved 3D
+load, played back one piece at a time in the order the plan prescribes.
 
-`src/truckmap/layout.ts` owns the geometry, and one property makes the picture
-worth reading rather than merely worth looking at: a block's **area is exactly
-proportional to the item's volume**. Its height is how tall the piece stands in
-the pose it travels in; its width is how much truck *length* it consumes — its
-depth scaled by the share of the truck's width it uses. Two nightstands side by
-side occupy one slice of truck, so each is drawn with half the depth it would
-alone. `__tests__/truckLayout.test.ts` asserts the drawn area matches the true
-volumetric fill to within half a percent.
+`src/truckmap/layout.ts` is a small bin-packing solver. Packing boxes into a box
+optimally is NP-hard, so it does the achievable thing instead: try eight
+deterministic arrangements and keep the best. Within a pass it turns each piece
+both ways on the deck, lays down anything that will not stand, and settles every
+placement down-then-forward-then-to-a-wall until it touches something.
 
-A plan view of the floor would have been the wrong drawing: it ignores the six or
-seven feet of height every load uses, and would show most real moves as "not
-fitting".
+Two hard guarantees, both asserted in `__tests__/truckLayout.test.ts`:
 
-Placement is a skyline packer that prefers the position **furthest forward**, then
-lowest. Lowest-first is the textbook rule and it draws a bar chart — every piece
-takes a fresh patch of deck, because the deck is always the lowest thing
-available. Preferring the smallest x reproduces how a truck is really loaded:
-build the front floor-to-ceiling, then start the next slice behind it.
+- **No two pieces occupy the same space.**
+- **Nothing floats** — every piece rests on the deck or on at least 70% support.
 
-Poses come from the same guidance rule that writes the instruction, so the picture
-and the words cannot drift. Where the truck will not take the ideal pose — a
-96-inch rolled rug cannot stand under a 7'2" roof — the packer lays the piece down
-and the detail panel says it did, rather than printing "stand it on end" beside a
-picture of it lying flat.
+The search is deliberately narrow, because most of the freedom is not ours. Load
+order *between* groups is fixed: the plan prints heavy base, then long and tall,
+then boxes, and people load in the order they read. Order *within* a group is a
+knob. Pose is constrained by the guidance rule that writes the instruction, with
+flatter poses as fallbacks rather than alternatives.
+
+Scoring, in order: most pieces placed, then the shortest load, then the lowest
+centre of mass — two loads of equal length are not equally good if one is stacked
+tall and the other is not.
+
+**Two views of one solve**, the convention of any engineering drawing: from the
+side for the stacking, from above for which wall a piece is against. A side
+elevation alone can never answer the second question — half the load is hidden
+behind the other half. Pieces further from the viewer are drawn dimmer, so the
+depth the projection throws away is at least visible.
 
 Bed dimensions are U-Haul's published interiors. They deliberately do **not**
 replace `TRUCK_CAPACITY`, which is what sizing decisions are made from: the 10'
