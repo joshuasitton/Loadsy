@@ -9,6 +9,26 @@
 
 const DASH = '—';
 
+/**
+ * A volume, as a number somebody should act on.
+ *
+ * Whole cubic feet, always. Every volume in this app is the product of three
+ * estimated dimensions — often estimated by a model from a photograph — and
+ * printing "460.75 ft³" claims a precision of about a fifth of a shoebox that
+ * nothing behind it can support. It also reads as a measurement rather than an
+ * estimate, which is the opposite of what every other line on those screens is
+ * carefully saying.
+ *
+ * Small items would round to nothing, so anything under 10 ft³ keeps one decimal
+ * — the difference between a 3 ft³ box and a 3.4 ft³ box is real at that scale,
+ * and a list of items that all say "3 ft³" is less useful, not more honest.
+ */
+export function formatCuFt(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DASH;
+  if (Math.abs(value) < 10) return `${Math.round(value * 10) / 10}`;
+  return `${Math.round(value)}`;
+}
+
 function toDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
   const date = new Date(iso);

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { formatCuFt } from '../src/ui/format';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,7 +50,7 @@ export default function InventoryScreen() {
             message="We weren't sure about these. Confirm or correct them and your truck estimate gets a lot sharper."
           />
         ) : totals.items > 0 ? (
-          <Banner tone="green" title="Inventory looks good" message={`${totals.items} items · ${totals.cuFt} ft³ before packing buffer`} />
+          <Banner tone="green" title="Inventory looks good" message={`${totals.items} items · ${formatCuFt(totals.cuFt)} ft³ before packing buffer`} />
         ) : null}
 
         {move.rooms.length === 0 ? (
@@ -66,7 +67,7 @@ export default function InventoryScreen() {
           <View key={room.id} style={styles.room}>
             <View style={styles.roomHeader}>
               <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomTotal}>{roomCubicFeet(room)} ft³</Text>
+              <Text style={styles.roomTotal}>{formatCuFt(roomCubicFeet(room))} ft³</Text>
             </View>
 
             {room.items.length === 0 ? (
@@ -203,7 +204,7 @@ function ItemCard({
         <View style={styles.itemNameBlock}>
           <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemMeta}>
-            {lengthIn}″ × {widthIn}″ × {heightIn}″ · {item.cubicFeet} ft³
+            {lengthIn}″ × {widthIn}″ × {heightIn}″ · {formatCuFt(item.cubicFeet)} ft³
           </Text>
         </View>
         <Pressable
@@ -395,7 +396,7 @@ function DimensionModal({
               <DimField label="Width" value={width} onChange={setWidth} />
               <DimField label="Height" value={height} onChange={setHeight} />
             </View>
-            <Text style={styles.preview}>{valid ? `${preview} ft³` : 'Enter all three dimensions'}</Text>
+            <Text style={styles.preview}>{valid ? `${formatCuFt(preview)} ft³` : 'Enter all three dimensions'}</Text>
 
             <SectionLabel>CATEGORY</SectionLabel>
             <View style={styles.chipRow}>

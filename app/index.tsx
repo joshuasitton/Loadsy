@@ -9,7 +9,7 @@ import { DemoBar } from '../src/demo/DemoBar';
 import { useHistory } from '../src/state/historyStore';
 import { useMove } from '../src/state/moveStore';
 import { Card, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
-import { formatDateTime } from '../src/ui/format';
+import { formatCuFt, formatDateTime } from '../src/ui/format';
 import { colors, radius, space, type } from '../src/ui/theme';
 
 /** Screen 7 — My Move dashboard. 5-step progress tracker bound to MoveStatus. */
@@ -48,13 +48,13 @@ const ROWS: StepRow[] = [
       const unresolved = unresolvedCount(ctx.move);
       return unresolved > 0
         ? `${count} items · ${unresolved} need a quick check`
-        : `${count} items · ${ctx.recommendation.rawCuFt} ft³`;
+        : `${count} items · ${formatCuFt(ctx.recommendation.rawCuFt)} ft³`;
     },
     lockedReason: () => null,
   },
   {
     status: 'truckAndPrice',
-    title: 'Truck & Price',
+    title: 'Trip, Truck & Price',
     // The trip is the front of this stage: where the move goes decides the
     // mileage and the drop fee, and both are priced two screens later.
     href: '/trip',
@@ -210,9 +210,7 @@ export default function MyMoveScreen() {
             </Text>
           </View>
           <Text style={styles.keepingBody}>
-            Every change is written to this device as it happens. Close the app, come back
-            days later, and your rooms, items and plan are where you left them. There is no
-            account behind it yet, so it stays on this phone — and nobody else can see it.
+            Saved to this phone as you go. No account, so nobody else can see it.
           </Text>
 
           {/*
@@ -261,23 +259,22 @@ export default function MyMoveScreen() {
             )
           ) : null}
 
-          <Pressable
-            onPress={() => router.push('/history')}
-            accessibilityRole="button"
-            accessibilityLabel={
-              history.length === 0
-                ? 'Past moves. None yet'
-                : `Past moves. ${history.length} completed`
-            }
-            style={({ pressed }) => [styles.historyLink, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkText}>
-              {history.length === 0
-                ? 'Past moves →'
-                : `Past moves (${history.length}) →`}
-            </Text>
-          </Pressable>
         </Card>
+
+        <Pressable
+          onPress={() => router.push('/history')}
+          accessibilityRole="button"
+          accessibilityLabel={
+            history.length === 0
+              ? 'Past moves. None yet'
+              : `Past moves. ${history.length} completed`
+          }
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+        >
+          <Text style={styles.linkText}>
+            {history.length === 0 ? 'Past moves →' : `Past moves (${history.length}) →`}
+          </Text>
+        </Pressable>
       </ScrollView>
     </Screen>
   );

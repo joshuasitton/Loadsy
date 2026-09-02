@@ -4,7 +4,7 @@ import { TRUCK_LABEL } from '../src/domain/truck';
 import type { CompletedMove } from '../src/domain/moveHistory';
 import { useHistory } from '../src/state/historyStore';
 import { Card, Screen, SectionLabel } from '../src/ui/components';
-import { formatDate, formatDateTime } from '../src/ui/format';
+import { formatCuFt, formatDate, formatDateTime } from '../src/ui/format';
 import { colors, radius, space, type } from '../src/ui/theme';
 
 /**
@@ -72,7 +72,7 @@ export default function HistoryScreen() {
                   <Text style={styles.truck}>{TRUCK_LABEL[record.truckSize]}</Text>
                   <Text style={styles.meta}>
                     {record.roomCount} {record.roomCount === 1 ? 'room' : 'rooms'} ·{' '}
-                    {record.itemCount} items · {Math.round(record.rawCuFt)} ft³
+                    {record.itemCount} items · {formatCuFt(record.rawCuFt)} ft³
                     {record.originZip ? ` · from ${record.originZip}` : ''}
                   </Text>
                 </View>
@@ -82,8 +82,8 @@ export default function HistoryScreen() {
               {isOpen ? (
                 <View style={styles.detail}>
                   <View style={styles.figures}>
-                    <Figure label="LOADED" value={`${Math.round(record.rawCuFt)} ft³`} />
-                    <Figure label="WITH BUFFER" value={`${Math.round(record.adjustedCuFt)} ft³`} />
+                    <Figure label="LOADED" value={`${formatCuFt(record.rawCuFt)} ft³`} />
+                    <Figure label="WITH BUFFER" value={`${formatCuFt(record.adjustedCuFt)} ft³`} />
                     <Figure label="TRUCK" value={TRUCK_LABEL[record.truckSize]} />
                   </View>
 

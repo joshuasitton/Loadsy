@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { formatCuFt } from '../src/ui/format';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -187,12 +188,12 @@ export default function LayoutViewScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>{TRUCK_LABEL[recommendation.size]}</Text>
           <Text style={styles.subtitle}>
-            {zonedCuFt} ft³ across {zones.length}{' '}
+            {formatCuFt(zonedCuFt)} ft³ across {zones.length}{' '}
             {zones.length === 1 ? 'load zone' : 'load zones'}
           </Text>
           <Text style={styles.subtitleDim}>
             With the {Math.round(recommendation.bufferPct * 100)}% packing buffer,{' '}
-            {recommendation.adjustedCuFt} ft³ has to fit.
+            {formatCuFt(recommendation.adjustedCuFt)} ft³ has to fit.
           </Text>
         </View>
 
@@ -221,9 +222,8 @@ export default function LayoutViewScreen() {
           {view === 'load' ? (
             <View style={styles.loadView}>
               <Text style={styles.loadIntro}>
-                A solved 3D load, played back in the order the plan prescribes. Two views of
-                the same solve: from the side to see the stacking, from above to see which
-                wall a piece is against. Tap any piece for its instructions.
+                Your load, solved and played back in carrying order. Tap any piece — or any
+                row below the truck — for its instructions.
               </Text>
               <TruckLoadAnimation
                 // Keyed on the inventory: a different item set is a different
@@ -331,7 +331,7 @@ export default function LayoutViewScreen() {
                 {zone.step}. {zone.label}
               </Text>
               <Text style={styles.legendValue}>
-                {zone.cubicFeet} ft³ · {Math.round(zone.fraction * 100)}%
+                {formatCuFt(zone.cubicFeet)} ft³ · {Math.round(zone.fraction * 100)}%
               </Text>
             </Pressable>
           ))}
@@ -344,7 +344,7 @@ export default function LayoutViewScreen() {
         */}
         <Text style={styles.caveat}>
           {view === 'load'
-            ? 'Packing a truck optimally is a problem nobody solves exactly, so this tries several arrangements and keeps the best — turning pieces, laying down what will not stand, and settling everything against what is already loaded. Nothing overlaps and nothing floats. A person at the tailgate will still beat it, and the truck size is worked out from volume with a 15% reserve either way.'
+            ? 'Nothing overlaps and nothing floats, but a person at the tailgate will still beat it. The truck size comes from volume with a 15% reserve either way.'
             : 'This is a load-zone diagram, not a piece-by-piece packing solution. It shows where each group belongs and how much of the truck it takes up.'}
         </Text>
 
@@ -437,7 +437,7 @@ function ItemDetail({ item }: { item: InventoryItem }) {
       <Text style={styles.detailTitle}>{item.name}</Text>
       <Text style={styles.detailInstruction}>
         {Math.round(lengthIn)} × {Math.round(widthIn)} × {Math.round(heightIn)} in ·{' '}
-        {item.cubicFeet} ft³ · {POSE_LABEL[poseForItem(item)].toLowerCase()}
+        {formatCuFt(item.cubicFeet)} ft³ · {POSE_LABEL[poseForItem(item)].toLowerCase()}
       </Text>
       {guidance ? (
         <View style={styles.detailItem}>
@@ -476,7 +476,7 @@ function ZoneDetail({ step, items }: { step: LoadStepOrder; items: InventoryItem
         return (
           <View key={id} style={styles.detailItem}>
             <Text style={styles.detailItemName}>
-              {item.name} · {item.cubicFeet} ft³
+              {item.name} · {formatCuFt(item.cubicFeet)} ft³
             </Text>
             {guidance ? (
               <>

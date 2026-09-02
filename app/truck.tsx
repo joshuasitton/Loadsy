@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { formatCuFt } from '../src/ui/format';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -15,6 +16,9 @@ import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 3 — Truck Recommendation. */
 
+/** Chip width plus the gap between chips, for scrolling the row by whole chips. */
+const CHIP_STRIDE = 150 + space.sm;
+
 const SIZE_GUIDE = [
   { size: 'van' as const, body: 'A few pieces of furniture and a car-load of boxes. Studios and dorm rooms.' },
   { size: '10ft' as const, body: 'A studio or small one-bedroom. Bed, sofa, dresser, and around fifteen boxes.' },
@@ -26,6 +30,17 @@ const SIZE_GUIDE = [
 export default function TruckScreen() {
   const { move, dispatch, recommendation } = useMove();
   const insets = useSafeAreaInsets();
+  const chipRow = useRef<ScrollView>(null);
+
+  /**
+   * Brings the recommended chip into view, leaving the one before it half
+   * visible so the row still reads as scrollable.
+   */
+  const scrollToRecommended = useCallback(() => {
+    const index = TRUCK_SIZES.indexOf(recommendation.size);
+    if (index <= 0) return;
+    chipRow.current?.scrollTo({ x: Math.max(0, (index - 0.4) * CHIP_STRIDE), animated: false });
+  }, [recommendation.size]);
   // Preview only. Spec §3 Screen 3: tapping a chip must NOT change the recommendation.
   // Derived rather than seeded, so a recommendation that lands after mount (the
   // store hydrates from AsyncStorage a frame late on a cold deep link) doesn't
@@ -58,21 +73,21 @@ export default function TruckScreen() {
 
         <Card style={styles.why}>
           <SectionLabel>WHY THIS SIZE</SectionLabel>
-          <WhyRow label="Everything you listed" value={`${recommendation.rawCuFt} ft³`} />
+          <WhyRow label="Everything you listed" value={`${formatCuFt(recommendation.rawCuFt)} ft³`} />
           <WhyRow
             label={`Packing buffer (+${Math.round(recommendation.bufferPct * 100)}%)`}
-            value={`${round(recommendation.adjustedCuFt - recommendation.rawCuFt)} ft³`}
+            value={`${formatCuFt(recommendation.adjustedCuFt - recommendation.rawCuFt)} ft³`}
             hint="Real loads never stack perfectly — this is the gap between the boxes."
           />
           <View style={styles.whyDivider} />
-          <WhyRow label="What you actually need" value={`${recommendation.adjustedCuFt} ft³`} emphasis />
+          <WhyRow label="What you actually need" value={`${formatCuFt(recommendation.adjustedCuFt)} ft³`} emphasis />
           <WhyRow
             label={`${TRUCK_LABEL[recommendation.size]} holds`}
             value={`${recommendation.capacity.min}–${recommendation.capacity.max} ft³`}
           />
           {!recommendation.exceedsLargest ? (
             <Text style={styles.headroom}>
-              That leaves about {recommendation.headroomCuFt} ft³ of headroom. We size up rather
+              That leaves about {formatCuFt(recommendation.headroomCuFt)} ft³ of headroom. We size up rather
               than fill a truck to its limit — a truck that is slightly too big costs a few
               dollars, one that is too small costs you the day.
             </Text>
@@ -81,10 +96,20 @@ export default function TruckScreen() {
 
         <View>
           <SectionLabel>COMPARE SIZES</SectionLabel>
+          {/*
+            Scrolled so the recommendation is the first thing in view.
+            
+            The row is 800pt of chips in a 343pt window, in size order, and the
+            recommendation can be anywhere in it — for a 15ft it started 94pt off
+            the right edge with no scrollbar to hint that anything was there. The
+            one chip this row exists to show was the one you could not see.
+          */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipRow}
+            onContentSizeChange={scrollToRecommended}
+            ref={chipRow}
           >
             {TRUCK_SIZES.map((size) => {
               const isRecommended = size === recommendation.size;
@@ -116,7 +141,7 @@ export default function TruckScreen() {
           {!isPreviewingRecommendation ? (
             <Text style={styles.previewNote}>
               Previewing the {TRUCK_CHIP_LABEL[previewing]} — it holds {previewCapacity.min}–
-              {previewCapacity.max} ft³ against your {recommendation.adjustedCuFt} ft³. Your
+              {previewCapacity.max} ft³ against your {formatCuFt(recommendation.adjustedCuFt)} ft³. Your
               recommendation is still the {TRUCK_CHIP_LABEL[recommendation.size]}.
             </Text>
           ) : null}
@@ -199,9 +224,6 @@ function WhyRow({
   );
 }
 
-function round(n: number): number {
-  return Math.round(n * 100) / 100;
-}
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xl, gap: space.xl },

@@ -136,9 +136,8 @@ export default function TripScreen() {
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.intro}>
-            Where the truck picks up and where it drops off. This is what decides how many
-            miles you are charged for — and whether the vendors add a one-way drop fee at
-            all, which changes who comes out cheapest.
+            Where the truck picks up and drops off. This sets your mileage — and whether
+            vendors add a one-way drop fee, which changes who comes out cheapest.
           </Text>
 
           <Card style={styles.card}>
@@ -160,10 +159,7 @@ export default function TripScreen() {
 
           <Card style={styles.card}>
             <SectionLabel>MOVING TO</SectionLabel>
-            <Text style={styles.help}>
-              Leave this blank for a local move — same town, truck comes back. Filling it in
-              is what tells Loadsy to expect a one-way drop, and roughly how far.
-            </Text>
+            <Text style={styles.help}>Blank means a local move — same town, truck comes back.</Text>
             <AddressFields
               value={destination}
               onChange={commitDestination}
@@ -187,13 +183,11 @@ export default function TripScreen() {
               Said plainly, because the number is load-bearing. Turning two
               addresses into real road miles needs a geocoder and a routing
               service, and Loadsy has neither yet — so the suggestion reads the
-              ZIPs and nothing else. An estimate the user can see and correct
+              ZIPs and nothing else. An estimate somebody can see and correct
               beats a confident one they cannot.
             */}
             <Text style={styles.help}>
-              That is a rough guess from the ZIP codes, not a route. If you know the real
-              figure, it is worth typing: mileage and fuel are what separate the vendors on
-              a long move.
+              A guess from the ZIP codes, not a route. Worth correcting if you know it.
             </Text>
             <TextInput
               value={milesDraft}
@@ -234,8 +228,8 @@ export default function TripScreen() {
               ) : null}
               {destinationEntered && !isPreciseAddress(destination) ? (
                 <Text style={styles.note}>
-                  A ZIP is enough to compare prices. The street address is only for your own
-                  record — Loadsy never sends it anywhere.
+                  A ZIP is enough to compare prices. The street is for your own record and
+                  never leaves this device.
                 </Text>
               ) : null}
             </Card>
@@ -357,9 +351,20 @@ const styles = StyleSheet.create({
     ...type.body,
     minHeight: 48,
   },
-  city: { flex: 3 },
-  state: { flex: 1, textAlign: 'center', letterSpacing: 2 },
-  zip: { letterSpacing: 3 },
+  /*
+   * flexBasis 0 and minWidth 0, not just flex.
+   *
+   * A TextInput carries an intrinsic width — roughly twenty characters — and a
+   * bare `flex: 1` grows FROM that rather than shrinking to it. On a 375pt phone
+   * the state field kept its natural size and ran 67pt off the right edge, with
+   * no horizontal scroll to reach it. The city field hid the same fault by being
+   * wide enough that its intrinsic width never bound.
+   */
+  city: { flex: 3, flexBasis: 0, minWidth: 0 },
+  state: { flex: 1, flexBasis: 0, minWidth: 0, textAlign: 'center', letterSpacing: 2 },
+  // Letter-spaced digits read as a code rather than a number, but 3pt turned
+  // "78704" into something closer to five separate numerals.
+  zip: { letterSpacing: 1.5 },
   milesInput: { textAlign: 'center', letterSpacing: 2 },
   summary: { gap: space.xs },
   summaryLine: { ...type.bodyStrong, color: colors.text },

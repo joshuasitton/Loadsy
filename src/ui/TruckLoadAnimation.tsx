@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatCuFt } from './format';
 import {
   AccessibilityInfo,
   Animated,
@@ -281,7 +282,7 @@ export function TruckLoadAnimation({
             <Text style={styles.spotlightMeta}>
               {POSE_LABEL[spotlight.pose]} ·{' '}
               {spotlightPlacement ? sideOfTruck(spotlightPlacement, plan.bed) : ''} ·{' '}
-              {STEP_LABELS[spotlight.step]} · {spotlight.cubicFeet} ft³
+              {STEP_LABELS[spotlight.step]} · {formatCuFt(spotlight.cubicFeet)} ft³
             </Text>
             {spotlight.posedDownFrom ? (
               // The one place the picture and the written instruction can differ,
@@ -295,9 +296,60 @@ export function TruckLoadAnimation({
         </View>
       ) : null}
 
-      <Text style={styles.solverNote}>
-        Best of {plan.strategy.tried} arrangements · {plan.strategy.name}
-      </Text>
+      {/*
+        The strategy's internal name ("front-low, flattest first") was on screen.
+        Interesting to whoever wrote the solver and meaningless to somebody
+        loading a truck, which is a fair test of whether a line belongs in a UI.
+      */}
+      <Text style={styles.solverNote}>Best of {plan.strategy.tried} arrangements tried</Text>
+
+      {/*
+        A full-width row for every piece, in load order.
+        
+        The blocks are drawn to scale, which means most of them are far too small
+        to hit: on a 375pt phone, 22 of a 37-piece load were under the 44pt
+        minimum and the smallest was 77 x 6. Widening them would be worse — the
+        proportions are the information, and overlapping touch targets turn a miss
+        into a WRONG answer rather than no answer. So the reliable path is a list,
+        driving the same selection, the same way the zone legend does.
+      */}
+      <View style={styles.pieceList}>
+        {order.map((itemId, index) => {
+          const rect = rectById.get(itemId);
+          if (!rect) return null;
+          const isSelected = itemId === selectedId;
+          const isLoaded = index < loaded;
+          return (
+            <Pressable
+              key={itemId}
+              onPress={() => onSelect(isSelected ? null : itemId)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`${index + 1}. ${rect.name}, ${POSE_LABEL[rect.pose].toLowerCase()}`}
+              style={({ pressed }) => [
+                styles.pieceRow,
+                isSelected && styles.pieceRowSelected,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.pieceSwatch,
+                  { backgroundColor: STEP_COLORS[rect.step] },
+                  // Not yet loaded reads as an outline, so the list and the
+                  // diagram agree about how far through the load you are.
+                  !isLoaded && styles.pieceSwatchPending,
+                ]}
+              />
+              <Text style={styles.pieceRowNumber}>{index + 1}</Text>
+              <Text style={styles.pieceRowName} numberOfLines={1}>
+                {rect.name}
+              </Text>
+              <Text style={styles.pieceRowMeta}>{formatCuFt(rect.cubicFeet)} ft³</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {plan.overflow.length > 0 ? (
         <Text style={styles.overflow}>
@@ -562,5 +614,20 @@ const styles = StyleSheet.create({
   spotlightNumber: { color: colors.textMuted, fontWeight: '400' },
   spotlightMeta: { ...type.caption, color: colors.textMuted },
   spotlightNote: { ...type.caption, color: colors.amber, lineHeight: 18, marginTop: 2 },
+  pieceList: { gap: 2 },
+  pieceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 44,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.sm,
+  },
+  pieceRowSelected: { backgroundColor: colors.surfaceRaised },
+  pieceSwatch: { width: 10, height: 10, borderRadius: 2 },
+  pieceSwatchPending: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
+  pieceRowNumber: { ...type.caption, color: colors.textDim, minWidth: 22 },
+  pieceRowName: { ...type.caption, color: colors.text, flex: 1 },
+  pieceRowMeta: { ...type.caption, color: colors.textMuted },
   overflow: { ...type.caption, fontSize: 12, color: colors.amber, lineHeight: 18 },
 });

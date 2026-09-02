@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { formatCuFt } from '../src/ui/format';
 import { useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +11,7 @@ import type { InventoryItem, LoadStep, TruckSize } from '../src/domain/types';
 import { allItems, roomCubicFeet } from '../src/domain/volume';
 import { loadOrderIndex, planLoad } from '../src/truckmap/layout';
 import { useMove } from '../src/state/moveStore';
-import { Banner, Card, Chip, PrimaryButton, Screen, SectionLabel } from '../src/ui/components';
+import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, space, type } from '../src/ui/theme';
 import { StepNav } from '../src/ui/StepNav';
 
@@ -85,7 +86,7 @@ export default function PackingScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
-        <PrimaryButton
+        <SecondaryButton
           title="See the truck layout"
           onPress={() => router.push('/layout-view')}
           disabled={!packingPlan}
@@ -184,10 +185,8 @@ function LoadPlanTab({
   return (
     <View style={styles.steps}>
       <Text style={styles.intro}>
-        The numbers are the order to carry things in — they match the truck diagram
-            exactly. The groups are the reasoning: heaviest low and forward, then the long
-            pieces, then the boxes. Where a number lands outside its group, the solver found
-            a better place for that piece and the number is the one to follow.
+        Carry things in numbered order. The groups explain why: heaviest low and
+        forward, then long pieces, then boxes.
       </Text>
 
       {steps.map((step) => (
@@ -240,8 +239,8 @@ function LoadPlanTab({
                       {item.estimatedWeightClass}
                       {item.isFragile ? ' · fragile' : ''} ·{' '}
                       {count > 1
-                        ? `${Math.round(item.cubicFeet * count * 100) / 100} ft³ total`
-                        : `${item.cubicFeet} ft³`}
+                        ? `${formatCuFt(item.cubicFeet * count)} ft³ total`
+                        : `${formatCuFt(item.cubicFeet)} ft³`}
                     </Text>
                   </View>
                   {guidance ? (
@@ -278,7 +277,7 @@ function ByRoomTab({ move }: { move: ReturnType<typeof useMove>['move'] }) {
         <Card key={room.id} style={styles.room}>
           <View style={styles.roomHeader}>
             <Text style={styles.roomName}>{room.name}</Text>
-            <Text style={styles.roomTotal}>{roomCubicFeet(room)} ft³</Text>
+            <Text style={styles.roomTotal}>{formatCuFt(roomCubicFeet(room))} ft³</Text>
           </View>
           <SectionLabel>{room.items.length} ITEMS</SectionLabel>
           {room.items.map((item) => (

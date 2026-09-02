@@ -1,4 +1,5 @@
 import type { InventoryItem, TruckSize } from '../domain/types';
+import { formatCuFt } from '../ui/format';
 import { stepForItem, type LoadStepOrder } from '../domain/packing';
 import { TRUCK_CAPACITY } from '../domain/truck';
 
@@ -209,7 +210,7 @@ export function renderZoneSVG(
     const y = bedY + bedHeight + 7;
     parts.push(
       `<path d="M ${round(focus.x)} ${y} L ${round(focus.x)} ${y + 4} L ${round(focus.x + focus.width)} ${y + 4} L ${round(focus.x + focus.width)} ${y}" fill="none" stroke="${focus.zone.color}" stroke-width="1.5"/>`,
-      `<text x="${midX}" y="${y + 18}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="600" fill="${focus.zone.color}">${focus.zone.label} · ${focus.zone.cubicFeet} ft³</text>`,
+      `<text x="${midX}" y="${y + 18}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="600" fill="${focus.zone.color}">${focus.zone.label} · ${formatCuFt(focus.zone.cubicFeet)} ft³</text>`,
     );
   }
 
@@ -241,7 +242,7 @@ export function zoneAriaLabel(
       : index === zones.length - 1
         ? 'at the door end, loaded last'
         : `${index + 1} of ${zones.length} back from the cab`;
-  return `${zone.label}: ${zone.cubicFeet} cubic feet, ${Math.round(zone.fraction * 100)} percent of the load, ${position}.`;
+  return `${zone.label}: ${formatCuFt(zone.cubicFeet)} cubic feet, ${Math.round(zone.fraction * 100)} percent of the load, ${position}.`;
 }
 
 function renderTopDown(zones: LoadZone[], bed: { lengthFt: number; widthFt: number }): string {
@@ -270,7 +271,7 @@ function renderTopDown(zones: LoadZone[], bed: { lengthFt: number; widthFt: numb
     if (width > 34) {
       parts.push(
         `<text x="${round(cursor + width / 2)}" y="${round(bedY + bedHeight / 2 - 2)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="600" fill="#FFFFFF">${zone.label}</text>`,
-        `<text x="${round(cursor + width / 2)}" y="${round(bedY + bedHeight / 2 + 11)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#FFFFFF" opacity="0.8">${zone.cubicFeet} ft³</text>`,
+        `<text x="${round(cursor + width / 2)}" y="${round(bedY + bedHeight / 2 + 11)}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#FFFFFF" opacity="0.8">${formatCuFt(zone.cubicFeet)} ft³</text>`,
       );
     }
     cursor += width;

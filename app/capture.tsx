@@ -38,6 +38,13 @@ export default function CaptureScreen() {
    * second one cannot be decided after the fact.
    */
   const [angles, setAngles] = useState<{ photoId: string; imageData: string }[]>([]);
+  /**
+   * Open on the first room and closed afterwards.
+   *
+   * The advice matters most before somebody has taken a single photo and is pure
+   * obstruction by the fourth room, so it defaults to whichever the user is.
+   */
+  const [tipsOpen, setTipsOpen] = useState(move.rooms.length === 0);
 
   /**
    * Synchronous re-entrancy guard. `busy` cannot do this job: it was only raised
@@ -267,23 +274,6 @@ export default function CaptureScreen() {
           </Banner>
         ) : null}
 
-        <Card style={styles.tips}>
-          <Text style={styles.tipsTitle}>What makes this accurate</Text>
-          {TIPS.map((tip) => (
-            <View key={tip.title} style={styles.tip}>
-              <Text style={styles.tipTitle}>{tip.title}</Text>
-              <Text style={styles.tipBody}>{tip.body}</Text>
-            </View>
-          ))}
-        </Card>
-
-        <Card style={styles.privacy}>
-          <Text style={styles.privacyText}>
-            Loadsy reads your photo only to identify furniture and estimate volume. Nothing is
-            shared, and nothing is uploaded unless you choose the photo yourself.
-          </Text>
-        </Card>
-
         {angles.length > 0 ? (
           <Card style={styles.angles}>
             <SectionLabel>{angles.length === 1 ? '1 ANGLE' : `${angles.length} ANGLES`}</SectionLabel>
@@ -329,6 +319,18 @@ export default function CaptureScreen() {
               onPress={() => { void capture('library'); }}
               disabled={!trimmedName || angles.length >= MAX_ANGLES}
             />
+            {/*
+              Why the button is off, in writing.
+              
+              It was disabled until the room was named, and said so only in an
+              accessibility hint — so a sighted user saw a grey primary button on
+              the app's core screen with no explanation. The room field shows a
+              placeholder, which looks filled, so "it is already named" was the
+              obvious and wrong conclusion.
+            */}
+            {!trimmedName ? (
+              <Text style={styles.actionsHint}>Name the room first, above.</Text>
+            ) : null}
             {angles.length >= MAX_ANGLES ? (
               <Text style={styles.anglesBody}>
                 That is plenty for one room — {MAX_ANGLES} angles is the most Loadsy measures at once.
@@ -336,6 +338,44 @@ export default function CaptureScreen() {
             ) : null}
           </View>
         )}
+
+        {/*
+          Directly under the buttons, and deliberately so: APP_STORE.md commits to
+          explaining what a photo is used for BEFORE the camera permission prompt
+          can appear, and "somewhere further down the page" is not before.
+        */}
+        <Text style={styles.privacyText}>
+          Photos are read to identify furniture, then discarded. Nothing is uploaded unless
+          you choose it.
+        </Text>
+
+        {/*
+          The tips are worth reading once and are in the way every time after.
+          They used to sit between the room name and the only two buttons on the
+          screen — about twenty lines of advice in front of the action the whole
+          app is built around.
+        */}
+        <Pressable
+          onPress={() => setTipsOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: tipsOpen }}
+          accessibilityLabel="How to get an accurate read"
+          style={({ pressed }) => [styles.tipsToggle, pressed && styles.tipsTogglePressed]}
+        >
+          <Text style={styles.tipsToggleText}>How to get an accurate read</Text>
+          <Text style={styles.tipsChevron}>{tipsOpen ? '▲' : '▼'}</Text>
+        </Pressable>
+
+        {tipsOpen ? (
+          <Card style={styles.tips}>
+            {TIPS.map((tip) => (
+              <View key={tip.title} style={styles.tip}>
+                <Text style={styles.tipTitle}>{tip.title}</Text>
+                <Text style={styles.tipBody}>{tip.body}</Text>
+              </View>
+            ))}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -363,11 +403,23 @@ const styles = StyleSheet.create({
   suggestionText: { ...type.caption, color: colors.textMuted },
   rejectionActions: { marginTop: space.md },
   tips: { gap: space.md },
-  tipsTitle: { ...type.heading, color: colors.text },
+  tipsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  tipsTogglePressed: { opacity: 0.7 },
+  tipsToggleText: { ...type.caption, color: colors.text, fontWeight: '600' },
+  tipsChevron: { ...type.caption, color: colors.textMuted },
+  actionsHint: { ...type.caption, color: colors.amber, textAlign: 'center' },
   tip: { gap: 2 },
   tipTitle: { ...type.bodyStrong, color: colors.text },
   tipBody: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
-  privacy: { backgroundColor: colors.surfaceRaised },
   privacyText: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   actions: { gap: space.md },
   angles: { gap: space.sm },
