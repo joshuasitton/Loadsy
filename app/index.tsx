@@ -1,10 +1,11 @@
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { canLeaveInventory, confidenceBannerCopy, unresolvedCount } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
+import { useEntitlement } from '../src/billing/entitlementStore';
 import { DemoBar } from '../src/demo/DemoBar';
 import { useHistory } from '../src/state/historyStore';
 import { useMove } from '../src/state/moveStore';
@@ -28,6 +29,16 @@ interface StepRow {
    * dimensions — or on an empty inventory. A gate with a second door is not a gate.
    */
   lockedReason: (ctx: ReturnType<typeof useMove>) => string | null;
+  /**
+   * Whether this row is behind the paywall.
+   *
+   * Not derived from `isPremiumStatus(row.status)` even though it could be —
+   * `status` is what the row REPRESENTS, and Reservations and Moving Day are
+   * premium for a product reason rather than because of where they sit in the
+   * status order. Writing it out keeps the two facts separable if the order ever
+   * changes.
+   */
+  premium: boolean;
 }
 
 /** The single reason string, so Screen 7 and Screen 2 can never disagree. */
@@ -35,6 +46,23 @@ function inventoryGate(ctx: ReturnType<typeof useMove>): string | null {
   if (allItems(ctx.move).length === 0) return 'Add your inventory first';
   if (!canLeaveInventory(ctx.move)) return confidenceBannerCopy(unresolvedCount(ctx.move));
   return null;
+}
+
+/**
+ * What a locked row says instead of its own summary.
+ *
+ * The unlocked copy describes a result — "12 load steps ready" — and printing
+ * that next to a lock would be describing something the user cannot look at.
+ */
+function premiumDetail(status: MoveStatus): string {
+  switch (status) {
+    case 'packingPlan':
+      return 'The load order and the truck layout, solved from your inventory';
+    case 'reservations':
+      return 'Hold the truck you picked and keep the confirmation here';
+    default:
+      return 'Your day-of checklist, built from your own load order';
+  }
 }
 
 const ROWS: StepRow[] = [
@@ -51,6 +79,7 @@ const ROWS: StepRow[] = [
         : `${count} items · ${formatCuFt(ctx.recommendation.rawCuFt)} ft³`;
     },
     lockedReason: () => null,
+    premium: false,
   },
   {
     status: 'truckAndPrice',
@@ -60,6 +89,7 @@ const ROWS: StepRow[] = [
     href: '/trip',
     detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · estimated prices from 5 vendors`,
     lockedReason: inventoryGate,
+    premium: false,
   },
   {
     status: 'packingPlan',
@@ -71,6 +101,7 @@ const ROWS: StepRow[] = [
         ? `${ctx.packingPlan.loadSteps.length} load steps ready`
         : 'Build a load order once your inventory is set'),
     lockedReason: inventoryGate,
+    premium: true,
   },
   {
     // Spec §3 Screen 7: MVP-scope stub. No booking logic behind this.
@@ -79,6 +110,7 @@ const ROWS: StepRow[] = [
     href: null,
     detail: () => 'Book directly with the vendor, then check it off here',
     lockedReason: () => null,
+    premium: true,
   },
   {
     status: 'movingDay',
@@ -86,11 +118,13 @@ const ROWS: StepRow[] = [
     href: null,
     detail: () => 'Your day-of checklist — coming together as you go',
     lockedReason: () => null,
+    premium: true,
   },
 ];
 
 export default function MyMoveScreen() {
   const ctx = useMove();
+  const { tier } = useEntitlement();
   const { history, complete } = useHistory();
   const router = useRouter();
   const currentIndex = MOVE_STATUS_ORDER.indexOf(ctx.move.status);
@@ -142,19 +176,50 @@ export default function MyMoveScreen() {
             const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo';
             const isStub = row.href === null;
             const locked = row.lockedReason(ctx);
+            /*
+             * Behind the paywall for this account — which makes the row MORE
+             * interactive, not less. It is the one place the wall is worth
+             * opening from, so it stays a live button and leads there instead of
+             * to the screen it names.
+             */
+            const gated = row.premium && tier === 'free';
             // Programmatically inert, not merely dimmed — the same standard the
             // spec sets for Screen 2's CTA.
-            const blocked = isStub || locked !== null;
+            const blocked = !gated && (isStub || locked !== null);
+            /*
+             * Only what the divider above does not already say. Everything below
+             * the rule is Premium, so repeating it on each row is noise; "SOON"
+             * is the part that differs — Reservations and Moving Day are not
+             * written yet, and a Premium account would not find them either.
+             */
+            const tag = isStub ? 'SOON' : null;
+            const detail = gated && locked === null ? premiumDetail(row.status) : row.detail(ctx);
             return (
+              <Fragment key={row.status}>
+                {/*
+                  Drawn once, where the free app ends. Two tiers scattered through
+                  one list as five identical rows with small labels is a thing you
+                  have to read to understand; a line across the list is a thing you
+                  see. It also stops "PREMIUM" reading as a boast about the row
+                  rather than a boundary.
+                */}
+                {row.premium && !ROWS[index - 1]?.premium ? (
+                  <View style={styles.tierBreak}>
+                    <Text style={styles.tierBreakLabel}>PREMIUM</Text>
+                    <View style={styles.tierBreakRule} />
+                  </View>
+                ) : null}
               <Pressable
-                key={row.status}
                 disabled={blocked}
-                onPress={() => row.href && !locked && router.push(row.href)}
+                onPress={() => {
+                  if (gated) return router.push('/premium');
+                  if (row.href && !locked) router.push(row.href);
+                }}
                 accessibilityRole={blocked ? 'text' : 'button'}
-                accessibilityLabel={`${row.title}. ${row.detail(ctx)}`}
+                accessibilityLabel={`${row.title}.${row.premium ? ' Premium.' : ''} ${detail}`}
                 accessibilityState={{ disabled: blocked }}
-                accessibilityHint={locked ?? undefined}
-                style={({ pressed }) => [styles.row, pressed && !isStub && styles.rowPressed]}
+                accessibilityHint={gated ? 'Opens what Premium adds' : (locked ?? undefined)}
+                style={({ pressed }) => [styles.row, pressed && !blocked && styles.rowPressed]}
               >
                 <View style={[styles.rowBadge, state === 'done' && styles.rowBadgeDone, state === 'current' && styles.rowBadgeCurrent]}>
                   {/*
@@ -176,11 +241,12 @@ export default function MyMoveScreen() {
                 <View style={styles.rowBody}>
                   <View style={styles.rowTitleLine}>
                     <Text style={styles.rowTitle}>{row.title}</Text>
-                    {isStub ? <Text style={styles.rowStub}>SOON</Text> : null}
+                    {tag ? <Text style={styles.rowStub}>{tag}</Text> : null}
                   </View>
-                  <Text style={styles.rowDetail}>{row.detail(ctx)}</Text>
+                  <Text style={styles.rowDetail}>{detail}</Text>
                 </View>
               </Pressable>
+              </Fragment>
             );
           })}
         </View>
@@ -318,6 +384,9 @@ const styles = StyleSheet.create({
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   rowTitle: { ...type.heading, color: colors.text },
   rowStub: { ...type.label, fontSize: 9, color: colors.textDim },
+  tierBreak: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
+  tierBreakLabel: { ...type.label, fontSize: 10, color: colors.textDim },
+  tierBreakRule: { flex: 1, height: 1, backgroundColor: colors.border },
   rowDetail: { ...type.caption, color: colors.textMuted },
   cta: { gap: space.md },
   ctaTitle: { ...type.heading, color: colors.text },

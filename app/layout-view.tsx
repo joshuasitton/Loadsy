@@ -17,6 +17,8 @@ import {
 } from '../src/truckmap/renderSvg';
 import { planLoad, POSE_LABEL } from '../src/truckmap/layout';
 import { TruckLoadAnimation } from '../src/ui/TruckLoadAnimation';
+import { useEntitlement } from '../src/billing/entitlementStore';
+import { PremiumWall } from '../src/ui/PremiumWall';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -25,7 +27,22 @@ import { colors, radius, space, type } from '../src/ui/theme';
 
 const FILE_NAME = 'loadsy-truck-plan.svg';
 
-export default function LayoutViewScreen() {
+export default function LayoutViewRoute() {
+  const { allows } = useEntitlement();
+  /*
+   * Rendered in place, and BEFORE the screen below it mounts.
+   *
+   * Not a redirect: a redirect breaks the back button and turns a shared link
+   * into a bounce. And not an early return further down either — the body's
+   * first act is to solve the load, a few hundred milliseconds of 3D packing,
+   * and running that for somebody who is about to be shown a locked door would
+   * be both slow and slightly absurd.
+   */
+  if (!allows('/layout-view')) return <PremiumWall feature="Truck Layout" />;
+  return <TruckLayoutScreen />;
+}
+
+function TruckLayoutScreen() {
   const { move, packingPlan, recommendation } = useMove();
   /**
    * 'load' is the item-level animation; the other two are the zone summaries.

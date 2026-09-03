@@ -112,10 +112,24 @@ These are explicitly out of MVP scope (§1) and nothing in the build reaches tow
 If a reviewer or stakeholder asks why they are missing, that is the answer:
 
 - Real-time rental pricing or availability APIs, and in-app booking
-- True 3D bin-packing optimisation
 - Video-based capture
 - Multi-user or shared move accounts
 - Payment processing of any kind
 
+3D bin-packing was on this list and came off it: `src/truckmap/layout.ts` solves the
+load in three dimensions and the Truck Layout screen draws it. It is the one item
+here that the build overtook.
+
 The Reservations and Moving Day rows on the dashboard are deliberately inert stubs
 marked "SOON" — no booking logic sits behind them.
+
+**There are no in-app purchases, and the answer to that App Store Connect question is
+"none".** The app has a Free and a Premium tier, and Premium is not shipping with this
+release: the wall at `src/ui/PremiumWall.tsx` describes what Premium will add, states in
+so many words that it is not for sale yet, and offers a "tell me when it ships" button
+that writes a boolean to this device and sends nothing anywhere. No product identifiers,
+no StoreKit, no receipts, no server. If a reviewer reads the wall as a purchase surface
+outside IAP, the answer is that it takes no money and no contact details by any route —
+which is why there is deliberately no "Buy" button in any branch of it, including the
+one behind the `EXPO_PUBLIC_PREMIUM_FOR_SALE` flag. Turning that flag on before billing
+exists would make the screen say so out loud.

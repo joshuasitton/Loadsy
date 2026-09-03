@@ -10,6 +10,8 @@ import { stepForItem, type LoadStepOrder } from '../src/domain/packing';
 import type { InventoryItem, LoadStep, TruckSize } from '../src/domain/types';
 import { allItems, roomCubicFeet } from '../src/domain/volume';
 import { loadOrderIndex, planLoad } from '../src/truckmap/layout';
+import { useEntitlement } from '../src/billing/entitlementStore';
+import { PremiumWall } from '../src/ui/PremiumWall';
 import { useMove } from '../src/state/moveStore';
 import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, space, type } from '../src/ui/theme';
@@ -19,7 +21,22 @@ import { StepNav } from '../src/ui/StepNav';
 
 type Tab = 'load' | 'room';
 
-export default function PackingScreen() {
+export default function PackingRoute() {
+  const { allows } = useEntitlement();
+  /*
+   * Rendered in place, and BEFORE the screen below it mounts.
+   *
+   * Not a redirect: a redirect breaks the back button and turns a shared link
+   * into a bounce. And not an early return further down either — the body's
+   * first act is to solve the load, a few hundred milliseconds of 3D packing,
+   * and running that for somebody who is about to be shown a locked door would
+   * be both slow and slightly absurd.
+   */
+  if (!allows('/packing')) return <PremiumWall feature="The Packing Plan" />;
+  return <PackingPlanScreen />;
+}
+
+function PackingPlanScreen() {
   const router = useRouter();
   const { move, packingPlan, recommendation } = useMove();
   const insets = useSafeAreaInsets();

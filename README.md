@@ -114,6 +114,39 @@ from, and Capture, Truck Layout and Past Moves are detours off a step rather tha
 steps — all four use the header's back control instead. Putting "Next →" on a
 screen that is not in the flow would have to invent an answer to what comes next.
 
+### Free and Premium
+
+Free ends where the answer is complete. A free account photographs its rooms, gets a
+truck size and five compared prices, and never sees a wall on the way — that is the
+whole of steps 1 and 2 on the dashboard, and it is a product somebody can finish.
+Premium is the work that starts after the truck is booked: the load order and the
+solved layout, plus Reservations and Moving Day when they are written.
+
+The line is drawn once, in `src/domain/tier.ts`, and in terms of `MoveStatus` — the
+only vocabulary the dashboard's five rows and the flow's five screens already share.
+The routes are derived from the statuses, which is what stops the dashboard offering a
+row the flow refuses to open. Truck Layout is the exception that has to be listed by
+hand: it is a detour off Packing Plan rather than a step in `FLOW`, so nothing derives
+it, and leaving it out would put the most expensive computation in the app one URL away
+from free.
+
+**Premium is not shipping with the MVP.** There is no billing anywhere in this
+repository — no products, no receipts, no server — so the wall describes, says plainly
+that there is nothing to buy, and takes an "interested" boolean that never leaves the
+device. `src/billing/tier.ts` holds the two flags and, more importantly, `honour()`:
+the single function that decides what tier a build will accept from storage.
+`{"tier":"premium"}` in AsyncStorage is one line of devtools away, and a build with
+nothing to sell and no demo has to answer "free" to it. Everything resolving a tier goes
+through that function, and `__tests__/tier.test.ts` pins it.
+
+Demo builds can flip between the tiers — the toggle is in the demo bar, and the wall
+carries one too. That exists because the solver is the most convincing thing Loadsy
+does and it now sits behind a lock; a walkthrough has to be able to show both sides,
+without a purchase existing. `PREMIUM_FOR_SALE` defaults off in **every** environment,
+including development, unlike `USE_MOCKS` and `DEMO_MODE`: those default on in dev
+because a developer wants the convenient thing, and this one defaults off because a
+developer wants to be looking at the screen users will actually get.
+
 ### Moving through the flow
 
 The four working screens — Inventory, Truck Size, Local Prices, Packing Plan —
@@ -124,6 +157,14 @@ what; `__tests__/flow.test.ts` asserts they are inverses.
 Forward navigates with `replace`, not `push`. These are steps in one flow rather
 than a stack of pages, so walking forward and back a few times should not build a
 history the user then has to unwind.
+
+For a free account the fifth step is locked, and `StepNav` turns its forward button
+into "Unlock Packing Plan" rather than hiding it. The counter still reads "of 5" —
+the step exists, it is just not theirs yet, and a denominator that changed with the
+tier would make two demo builds disagree about how long the flow is. The lock is
+checked *after* the confidence gate, deliberately: telling somebody their inventory is
+incomplete is more use than telling them about a paywall they would reach afterwards
+anyway. Fix first, then upsell.
 
 ### The load plan is an order of operations
 

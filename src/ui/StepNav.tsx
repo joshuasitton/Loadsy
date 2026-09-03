@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEntitlement } from '../billing/entitlementStore';
 import { nextStep, previousStep, stepPosition, type FlowRoute } from '../domain/flow';
 import { colors, radius, space, type } from './theme';
 
@@ -36,12 +37,22 @@ export function StepNav({
   onAdvance?: () => void;
 }) {
   const router = useRouter();
+  const { allows } = useEntitlement();
   const back = previousStep(current);
   const forward = nextStep(current);
   const position = stepPosition(current);
 
   const backLabel = back ? back.title : 'My Move';
   const blocked = blockedReason !== null;
+  /*
+   * The next step exists and this tier cannot open it.
+   *
+   * Distinct from `blocked`, and checked after it: `blocked` means the user has
+   * work to finish, and telling somebody their inventory is incomplete is more
+   * use than telling them it is behind a paywall they would hit afterwards
+   * anyway. Fix first, then upsell.
+   */
+  const locked = forward !== null && !blocked && !allows(forward.route);
 
   return (
     <View style={styles.wrap}>
@@ -57,7 +68,29 @@ export function StepNav({
           </Text>
         </Pressable>
 
-        {forward ? (
+        {forward && locked ? (
+          <Pressable
+            onPress={() => router.push('/premium')}
+            accessibilityRole="button"
+            accessibilityLabel={`${forward.title}. Part of Premium`}
+            accessibilityHint="Opens what Premium adds"
+            style={({ pressed }) => [
+              styles.button,
+              styles.locked,
+              pressed && styles.pressed,
+            ]}
+          >
+            {/*
+              Outline, not the filled accent the ordinary Next button uses. It is
+              still the thing to tap, but tapping it does not continue the flow —
+              it explains why the flow stops here — and a control that looks
+              identical to "Next" while doing something else is a small lie.
+            */}
+            <Text style={styles.lockedText} numberOfLines={1}>
+              Unlock {forward.title}
+            </Text>
+          </Pressable>
+        ) : forward ? (
           <Pressable
             // `replace`, not `push`. These are steps in one flow, not a stack of
             // pages: pushing means a user who walks forward and back a few times
@@ -103,6 +136,13 @@ export function StepNav({
 
       {blockedReason ? <Text style={styles.reason}>{blockedReason}</Text> : null}
 
+      {locked ? (
+        <Text style={styles.lockedNote}>
+          Your truck size and prices are done — that is the whole free app. The load order and
+          the layout are Premium.
+        </Text>
+      ) : null}
+
       {/*
         "Setup", not "Step". The dashboard already shows "Step 1 of 5" for the
         five stages of a move — which run past booking to moving day — and two
@@ -132,6 +172,9 @@ const styles = StyleSheet.create({
   back: { borderWidth: 1, borderColor: colors.borderStrong },
   backText: { ...type.bodyStrong, color: colors.text },
   forward: { backgroundColor: colors.accent },
+  locked: { borderWidth: 1, borderColor: colors.accent, backgroundColor: colors.accentDim },
+  lockedText: { ...type.bodyStrong, color: colors.accent },
+  lockedNote: { ...type.caption, color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
   forwardBlocked: { backgroundColor: colors.disabled },
   forwardText: { ...type.bodyStrong, color: colors.accentText },
   forwardTextBlocked: { color: colors.disabledText },

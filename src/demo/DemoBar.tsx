@@ -1,16 +1,17 @@
 /**
  * The demo control strip.
  *
- * Off unless EXPO_PUBLIC_DEMO_MODE is exactly "true", so a store build cannot
- * carry it by accident — the default is silence, and enabling it takes a
- * deliberate line in eas.json. It is not a debug menu: it is the thing you tap
- * in front of an audience, so it stays small, says what it will do before it
- * does it, and never sits between a real user and the app.
+ * Present under DEMO_MODE — on in development, off in a release, an explicit
+ * EXPO_PUBLIC_DEMO_MODE winning either way. A release build has no `__DEV__`, so
+ * a store build still cannot carry it by accident. It is not a debug menu: it is
+ * the thing you tap in front of an audience, so it stays small, says what it
+ * will do before it does it, and never sits between a real user and the app.
  */
 
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../auth/authStore';
+import { useEntitlement } from '../billing/entitlementStore';
 import { useMove } from '../state/moveStore';
 import { colors, radius, space, type } from '../ui/theme';
 import { DEMO_MODE } from './mode';
@@ -19,6 +20,7 @@ import { buildDemoMove, DEMO_SCENARIOS } from './scenarios';
 export function DemoBar() {
   const { dispatch, move } = useMove();
   const { signOut } = useAuth();
+  const { tier, setTier } = useEntitlement();
   const [expanded, setExpanded] = useState(false);
 
   if (!DEMO_MODE) return null;
@@ -69,6 +71,35 @@ export function DemoBar() {
               </Pressable>
             );
           })}
+
+          {/*
+            The free/premium switch, and the reason it is here rather than in a
+            settings screen: the packing solver is the most convincing thing
+            Loadsy does, and it now sits behind a wall. A walkthrough has to be
+            able to show the wall AND what is behind it, in either order, without
+            a purchase existing.
+          */}
+          <View style={styles.tierRow}>
+            <Text style={styles.tierLabel}>Viewing as</Text>
+            {(['free', 'premium'] as const).map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setTier(option)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: tier === option }}
+                accessibilityLabel={`View the app as a ${option} account`}
+                style={({ pressed }) => [
+                  styles.tierOption,
+                  tier === option && styles.tierOptionOn,
+                  pressed && styles.optionPressed,
+                ]}
+              >
+                <Text style={[styles.tierOptionText, tier === option && styles.tierOptionTextOn]}>
+                  {option === 'free' ? 'Free' : 'Premium'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
           <View style={styles.footerRow}>
             <Pressable
@@ -157,6 +188,19 @@ const styles = StyleSheet.create({
   optionPressed: { opacity: 0.7 },
   optionLabel: { ...type.bodyStrong, color: colors.text },
   optionBlurb: { ...type.caption, color: colors.textMuted },
+  tierRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  tierLabel: { ...type.caption, color: colors.textMuted, flex: 1 },
+  tierOption: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  tierOptionOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tierOptionText: { ...type.caption, color: colors.textMuted },
+  tierOptionTextOn: { color: colors.accentText, fontWeight: '600' },
   footerRow: { flexDirection: 'row', gap: space.sm },
   reset: {
     flex: 1,

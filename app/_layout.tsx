@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth/authStore';
+import { EntitlementProvider } from '../src/billing/entitlementStore';
 import { DEMO_MODE } from '../src/demo/mode';
 import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
@@ -66,12 +67,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <MoveProvider>
-          <HistoryProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </HistoryProvider>
-        </MoveProvider>
+        <EntitlementProvider>
+          <MoveProvider>
+            <HistoryProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </HistoryProvider>
+          </MoveProvider>
+        </EntitlementProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
@@ -102,6 +105,7 @@ function RootNavigator() {
       <Stack.Screen name="truck" options={{ title: 'Truck Size' }} />
       <Stack.Screen name="prices" options={{ title: 'Local Prices' }} />
       <Stack.Screen name="packing" options={{ title: 'Packing Plan' }} />
+      <Stack.Screen name="premium" options={{ title: 'Loadsy Premium' }} />
       <Stack.Screen name="layout-view" options={{ title: 'Truck Layout' }} />
       <Stack.Screen name="history" options={{ title: 'Past Moves' }} />
       <Stack.Screen
