@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { TRUCK_LABEL } from '../src/domain/truck';
-import type { InventoryItem } from '../src/domain/types';
+import type { InventoryItem, PackingPlan } from '../src/domain/types';
 import { allItems } from '../src/domain/volume';
 import { guidanceFor, poseForItem } from '../src/domain/itemGuidance';
 import { buildLoadSteps, type LoadStepOrder } from '../src/domain/packing';
@@ -55,7 +55,24 @@ function TruckLayoutScreen() {
   const [view, setView] = useState<'load' | TruckView>('load');
   /** The piece the user tapped in the animation, if any. */
   const [openItemId, setOpenItemId] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  /**
+   * Which plan the user has saved to this device, held by identity rather than
+   * as a boolean.
+   *
+   * The badge must never outlive the inventory it describes — "Plan saved" next
+   * to a plan that has since changed is a claim about a file the user no longer
+   * has. Storing WHICH plan was saved makes that unrepresentable: `saved` is a
+   * comparison, so it is false from the first render after an edit. Clearing a
+   * boolean in an effect gets there a render late, and trips the React Compiler
+   * rule against setState inside an effect.
+   *
+   * `packingPlan` is memoised in moveStore on the move itself, so its identity
+   * changes exactly when the inventory does — which is the event this needs.
+   */
+  const [savedPlan, setSavedPlan] = useState<PackingPlan | null>(null);
+  // Both null is not a match: with no plan there is nothing that could have been
+  // saved, and the button would otherwise read "Plan saved" on an empty move.
+  const saved = savedPlan !== null && savedPlan === packingPlan;
   /** The zone the user has opened. Null until they ask — the diagram reads fine closed. */
   const [openStep, setOpenStep] = useState<LoadStepOrder | null>(null);
   // Rendered inline rather than raised through Alert: react-native-web ships Alert
@@ -179,7 +196,7 @@ function TruckLayoutScreen() {
       } else {
         writeSvg(Paths.document);
       }
-      setSaved(true);
+      setSavedPlan(packingPlan);
     } catch {
       setProblem({ title: "Couldn't save the plan", message: 'Try sharing it instead.' });
     }

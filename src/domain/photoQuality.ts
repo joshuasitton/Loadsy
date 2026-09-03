@@ -4,7 +4,7 @@
  * silently — every rejection carries a reason the user can act on.
  */
 
-export type PhotoRejectionCode = 'tooDark' | 'tooBlurry' | 'noFurniture' | 'tooSmall';
+export type PhotoRejectionCode = 'tooDark' | 'tooBlurry' | 'noFurniture' | 'tooSmall' | 'network';
 
 export interface PhotoQualitySignals {
   /**

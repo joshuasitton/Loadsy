@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { formatCuFt } from '../src/ui/format';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { canLeaveInventory, confidenceBannerCopy, isUnresolved, markConfirmed, unresolvedCount } from '../src/domain/confidence';
 import type { InventoryItem, ItemCategory, WeightClass } from '../src/domain/types';
@@ -195,6 +195,7 @@ function ItemCard({
   onConfirm: () => void;
   onRemove: () => void;
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const flagged = isUnresolved(item);
   const { lengthIn, widthIn, heightIn } = item.dimensions;
 
@@ -207,15 +208,36 @@ function ItemCard({
             {lengthIn}″ × {widthIn}″ × {heightIn}″ · {formatCuFt(item.cubicFeet)} ft³
           </Text>
         </View>
-        <Pressable
-          onPress={onRemove}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${item.name}`}
-          hitSlop={10}
-          style={styles.iconButton}
-        >
-          <Text style={styles.iconButtonText}>✕</Text>
-        </Pressable>
+        {confirmingRemove ? (
+          <View style={styles.confirmRow}>
+            <Pressable
+              onPress={() => setConfirmingRemove(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel remove"
+              style={styles.iconButton}
+            >
+              <Text style={styles.iconButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={onRemove}
+              accessibilityRole="button"
+              accessibilityLabel={`Confirm remove ${item.name}`}
+              style={styles.iconButton}
+            >
+              <Text style={[styles.iconButtonText, styles.removeText]}>Remove</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setConfirmingRemove(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${item.name}`}
+            hitSlop={10}
+            style={styles.iconButton}
+          >
+            <Text style={styles.iconButtonText}>✕</Text>
+          </Pressable>
+        )}
       </View>
 
       {flagged ? (
@@ -443,7 +465,7 @@ function DimField({ label, value, onChange }: { label: string; value: string; on
       <TextInput
         value={value}
         onChangeText={onChange}
-        keyboardType="number-pad"
+        keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'number-pad'}
         style={styles.input}
         accessibilityLabel={`${label} in inches`}
         placeholder="0"
@@ -500,6 +522,15 @@ const styles = StyleSheet.create({
   itemEditLinkText: { ...type.caption, color: colors.accent, fontWeight: '600' },
   iconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   iconButtonText: { color: colors.textDim, fontSize: 16 },
+  confirmRow: { flexDirection: 'row', gap: space.sm },
+  /*
+   * The palette's red, not a hand-picked one. The literal that was here measured
+   * 3.56:1 on a card — below the 4.5:1 this app holds itself to — and it sat on
+   * the label for a destructive action, which is the last word anybody should
+   * have to squint at. `colors.danger` is 6.76:1 there and is already pinned by
+   * __tests__/contrast.test.ts, so using the token means this pair stays checked.
+   */
+  removeText: { color: colors.danger },
   coverage: { gap: space.sm },
   coverageBody: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
   coverageChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },

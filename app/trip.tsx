@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -72,19 +72,25 @@ export default function TripScreen() {
    * button below instead, next to the copy explaining the reason. This is a
    * commitment recorded in APP_STORE.md, not a preference.
    */
+  // Fire once per mount, not on every empty-string transition. Without the ref
+  // a user who clears the field to type a new ZIP gets overwritten by the
+  // device location before they can type a digit.
+  const autoFilled = useRef(false);
   useEffect(() => {
-    if (move.originZip !== '') return;
+    if (autoFilled.current || move.originZip !== '') return;
     let cancelled = false;
     (async () => {
       if (!(await hasLocationPermission())) return;
       const result = await getDeviceZip();
       if (cancelled || result.status !== 'ok') return;
+      autoFilled.current = true;
       dispatch({ type: 'setOriginAddress', address: result.address });
     })();
     return () => {
       cancelled = true;
     };
-  }, [move.originZip, dispatch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const trip = buildTrip(move);
   const originReady = isUsableAddress(origin);
@@ -112,20 +118,25 @@ export default function TripScreen() {
   async function fillFromLocation() {
     setLocating(true);
     setLocationNote(null);
-    const result = await getDeviceZip({ request: true });
-    setLocating(false);
+    try {
+      const result = await getDeviceZip({ request: true });
 
-    if (result.status === 'ok') {
-      // Merged, not replaced: an apartment number the user typed is not something
-      // the geocoder knows, and overwriting it would be a silent data loss.
-      commitOrigin(normaliseAddress({ ...result.address, line2: origin.line2 }));
-      return;
+      if (result.status === 'ok') {
+        // Merged, not replaced: an apartment number the user typed is not something
+        // the geocoder knows, and overwriting it would be a silent data loss.
+        commitOrigin(normaliseAddress({ ...result.address, line2: origin.line2 }));
+        return;
+      }
+      setLocationNote(
+        result.status === 'denied'
+          ? 'Location is off for Loadsy. Type the address instead.'
+          : "Couldn't read your location. Type the address instead.",
+      );
+    } catch {
+      setLocationNote("Couldn't read your location. Type the address instead.");
+    } finally {
+      setLocating(false);
     }
-    setLocationNote(
-      result.status === 'denied'
-        ? 'Location is off for Loadsy. Type the address instead.'
-        : "Couldn't read your location. Type the address instead.",
-    );
   }
 
   return (
