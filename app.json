@@ -22,9 +22,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "imageWidth": 200,
+          "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#F0F8F3"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [
@@ -52,7 +52,7 @@
       "package": "com.loadsy.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F0F8F3"
+        "backgroundColor": "#0D2430"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

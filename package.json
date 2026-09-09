@@ -13,7 +13,8 @@
     "test": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs --test \"__tests__/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "eval:detect": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/eval/detect.ts"
+    "eval:detect": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/eval/detect.ts",
+    "brand:icons": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/brand/render-marks.mjs && node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/brand/verify-marks.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",

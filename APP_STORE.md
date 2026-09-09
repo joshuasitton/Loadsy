@@ -80,10 +80,26 @@ sufficient — someone needs to swipe through every screen with the screen curta
 
 ## Outstanding
 
-**Icon and splash screen**
-`assets/icon.png`, `assets/adaptive-icon.png` and `assets/splash.png` are generated
-placeholders. Correctly sized (1024×1024 icon, no alpha, no pre-rounded corners) so they
-will build and upload, but they need real design work before submission.
+**Icon and splash screen — done**
+The mark is an L built from two cargo blocks, with a green square filling the notch the
+L leaves. That notch is the safety reserve the sizing model holds back, so the brand
+colour marks the space you were right not to fill.
+
+All four assets are generated from one geometry in `src/ui/markGeometry.ts` by
+`npm run brand:icons`, which also verifies what it wrote. The app's own `<Mark />` reads
+the same numbers, so the home-screen icon and the sign-in logo cannot drift apart.
+
+Per-platform decisions worth not undoing:
+
+- `icon.png` is 1024×1024, opaque to the edge, with no pre-rounded corners — iOS applies
+  its own mask, and a rounded corner in the artwork gets rounded twice.
+- `adaptive-icon.png` carries the mark alone on transparency; the ground is
+  `android.adaptiveIcon.backgroundColor`. The mark's *diagonal* fits the 264px circle
+  Android guarantees, which puts it at ~43% of the canvas against ~70% on iOS. That gap
+  is deliberate: a launcher may mask to a circle, and a square inscribed in a circle is
+  smaller than one inscribed in a square by a factor of √2.
+- `splash.png` is rounded, unlike the iOS master, because nothing masks a splash — it has
+  to bring its own tile shape or it reads as a dark rectangle instead of as the icon.
 
 **Screenshots from Screens 2–5**
 The spec calls these the strongest visual sell: inventory, recommendation, prices,

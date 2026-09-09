@@ -14,6 +14,7 @@ import { DEMO_EMAIL, DEMO_PASSWORD } from '../src/auth/demoCredentials';
 import { DEMO_MODE } from '../src/demo/mode';
 import { buildDemoMove, DEMO_SCENARIOS } from '../src/demo/scenarios';
 import { useMove } from '../src/state/moveStore';
+import { Mark } from '../src/ui/Mark';
 import { Card, PrimaryButton, Screen } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
 
@@ -73,6 +74,12 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
+            {/*
+              The icon, on the one screen where somebody arrives without having
+              seen it on a home screen first. A mark nobody meets inside the
+              product is a mark nobody learns.
+            */}
+            <Mark size={64} accessibilityLabel="Loadsy" />
             <Text style={styles.wordmark}>Loadsy</Text>
             <Text style={styles.tagline}>Right size truck. Right price. Right plan.</Text>
           </View>
@@ -222,7 +229,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.lg },
-  hero: { alignItems: 'center', gap: space.xs, marginTop: space.xl, marginBottom: space.sm },
+  hero: { alignItems: 'center', gap: space.sm, marginTop: space.xl, marginBottom: space.sm },
   wordmark: { ...type.display, color: colors.text, letterSpacing: -1 },
   tagline: { ...type.caption, color: colors.textMuted, textAlign: 'center' },
   card: { gap: space.md },

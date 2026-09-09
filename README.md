@@ -114,6 +114,32 @@ from, and Capture, Truck Layout and Past Moves are detours off a step rather tha
 steps — all four use the header's back control instead. Putting "Next →" on a
 screen that is not in the flow would have to invent an answer to what comes next.
 
+### The mark
+
+An L built from two cargo blocks — a tall piece standing on end and a heavy base, low and
+forward, which is the profile of a correctly loaded bed. The green square fills the notch
+the L leaves, and that notch is the whole idea: it is the safety reserve the sizing model
+holds back, so the brand colour marks the space you were right not to fill.
+
+It replaced a side-view box truck, which was the category's stock image — the same picture
+U-Haul, Budget, PODS and Lugg resolve to — and whose only distinguishing detail, a tape
+measure along the roof, disappeared below about 64px.
+
+The geometry lives in `src/ui/markGeometry.ts` and nothing else defines it. `<Mark />`
+draws it as SVG inside the app; `npm run brand:icons` rasterises the same numbers into the
+four PNGs and then reads those PNGs back to check them. That second half is not ceremony:
+the Android layer is a white mark on transparency, so it is invisible in any viewer with a
+white background, and an icon that shipped empty would look exactly like one that shipped
+correctly. The check decodes the file and counts pixels instead.
+
+It caught a real error on the first run. The mark cleared Android's 264px safe *square*
+and overshot its safe *circle* by 41px, which a launcher with a circular mask would have
+trimmed to a stump.
+
+There is no SVG rasteriser on this machine and none was added. The PNGs are encoded with
+`node:zlib`, which ships with the runtime — four static files that change once a year did
+not seem worth a build dependency.
+
 ### Free and Premium
 
 Free ends where the answer is complete. A free account photographs its rooms, gets a
