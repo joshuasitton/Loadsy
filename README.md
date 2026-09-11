@@ -117,9 +117,20 @@ screen that is not in the flow would have to invent an answer to what comes next
 ### The mark
 
 An L built from two cargo blocks — a tall piece standing on end and a heavy base, low and
-forward, which is the profile of a correctly loaded bed. The green square fills the notch
-the L leaves, and that notch is the whole idea: it is the safety reserve the sizing model
-holds back, so the brand colour marks the space you were right not to fill.
+forward, which is the profile of a correctly loaded bed. A green square fills the notch the
+L leaves, with a truck cut out of it.
+
+The square began as the empty reserve — the 15% the sizing model holds back, so the brand
+colour marked the space you were right *not* to fill. That reading is gone now, traded
+deliberately for one moment of recognition: a meaning nobody can read without being told is
+not doing much work, and the mark otherwise said nothing about moving on its own.
+
+The truck is **cut out of** the square rather than standing in for it, and that is the part
+worth not undoing. The square's mass is what carried the mark at 16px. A truck silhouette in
+its place is four shapes where there was one, and by 32px they merge into a blob with no edge
+— exactly what the old box-truck icon was already suffering. Knocked out, it degrades in the
+right order: a truck close up, a green square far away, and the square was the mark to begin
+with.
 
 It replaced a side-view box truck, which was the category's stock image — the same picture
 U-Haul, Budget, PODS and Lugg resolve to — and whose only distinguishing detail, a tape

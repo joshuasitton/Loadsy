@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets');
 
+import { RESERVE } from '../../src/ui/markGeometry.ts';
+
 const INK = '0d2430';
 const WHITE = 'ffffff';
 const PINE = '0b7a62';
@@ -56,6 +58,33 @@ function decode(file) {
     raw.copy(px, y * width * 4, y * stride + 1, (y + 1) * stride);
   }
   return { width, height, px };
+}
+
+/** Colour counts inside one region of the grid, in 120-unit coordinates. */
+function within(file, box, window = 1) {
+  const { width, height, px } = decode(file);
+  const span = 120 * window;
+  const origin = (120 - span) / 2;
+  const toPx = (g) => ((g - origin) / span) * width;
+  const x0 = Math.max(0, Math.ceil(toPx(box.x0)));
+  const x1 = Math.min(width - 1, Math.floor(toPx(box.x1)));
+  const y0 = Math.max(0, Math.ceil(toPx(box.y0)));
+  const y1 = Math.min(height - 1, Math.floor(toPx(box.y1)));
+
+  let pine = 0;
+  let cut = 0;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = (y * width + x) * 4;
+      const a = px[i + 3];
+      const h = px.subarray(i, i + 3).toString('hex');
+      if (a >= 250 && h === PINE) pine++;
+      // The knockout is the ground: opaque ink on the tiles, transparent on the
+      // Android foreground where app.json supplies the ink instead.
+      else if (a < 20 || (a >= 250 && h === INK)) cut++;
+    }
+  }
+  return { pine, cut, area: (x1 - x0 + 1) * (y1 - y0 + 1) };
 }
 
 function inspect(file) {
@@ -112,6 +141,14 @@ console.log('\nicon.png — iOS master');
   const left = it.box.minX;
   const right = it.width - 1 - it.box.maxX;
   check(Math.abs(left - right) <= 2, `centred horizontally (${left}px / ${right}px)`);
+
+  // The truck is cut out of the reserve square. If the knockout silently failed
+  // the result is a plain green square, which looks completely fine — so the only
+  // way to catch it is to count what is actually inside the square.
+  const sq = within('icon.png', RESERVE);
+  const cutShare = (sq.cut / sq.area) * 100;
+  check(sq.pine > 0, `reserve square still reads green (${((sq.pine / sq.area) * 100).toFixed(1)}%)`);
+  check(cutShare > 12 && cutShare < 45, `truck cut out of it (${cutShare.toFixed(1)}% of the square)`);
 }
 
 console.log('\nadaptive-icon.png — Android foreground');
@@ -133,6 +170,14 @@ console.log('\nadaptive-icon.png — Android foreground');
     reach * 2 <= safe + 1,
     `mark spans ${(reach * 2).toFixed(0)}px across its diagonal, inside the ${safe.toFixed(0)}px safe circle`,
   );
+
+  // Here the knockout must be genuinely transparent, not ink: the layer is
+  // composited over app.json's background, and baking a second copy of it in
+  // would defeat the point of a foreground layer.
+  const sq = within('adaptive-icon.png', RESERVE, 1.63);
+  const cutShare = (sq.cut / sq.area) * 100;
+  check(sq.pine > 0, 'reserve square still reads green');
+  check(cutShare > 12 && cutShare < 45, `truck cut through to transparency (${cutShare.toFixed(1)}%)`);
 }
 
 console.log('\nfavicon.png — browser tab');

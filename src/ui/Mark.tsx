@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import {
   CORNER_R,
   GRID,
@@ -8,6 +8,10 @@ import {
   MARK_WHITE,
   RESERVE,
   TILE_R,
+  TRUCK_BODY,
+  TRUCK_CAB,
+  TRUCK_R,
+  TRUCK_WHEELS,
   markPath,
 } from './markGeometry';
 
@@ -41,6 +45,31 @@ export function Mark({
         rx={CORNER_R}
         fill={MARK_PINE}
       />
+      {/*
+        Painted in ink rather than masked out. On the tile the ground IS ink, so
+        this is a true knockout; off the tile the L is ink too, so a dark truck on
+        the green square reads the same. One fill covers both, and an SVG <Mask>
+        would have needed a unique id per instance for no visible gain.
+      */}
+      <Rect
+        x={TRUCK_BODY.x0}
+        y={TRUCK_BODY.y0}
+        width={TRUCK_BODY.x1 - TRUCK_BODY.x0}
+        height={TRUCK_BODY.y1 - TRUCK_BODY.y0}
+        rx={TRUCK_R}
+        fill={MARK_INK}
+      />
+      <Rect
+        x={TRUCK_CAB.x0}
+        y={TRUCK_CAB.y0}
+        width={TRUCK_CAB.x1 - TRUCK_CAB.x0}
+        height={TRUCK_CAB.y1 - TRUCK_CAB.y0}
+        rx={TRUCK_R}
+        fill={MARK_INK}
+      />
+      {TRUCK_WHEELS.map((wheel) => (
+        <Circle key={wheel.cx} cx={wheel.cx} cy={wheel.cy} r={wheel.r} fill={MARK_INK} />
+      ))}
     </Svg>
   );
 }

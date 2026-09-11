@@ -10,9 +10,7 @@
  *
  * The mark is an L built from two cargo blocks: a tall piece standing on end and
  * a heavy base, low and forward, which is the profile of a correctly loaded bed.
- * The square fills the notch the L leaves. That notch is the point — it is the
- * safety reserve the sizing model holds back, so the brand colour marks the space
- * you were right not to fill.
+ * A green square fills the notch the L leaves, with a truck cut out of it.
  */
 
 /** Every coordinate below is on this square. Assets scale it; nothing re-draws it. */
@@ -44,6 +42,32 @@ export const RESERVE: Box = { x0: 58, y0: 18, x1: 102, y1: 62 };
 export const CORNER_R = 8;
 /** The tile's own radius, used only where nothing else supplies a mask. */
 export const TILE_R = 26;
+
+/**
+ * The truck cut out of the reserve square.
+ *
+ * Cut out rather than standing in for it, and that is the whole decision. The
+ * square's mass is what carried this mark at 16px; a truck silhouette in its
+ * place is four shapes where there was one, and by 32px they merge into a blob
+ * with no edge of its own — which is the cost the old box-truck icon was already
+ * paying. Knocked out, the mark degrades in the right order: a truck close up, a
+ * green square far away, and the square was the mark to begin with.
+ *
+ * What it trades is the meaning. The empty corner used to be the reserve the
+ * sizing model holds back, so the brand colour marked the space you were right
+ * NOT to fill. A truck fills it. That is a real loss, taken deliberately: a
+ * meaning nobody can read without being told it is not doing much work, and one
+ * moment of recognition is worth more than a private joke.
+ */
+export const TRUCK_BODY: Box = { x0: 64, y0: 28, x1: 83, y1: 46 };
+/** Overlaps the body, so the rounded corners do not leave a notch at the seam. */
+export const TRUCK_CAB: Box = { x0: 80, y0: 35, x1: 95, y1: 46 };
+export const TRUCK_R = 3;
+/** Wheels are what say "vehicle" rather than "stepped rectangle". */
+export const TRUCK_WHEELS = [
+  { cx: 70.5, cy: 47.5, r: 3.2 },
+  { cx: 89, cy: 47.5, r: 3.2 },
+] as const;
 
 export const MARK_INK = '#0D2430';
 export const MARK_WHITE = '#FFFFFF';

@@ -36,6 +36,10 @@ import {
   MARK_WHITE,
   RESERVE,
   TILE_R,
+  TRUCK_BODY,
+  TRUCK_CAB,
+  TRUCK_R,
+  TRUCK_WHEELS,
 } from '../../src/ui/markGeometry.ts';
 
 /* -------------------------------------------------------------------- shape */
@@ -97,8 +101,23 @@ function inRoundedRect(x, y, r, radius) {
  * layer and the splash both sit on a colour the OS supplies, so they ship the
  * mark alone.
  */
+/** The cut-out truck: two overlapping rounded boxes and two wheels. */
+function inTruck(x, y) {
+  if (inRoundedRect(x, y, TRUCK_BODY, TRUCK_R)) return true;
+  if (inRoundedRect(x, y, TRUCK_CAB, TRUCK_R)) return true;
+  for (const wheel of TRUCK_WHEELS) {
+    const dx = x - wheel.cx;
+    const dy = y - wheel.cy;
+    if (dx * dx + dy * dy <= wheel.r * wheel.r) return true;
+  }
+  return false;
+}
+
 function sample(x, y, { ground, tileRadius }) {
-  if (inRoundedRect(x, y, RESERVE, CORNER_R)) return PINE;
+  // The knockout takes the ground's colour, which is `null` on the Android layer
+  // — so there it is genuinely transparent and app.json's ink shows through,
+  // rather than baking a second copy of the background into the foreground.
+  if (inRoundedRect(x, y, RESERVE, CORNER_R)) return inTruck(x, y) ? ground : PINE;
   if (inL(x, y)) return WHITE;
   if (ground === null) return null;
   if (tileRadius <= 0) return ground;

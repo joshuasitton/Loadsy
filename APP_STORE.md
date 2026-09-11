@@ -82,8 +82,9 @@ sufficient — someone needs to swipe through every screen with the screen curta
 
 **Icon and splash screen — done**
 The mark is an L built from two cargo blocks, with a green square filling the notch the
-L leaves. That notch is the safety reserve the sizing model holds back, so the brand
-colour marks the space you were right not to fill.
+L leaves and a truck cut out of the square. The truck is knocked out rather than drawn in
+place of the square: the square's mass is what keeps the mark legible at 16px, and a
+silhouette with wheels and a stepped cab merges into a blob well before that.
 
 All four assets are generated from one geometry in `src/ui/markGeometry.ts` by
 `npm run brand:icons`, which also verifies what it wrote. The app's own `<Mark />` reads
