@@ -1,5 +1,5 @@
 import { Link, useRouter } from 'expo-router';
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
@@ -134,13 +134,22 @@ export default function MyMoveScreen() {
   // and Alert.alert is a no-op on react-native-web, where this app's demo runs.
   const [confirmingFinish, setConfirmingFinish] = useState(false);
 
+  const finishing = useRef(false);
+
   async function finishMove() {
-    // Archive first, reset second. The other order would wipe the inventory and
-    // then try to summarise the empty move that replaced it.
-    await complete(ctx.move, ctx.recommendation.size);
-    ctx.dispatch({ type: 'reset' });
-    setConfirmingFinish(false);
-    router.push('/history');
+    if (finishing.current) return;
+    finishing.current = true;
+    try {
+      // Archive first, reset second. The other order would wipe the inventory and
+      // then try to summarise the empty move that replaced it.
+      await complete(ctx.move, ctx.recommendation.size);
+      ctx.dispatch({ type: 'reset' });
+      setConfirmingFinish(false);
+      router.push('/history');
+    } catch {
+      // Let the user retry — the two-tap buttons are still visible.
+      finishing.current = false;
+    }
   }
 
   return (

@@ -4,6 +4,11 @@
 
 React Native + Expo implementation of the Loadsy MVP Technical Spec.
 
+`CLAUDE.md` is the short orientation for anyone — or anything — arriving cold.
+`docs/build-state.md` is where the project stands and how it got there,
+`docs/leadership-standup.md` is the decision log, and `APP_STORE.md` is the
+release checklist. This file is the reasoning behind the code.
+
 ---
 
 ## Getting it running
@@ -113,6 +118,51 @@ Truck Size, Local Prices, Packing Plan. The dashboard is the hub the flow starts
 from, and Capture, Truck Layout and Past Moves are detours off a step rather than
 steps — all four use the header's back control instead. Putting "Next →" on a
 screen that is not in the flow would have to invent an answer to what comes next.
+
+### The mark
+
+The cargo bed seen end-on, packed with four pieces and no gap between them: a tall piece on
+end, a wide one above two narrow ones, and the last piece in drawn dark. It is the view the
+app's own load diagram uses, and the one thing Loadsy computes that no competitor does – not a
+truck, but the solved load inside one.
+
+The pieces are uneven on purpose. Four equal boxes read as a folder icon; this reads as a
+solution, which is what the packer actually returns. One number sets the composition – the gap
+is 6 units everywhere – and every piece's size follows from it and from the pack filling 70% of
+the grid, centred, so nothing is placed by eye.
+
+**What it trades.** Of the three directions drawn, this was the least literal. Someone who has
+built a plan in the app will recognise their own load; someone who hasn't may read it as a grid
+or a chart, and it says nothing about moving by itself. Two earlier versions made the opposite
+bet – an L monogram whose empty corner was the sizing reserve, then the same L with a truck cut
+into that corner for recognition – and were set aside for this one. Pair it with the wordmark
+until the product is known.
+
+**The dark piece is close to the line.** Ink on the green ground is 3.03:1, just clear of the
+3:1 WCAG floor for graphics. Against the white pieces beside it the contrast is 16:1, and those
+shared edges are what actually define it. `verify-marks.mjs` pins the ratio, because a palette
+change that took it under would leave a hole where a piece should be.
+
+It replaced a side-view box truck, which was the category's stock image — the same picture
+U-Haul, Budget, PODS and Lugg resolve to — and whose only distinguishing detail, a tape
+measure along the roof, disappeared below about 64px.
+
+The geometry lives in `src/ui/markGeometry.ts` and nothing else defines it. `<Mark />`
+draws it as SVG inside the app; `npm run brand:icons` rasterises the same numbers into the
+four PNGs and then reads those PNGs back to check them. That second half is not ceremony:
+the Android layer is white and ink shapes on transparency, so it looks empty in any viewer with
+a white background, and an icon that shipped empty would look exactly like one that shipped
+correctly. The check decodes the file and counts pixels instead – including inside each of the
+three gaps, because a mark whose gaps had closed would still look like a green square with shapes
+on it.
+
+It caught a real error on the first run. The mark cleared Android's 264px safe *square*
+and overshot its safe *circle* by 41px, which a launcher with a circular mask would have
+trimmed to a stump.
+
+There is no SVG rasteriser on this machine and none was added. The PNGs are encoded with
+`node:zlib`, which ships with the runtime — four static files that change once a year did
+not seem worth a build dependency.
 
 ### Free and Premium
 

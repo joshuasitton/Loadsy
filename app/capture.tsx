@@ -3,7 +3,10 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
+import { ApiError } from '../src/api/client';
+import { MAX_PHOTOS } from '../src/domain/capture';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
+import { measureFrame } from '../src/media/frameSignals';
 import { prepareUpload } from '../src/media/prepareUpload';
 import { resolveRoomId } from '../src/domain/rooms';
 import { useMove } from '../src/state/moveStore';
@@ -11,9 +14,6 @@ import { Banner, Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } fr
 import { colors, radius, space, type } from '../src/ui/theme';
 
 /** Screen 1 — Capture Room. */
-
-/** Mirrors MAX_PHOTOS in app/v1/detect+api.ts. Exceeding it is a 400 nobody should hit. */
-const MAX_ANGLES = 4;
 
 const ROOM_SUGGESTIONS = ['Living Room', 'Bedroom', 'Kitchen', 'Dining Room', 'Office', 'Garage'];
 
@@ -150,14 +150,18 @@ export default function CaptureScreen() {
       }
 
       // Spec §3 Screen 1 edge case: gate the photo before it can produce an inventory.
+      //
+      // Brightness and sharpness are now MEASURED (src/media/frameSignals.ts).
+      // They used to be hardcoded to 1 — a claim of perfect exposure and perfect
+      // focus for every photo — and then, more honestly, left undefined, which is
+      // why MIN_BRIGHTNESS and MIN_SHARPNESS have never once fired. measureFrame
+      // still returns undefined for either when it could not look, so the gate's
+      // "unknown is not too dark" contract is unchanged; the difference is that
+      // unknown is now rare rather than universal.
+      const measured = await measureFrame(asset.uri, asset.width, asset.height);
+      if (!mounted.current) return;
       const signals: PhotoQualitySignals = {
-        // Left UNMEASURED rather than asserted. These were previously hardcoded to
-        // 1 — a claim of perfect exposure and perfect focus for every photo — which
-        // is why MIN_BRIGHTNESS and MIN_SHARPNESS have never once fired. Passing
-        // undefined says the true thing: nobody has looked. The gate skips them
-        // either way, but a later reader now sees a gap rather than a passing test.
-        brightness: undefined,
-        sharpness: undefined,
+        ...measured,
         // Left undefined when the picker did not report them — unknown, not small.
         widthPx: asset.width,
         heightPx: asset.height,
@@ -213,24 +217,23 @@ export default function CaptureScreen() {
       for (const angle of angles) dispatch({ type: 'addPhoto', roomId, photoId: angle.photoId });
       dispatch({ type: 'addItems', roomId, items });
       router.replace('/inventory');
-    } catch {
+    } catch (err) {
       // launchCameraAsync rejects outright on the iOS Simulator, which has no
       // camera. Every await above is inside this try so that failure surfaces as
       // an explanation rather than an unhandled rejection and a dead button.
       if (!mounted.current) return;
-      {
-        // Rendered inline, not as an Alert: this one has a path forward, and the
-        // banner is where every other capture failure already speaks.
-        setRejection({
-          ok: false,
-          code: 'noFurniture',
-          title: "Couldn't measure that room",
-          message:
-            'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
-          recoverable: true,
-        });
-        return;
-      }
+      // Rendered inline, not as an Alert: this one has a path forward, and the
+      // banner is where every other capture failure already speaks.
+      const isNetwork = !(err instanceof ApiError);
+      setRejection({
+        ok: false,
+        code: isNetwork ? 'network' : 'noFurniture',
+        title: isNetwork ? 'Connection problem' : "Couldn't measure that room",
+        message: isNetwork
+          ? "Couldn't reach our servers. Check your connection and try again, or add the items by hand."
+          : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
+        recoverable: true,
+      });
     } finally {
       inFlight.current = false;
       if (mounted.current) setBusy(false);
@@ -311,13 +314,13 @@ export default function CaptureScreen() {
             <PrimaryButton
               title={angles.length === 0 ? 'Take a photo' : 'Add another angle'}
               onPress={() => { void capture('camera'); }}
-              disabled={!trimmedName || angles.length >= MAX_ANGLES}
+              disabled={!trimmedName || angles.length >= MAX_PHOTOS}
               accessibilityHint={trimmedName ? undefined : 'Name the room first'}
             />
             <SecondaryButton
               title={angles.length === 0 ? 'Choose from library' : 'Add from library'}
               onPress={() => { void capture('library'); }}
-              disabled={!trimmedName || angles.length >= MAX_ANGLES}
+              disabled={!trimmedName || angles.length >= MAX_PHOTOS}
             />
             {/*
               Why the button is off, in writing.
@@ -331,9 +334,9 @@ export default function CaptureScreen() {
             {!trimmedName ? (
               <Text style={styles.actionsHint}>Name the room first, above.</Text>
             ) : null}
-            {angles.length >= MAX_ANGLES ? (
+            {angles.length >= MAX_PHOTOS ? (
               <Text style={styles.anglesBody}>
-                That is plenty for one room — {MAX_ANGLES} angles is the most Loadsy measures at once.
+                That is plenty for one room — {MAX_PHOTOS} angles is the most Loadsy measures at once.
               </Text>
             ) : null}
           </View>

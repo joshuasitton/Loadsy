@@ -24,7 +24,7 @@ interface HistoryValue {
   loaded: boolean;
   /** Archives the move as it stands and returns the record written. */
   complete: (move: Move, truckSize: TruckSize) => Promise<CompletedMove>;
-  remove: (id: string) => Promise<void>;
+  remove: (id: string) => Promise<boolean>;
 }
 
 const HistoryContext = createContext<HistoryValue | null>(null);
@@ -60,13 +60,17 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = useCallback(
-    async (next: CompletedMove[]) => {
+    async (next: CompletedMove[]): Promise<boolean> => {
       setHistory(next);
-      if (!writable) return;
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => {
+      if (!writable) return true;
+      try {
+        await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+        return true;
+      } catch {
         // Best effort, like every other write in this app. A failed save must
         // never interrupt the user in the middle of finishing a move.
-      });
+        return false;
+      }
     },
     [writable],
   );
@@ -83,8 +87,15 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   );
 
   const remove = useCallback(
-    async (id: string) => {
-      await persist(removeCompleted(history, id));
+    async (id: string): Promise<boolean> => {
+      const next = removeCompleted(history, id);
+      const ok = await persist(next);
+      if (!ok) {
+        // Roll back — the write didn't stick, so restore the previous list
+        // to avoid the item disappearing now and reappearing on next launch.
+        setHistory(history);
+      }
+      return ok;
     },
     [history, persist],
   );
