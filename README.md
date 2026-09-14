@@ -4,6 +4,11 @@
 
 React Native + Expo implementation of the Loadsy MVP Technical Spec.
 
+`CLAUDE.md` is the short orientation for anyone — or anything — arriving cold.
+`docs/build-state.md` is where the project stands and how it got there,
+`docs/leadership-standup.md` is the decision log, and `APP_STORE.md` is the
+release checklist. This file is the reasoning behind the code.
+
 ---
 
 ## Getting it running
