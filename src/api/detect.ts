@@ -114,8 +114,13 @@ const WEIGHT_CLASSES: readonly InventoryItem['estimatedWeightClass'][] = [
  *   gate counts items whose confidence is exactly 'low'; a detector answering
  *   'medium' made every item pass silently, so an inventory the model was unsure
  *   about sailed through with no banner and no review prompt.
+ *
+ * Exported for `scripts/eval/detect.ts`, which must read the model's answer exactly
+ * as the app does. The eval once had its own lenient parser that kept items with no
+ * `confidence` – items this function drops – so it counted volume no user would
+ * ever see, and overstated how much the detector found.
  */
-function parseDetectedItem(
+export function parseDetectedItem(
   item: unknown,
   index: number,
   request: DetectRequest,
