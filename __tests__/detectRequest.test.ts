@@ -79,10 +79,15 @@ test('SINGLE SOURCE: the route and the eval both build the request through the s
 });
 
 test('SINGLE SOURCE: the eval reads the app answer with the app parser and sizes with the app buffer', () => {
-  const source = readFileSync(join(ROOT, 'scripts/eval/detect.ts'), 'utf8');
-  assert.match(source, /\bparseDetectedItem\b/);
-  assert.match(source, /\bDEFAULT_PACKING_BUFFER_PCT\b/);
-  assert.doesNotMatch(source, /\*\s*1\.2\b/, 'a hard-coded 1.2 buffer is the drift this replaced');
+  // Answers are read at scoring time, in score.ts, so a saved run scored again later
+  // is read by the parser as it is then.
+  const score = readFileSync(join(ROOT, 'scripts/eval/score.ts'), 'utf8');
+  assert.match(score, /import \{[^}]*\bparseDetectedItem\b[^}]*\} from '[./]+\/src\/api\/detect'/);
+  assert.match(score, /import \{[^}]*\bDEFAULT_PACKING_BUFFER_PCT\b[^}]*\} from '[./]+\/src\/domain\/volume'/);
+  for (const file of ['scripts/eval/detect.ts', 'scripts/eval/score.ts', 'scripts/eval/report.ts']) {
+    const source = readFileSync(join(ROOT, file), 'utf8');
+    assert.doesNotMatch(source, /\*\s*1\.2\b/, `${file}: a hard-coded 1.2 buffer is the drift this replaced`);
+  }
 });
 
 test('the upload size the eval prepares to is the one the app uploads at', () => {

@@ -16,3 +16,6 @@ expo-env.d.ts
 # iPhone saves .heic by default, and a list that forgot one format would commit
 # the very photos it exists to protect.
 /eval-photos/
+
+# Saved eval runs: no photos, but an item-by-item inventory of the rooms in them.
+/eval-results/
