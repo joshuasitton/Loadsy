@@ -18,6 +18,7 @@
  */
 
 import { MAX_PHOTOS } from '../domain/capture';
+import { ceilingForDetection, formatCeiling } from '../domain/ceiling';
 
 /** The model the route and the eval use unless `VISION_MODEL` says otherwise. */
 export const DEFAULT_VISION_MODEL = 'claude-opus-5';
@@ -64,7 +65,21 @@ export interface VisionRequestBody {
  *   call, because telling one sofa seen twice from two matching sofas needs both
  *   images in view at once.
  */
-export function buildDetectBody(model: string, roomName: string, photos: readonly string[]): VisionRequestBody {
+export interface DetectOptions {
+  /**
+   * The home's ceiling height in inches, as the person answered it. Only a
+   * non-standard height changes the request – see `ceilingForDetection` – so a move
+   * with an ordinary ceiling, or no answer, sends exactly what it sent before.
+   */
+  ceilingHeightIn?: number | null;
+}
+
+export function buildDetectBody(
+  model: string,
+  roomName: string,
+  photos: readonly string[],
+  options: DetectOptions = {},
+): VisionRequestBody {
   if (photos.length === 0) throw new Error('buildDetectBody: no photos');
   if (photos.length > MAX_PHOTOS) {
     throw new Error(`buildDetectBody: ${photos.length} photos, at most ${MAX_PHOTOS} per room`);
@@ -87,23 +102,37 @@ export function buildDetectBody(model: string, roomName: string, photos: readonl
               source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data },
             },
           ]),
-          { type: 'text', text: userTurn(roomName, photos.length) },
+          { type: 'text', text: userTurn(roomName, photos.length, options.ceilingHeightIn) },
         ],
       },
     ],
   };
 }
 
-export function userTurn(roomName: string, photoCount: number): string {
-  return [
+export function userTurn(roomName: string, photoCount: number, ceilingHeightIn?: number | null): string {
+  const lines = [
     `Room label given by the user: "${roomName}"`,
     photoCount > 1
       ? `\nThe ${photoCount} images above are different views of this ONE room. Every physical object exists once and must appear exactly once in your output.`
       : '',
+  ];
+
+  // Inserted only when it says something. An empty entry would still add a line
+  // break to the join, and a move with a standard ceiling must send the request
+  // byte for byte as it did before the question existed.
+  const ceiling = ceilingForDetection(ceilingHeightIn);
+  if (ceiling !== null) {
+    lines.push(
+      `\nThe ceilings in this home are ${ceiling} in (${formatCeiling(ceiling)}) high, as the user told us. Wherever the ceiling is your scale reference, measure against ${ceiling} in, not the typical 96 in.`,
+    );
+  }
+
+  lines.push(
     '',
     'List every object in this room that will be loaded onto the moving truck.',
     'Return only JSON of the form {"items":[...]}, with no prose and no markdown.',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 export const SYSTEM_PROMPT = `You are the vision component of Loadsy, a moving-truck estimator. A user photographs each room of the home they are leaving. From the photograph you produce a structured inventory of every object that will be loaded onto a moving truck.

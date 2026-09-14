@@ -90,8 +90,8 @@ makes it one; these now are.
 
    Scope as recommended: once per move, not per room; quick choices for "no"
    (7, 9, 10, 12 ft, or other) instead of typed text; "not sure" is treated as
-   8 ft, today's behaviour. Lands with sprint item E2, after the open branches
-   merge – see `docs/sprint-2026-09-14.md`.
+   8 ft, today's behaviour. **Shipped the same day** as sprint item E2b – see
+   `docs/sprint-2026-09-14.md`.
 
 ### Decision needed from the Chairman
 

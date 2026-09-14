@@ -17,6 +17,7 @@ import type {
   Room,
   TruckSize,
 } from '../domain/types';
+import { normaliseCeilingHeight } from '../domain/ceiling';
 import { buildPackingPlan } from '../domain/packingPlan';
 import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
@@ -70,6 +71,7 @@ type Action =
   | { type: 'setOriginAddress'; address: Address | null }
   | { type: 'setDestinationAddress'; address: Address | null }
   | { type: 'setTripMiles'; miles: number | null }
+  | { type: 'setCeilingHeight'; inches: number }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
   /**
@@ -91,6 +93,7 @@ function newMove(): Move {
     originZip: '',
     destinationZip: null,
     tripMiles: null,
+    ceilingHeightIn: null,
     moveDate: null,
     status: 'inventory',
   };
@@ -231,6 +234,11 @@ function reducer(state: MoveState, action: Action): MoveState {
       // non-finite mileage must never reach a quote, where it would produce a
       // negative fuel line and a total that does not reconcile.
       return { ...state, move: { ...state.move, tripMiles: normaliseMiles(action.miles) } };
+
+    case 'setCeilingHeight':
+      // Through the same range check persistence uses, so a slip – inches typed as
+      // feet – can never reach the detector and scale every measurement by it.
+      return { ...state, move: { ...state.move, ceilingHeightIn: normaliseCeilingHeight(action.inches) } };
 
     case 'setMoveDate':
       return { ...state, move: { ...state.move, moveDate: action.iso } };

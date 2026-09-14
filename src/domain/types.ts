@@ -93,6 +93,15 @@ export interface Move {
    * has to decide what an absent distance means.
    */
   tripMiles: number | null;
+  /**
+   * The home's ceiling height in inches, as the person answered it, or null when
+   * the question has not been answered yet.
+   *
+   * Asked once per move, before the first photo. "Yes, the standard 8 ft" is
+   * stored as 96, so null means only "not asked" – the capture screen uses that to
+   * know whether to ask. See src/domain/ceiling.ts for why it matters.
+   */
+  ceilingHeightIn: number | null;
   /** ISO-8601 string; Date is not JSON-serialisable across the API boundary. */
   moveDate: string | null;
   status: MoveStatus;

@@ -28,6 +28,7 @@ import type {
   TruckSize,
   WeightClass,
 } from '../domain/types';
+import { normaliseCeilingHeight } from '../domain/ceiling';
 import { MOVE_STATUS_ORDER, TRUCK_SIZES } from '../domain/types';
 import { parseAddress, zipFor } from '../domain/address';
 import { normaliseMiles } from '../domain/trip';
@@ -250,6 +251,9 @@ export function parseStoredState(raw: string): ParsedState | null {
     // Through the same clamp the reducer uses, so a payload hand-edited to a
     // negative or absurd mileage cannot do what a dispatch is prevented from doing.
     tripMiles: normaliseMiles(finiteNumber(storedMove.tripMiles)),
+    // Absent from every payload written before the question existed, which reads
+    // as "not asked" – so an existing move is asked once, never silently assumed.
+    ceilingHeightIn: normaliseCeilingHeight(finiteNumber(storedMove.ceilingHeightIn)),
     moveDate: nonEmptyString(storedMove.moveDate),
     status: status ?? 'inventory',
   };

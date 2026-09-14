@@ -10,6 +10,7 @@ import { measureFrame } from '../src/media/frameSignals';
 import { prepareUpload } from '../src/media/prepareUpload';
 import { resolveRoomId } from '../src/domain/rooms';
 import { useMove } from '../src/state/moveStore';
+import { CeilingQuestion } from '../src/ui/CeilingQuestion';
 import { Banner, Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
 
@@ -64,6 +65,14 @@ export default function CaptureScreen() {
   }, []);
 
   const trimmedName = roomName.trim();
+  // Asked once per move. Until it is answered the camera stays off, for the same
+  // reason an unnamed room keeps it off: the answer changes what every photo measures.
+  const ceilingAnswered = move.ceilingHeightIn !== null;
+  const blockedReason = !trimmedName
+    ? 'Name the room first, above.'
+    : !ceilingAnswered
+      ? 'Answer the ceiling question first, above.'
+      : null;
 
   /**
    * Creates the room only when the user has chosen to keep going by hand. The
@@ -89,6 +98,9 @@ export default function CaptureScreen() {
       );
       return;
     }
+    // Behind the disabled buttons as well, like the name check above: a capture
+    // measured against the wrong ceiling is a wrong inventory, not a slow one.
+    if (!ceilingAnswered) return;
     if (inFlight.current) return;
     inFlight.current = true;
     setRejection(null);
@@ -203,7 +215,12 @@ export default function CaptureScreen() {
       // The same id must carry through to addItems below: addRoom is a no-op on a
       // colliding id, so items aimed at a fresh id would land in no room at all.
       const roomId = resolveRoomId(move, trimmedName, `room-${Date.now()}`);
-      const items = await detectItems({ roomId, roomName: trimmedName, photos: angles });
+      const items = await detectItems({
+        roomId,
+        roomName: trimmedName,
+        photos: angles,
+        ceilingHeightIn: move.ceilingHeightIn,
+      });
       if (!mounted.current) return;
 
       const postVerdict = assessPhoto({ detectedItemCount: items.length });
@@ -267,6 +284,11 @@ export default function CaptureScreen() {
           ))}
         </View>
 
+        <CeilingQuestion
+          value={move.ceilingHeightIn}
+          onAnswer={(inches) => dispatch({ type: 'setCeilingHeight', inches })}
+        />
+
         {rejection ? (
           <Banner tone={rejection.recoverable ? 'amber' : 'danger'} title={rejection.title} message={rejection.message}>
             {rejection.recoverable ? (
@@ -314,13 +336,13 @@ export default function CaptureScreen() {
             <PrimaryButton
               title={angles.length === 0 ? 'Take a photo' : 'Add another angle'}
               onPress={() => { void capture('camera'); }}
-              disabled={!trimmedName || angles.length >= MAX_PHOTOS}
-              accessibilityHint={trimmedName ? undefined : 'Name the room first'}
+              disabled={blockedReason !== null || angles.length >= MAX_PHOTOS}
+              accessibilityHint={blockedReason ?? undefined}
             />
             <SecondaryButton
               title={angles.length === 0 ? 'Choose from library' : 'Add from library'}
               onPress={() => { void capture('library'); }}
-              disabled={!trimmedName || angles.length >= MAX_PHOTOS}
+              disabled={blockedReason !== null || angles.length >= MAX_PHOTOS}
             />
             {/*
               Why the button is off, in writing.
@@ -331,9 +353,7 @@ export default function CaptureScreen() {
               placeholder, which looks filled, so "it is already named" was the
               obvious and wrong conclusion.
             */}
-            {!trimmedName ? (
-              <Text style={styles.actionsHint}>Name the room first, above.</Text>
-            ) : null}
+            {blockedReason ? <Text style={styles.actionsHint}>{blockedReason}</Text> : null}
             {angles.length >= MAX_PHOTOS ? (
               <Text style={styles.anglesBody}>
                 That is plenty for one room — {MAX_PHOTOS} angles is the most Loadsy measures at once.
