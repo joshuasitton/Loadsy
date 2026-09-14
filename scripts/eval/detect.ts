@@ -29,6 +29,8 @@
  *   (neither)       Live. Needs VISION_API_KEY in the environment. Every answer is
  *                   saved to eval-results/ as it arrives.
  *   --from <file>   Score a saved run again against today's truth.json. No key, no cost.
+ *   --check-key     Checks VISION_API_KEY the way the eval uses it – two tiny requests, no
+ *                   photos, well under a cent – and says what is wrong. Never prints the key.
  *   --inventory     Live, but blind: no measurements needed, only the ceiling height.
  *                   Prints what the app would find – items, sizes, counts, truck – and
  *                   saves it, so it can be scored with --from once truth.json is written.
@@ -425,7 +427,59 @@ function report(run: SavedRun, truth: Map<string, TruthRoom>) {
   }
 }
 
+/**
+ * Diagnoses the key from inside the eval's own process: the same variable, the same
+ * fetch, the same headers. A key that works in curl can still fail here – unexported,
+ * a different value in this window, a stray character – and guessing which from outside
+ * wastes an afternoon. Prints the key's shape, never the key.
+ */
+async function checkKey() {
+  const key = process.env.VISION_API_KEY;
+  if (key === undefined) {
+    fail('VISION_API_KEY is not in this process. If `echo ${#VISION_API_KEY}` shows a length, it is set but not exported: run `export VISION_API_KEY`.');
+  }
+  const shape = /^sk-ant-api\d\d-/.test(key) ? 'a regular API key' : /^sk-ant-admin/.test(key) ? 'an ADMIN key – it cannot call models' : 'NOT a Console API key (should start sk-ant-api03-)';
+  const odd = [...key].filter((c) => !/[A-Za-z0-9_-]/.test(c)).length;
+  console.log(`key in this process   ${key.length} characters, ${shape}${odd ? `, ${odd} unexpected character(s) – re-copy it` : ', no unexpected characters'}`);
+  console.log(`fingerprint           ${sha256(key).slice(0, 8)}   (compare between windows: same 8 characters, same key)`);
+  const proxies = ['HTTPS_PROXY', 'https_proxy', 'NODE_USE_ENV_PROXY', 'ANTHROPIC_BASE_URL'].filter((name) => process.env[name]);
+  if (proxies.length) console.log(`note                  ${proxies.join(', ')} set in this environment`);
+
+  const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+  const describe = async (response: Response) => {
+    if (response.ok) return `${response.status} OK`;
+    let detail = '';
+    try {
+      const error = ((await response.json()) as { error?: { type?: string; message?: string } }).error;
+      detail = [error?.type, error?.message].filter(Boolean).join(': ');
+    } catch {
+      // not JSON
+    }
+    return `${response.status} ${detail}`;
+  };
+
+  try {
+    const models = await fetch('https://api.anthropic.com/v1/models', { headers });
+    console.log(`list models           ${await describe(models)}`);
+    const message = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with the word ok.' }] }),
+    });
+    const result = await describe(message);
+    console.log(`call ${model.padEnd(17)}${result}`);
+    if (message.ok) console.log('\nThe key works from the eval. Run the inventory now, in this same window.');
+    else if (message.status === 401) console.log('\nRefused as a key. If list models said 200 with the same fingerprint, tell Claude – that is not a key problem.');
+    else if (message.status === 403) console.log('\nThe key is valid but not allowed to do this – check the workspace and organization permissions in the Console.');
+    else if (message.status === 404) console.log(`\nThe key works, but this account cannot use ${model}.`);
+    else console.log('\nThe key authenticated; the error above is about the account or the request, not the key.');
+  } catch (error) {
+    console.log(`network error         ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function main() {
+  if (args.includes('--check-key')) return checkKey();
   if (mode === 'mock') {
     const truth = loadTruth(EXAMPLE_TRUTH, true);
     console.log('MOCK · the mock detector scored against scripts/eval/example-truth.json – invented rooms, proves the scoring only\n');
