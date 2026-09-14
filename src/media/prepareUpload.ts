@@ -19,16 +19,11 @@
  */
 
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { UPLOAD_LONG_EDGE, UPLOAD_QUALITY } from './uploadSpec';
 
-/** Long edge of the uploaded image, in pixels. A multiple of 28 by design. */
-export const UPLOAD_LONG_EDGE = 1568;
-
-/**
- * JPEG quality for the upload. 0.8 sits above the point where compression
- * artifacts start eating fine edges, which is what the detector reads to size
- * things.
- */
-export const UPLOAD_QUALITY = 0.8;
+// Re-exported so existing imports keep working. Defined in uploadSpec.ts, where the
+// detection eval can read them without loading a native module.
+export { UPLOAD_LONG_EDGE, UPLOAD_QUALITY };
 
 export interface PreparedUpload {
   /** base64 JPEG, no data: prefix — what the detect contract expects. */
