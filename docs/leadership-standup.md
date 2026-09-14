@@ -10,6 +10,137 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-14 — Sprint start, and Chairman decisions on sweep capture and the mark
+
+### Sprint started: ready to submit by Friday 25 September
+
+The Chairman opened a two-week sprint today, Monday 14 September to Friday
+25 September, with the goal of being ready to submit to the App Store. The plan,
+its definition of done and the day-by-day work are in `docs/sprint-2026-09-14.md`.
+
+Checking the repository for the kickoff turned up three launch blockers not on any
+earlier list: `VISION_API_KEY` is set in no EAS environment, so a production build
+fails at detection; `/v1/detect` has no authentication or rate limiting, and its URL
+ships inside the app; and every demo deploy replaces the production endpoint,
+because both use `loadsy.expo.app` and `demo:deploy` deploys with `--prod`.
+
+**Decisions needed from the Chairman this week,** in order of lead time:
+
+1. ~~**Apple Developer Program:** enrolled? Individual or Organization?~~
+   **Resolved 14 September: enrolled** (open since 09-08). EAS build history shows
+   three successful internal iOS builds on 25–27 August, so signing and device
+   registration work. All three used the `preview` profile – mocks and demo mode on –
+   so real detection has still never run on a phone. Remaining: create the App Store
+   Connect app record, which is what reserves the name.
+2. **Create the vision key, with a workspace spend limit set first,** and store it as
+   an EAS secret.
+3. ~~**Select Xcode**~~ **Resolved 14 September:** Xcode 26.5 selected, first
+   launch complete, five iPhone simulators available.
+4. ~~**The uncommitted 360-capture work on `main`:** land it or park it.~~
+   **Resolved 14 September: land it,** with the rest of the open branches. Items 1–3
+   of `docs/360-capture-plan.md` – real brightness and sharpness measurement,
+   `MAX_PHOTOS` in one place, and the tested `selectKeyframes` – ship in v1; the
+   sweep screen itself stays v1.1.
+5. **Revenue posture for v1** (open since 09-08) – recommended: no monetisation, and
+   the Premium screen and "SOON" rows hidden from the release build.
+6. **Anthropic's API data-retention terms,** which decide whether the privacy label can
+   say "Data Not Collected".
+7. **A physical iPhone** for testing from Wednesday.
+
+---
+
+Two decisions made on sweep capture and the mark, and one question opened.
+Recorded here because nothing in this log is a commitment until the Chairman
+makes it one; these now are.
+
+### Decided
+
+1. **The 360° sweep is v1.1, not v1.0.** v1 ships the existing tap-per-angle
+   capture, with the brightness and sharpness checks from
+   `docs/360-capture-plan.md` items 1–3 now actually measuring photos. The
+   reasoning is in the Sweep Capture Decision memo: the sweep is the most
+   device-dependent feature in the product, the app has never run on a
+   physical phone, and the eval that would show whether a sweep improves the
+   inventory has none of its 20 photos (the two files in `eval-photos/` are 22-byte
+   placeholders, found 14 September). Building it first would put the least
+   verifiable feature ahead of the first real launch.
+
+2. **The app mark is "Solved, not stacked"** – the cargo bed seen end-on,
+   packed with four pieces and no gap, the last piece drawn dark, on Loadsy's
+   green. Chosen over an L monogram and over that L with a truck cut into its
+   corner. It is the least literal of the three, so it is paired with the
+   wordmark until the product is known. Shipped in PR #3.
+
+3. **Ask for ceiling height, once, before the first photo:** "Are your ceilings
+   the standard 8ft high?" If no, the person picks the height. The detection
+   prompt measures furniture against visible references and assumes a 96 in
+   ceiling; when the ceiling is the reference in frame and the real ceiling is
+   9 ft, every dimension comes out about 11% short, which compounds to about 30%
+   less volume – a truck too small, the dangerous direction. One question fixes
+   that.
+
+   Considered and set aside the same day: asking for full room dimensions (it
+   demands the measuring the app promises to remove, and one known wall length
+   does not fix scale at other distances from the camera), and estimating box
+   counts for loose items (later – the camera cannot see inside cabinets,
+   closets or drawers). A related question stays open and is being measured
+   rather than guessed: whether loose contents the camera cannot see are missing
+   from truck volume today. Josh is recording a rough box count per room during
+   the eval photo session so the eval can tell.
+
+   Scope as recommended: once per move, not per room; quick choices for "no"
+   (7, 9, 10, 12 ft, or other) instead of typed text; "not sure" is treated as
+   8 ft, today's behaviour. Lands with sprint item E2, after the open branches
+   merge – see `docs/sprint-2026-09-14.md`.
+
+### Decision needed from the Chairman
+
+**Sweep for everyone, or for Premium only – and how each is funded.** Raised
+by the Chairman, who asked for it as a decision with funding for both
+scenarios. Full working in the Sweep Capture Decision memo; the essentials:
+
+The sweep's own cost does not decide it. It adds $0.11–$0.22 per move over
+tapping. Costs are per *started* move – an inventory costs the same whether or
+not the person ever books or buys – so every funding figure has to carry the
+people who don't.
+
+- **A · Sweep for everyone.** Funded by commission on truck bookings made
+  through Loadsy's links, by Premium sales subsidising free users, or – until
+  either exists – by investment, as the cost of acquiring users. To break even
+  on a 3-bed house at a 10% booking rate, a booking must earn $5.68 in
+  commission, against $3.47 for tapping alone: 64% more, so a costlier free
+  tier rather than a different problem. Needs a per-device cap on detection
+  calls, because re-sweeps multiply the cost. Always keeps the free promise.
+- **B · Sweep for Premium only.** Funded by the Premium purchase itself, which
+  covers even the worst-case sweep ($0.94) at any price above $1.35 after a 30%
+  store commission, or $1.11 after 15%. Free users keep tapping at $0.17–$0.35
+  per started move, funded as in A. Cannot ship before Premium payments exist,
+  and there are none today. Keeps the free promise only if the sweep is no more
+  accurate than tapping – because the Premium screen tells free users they never
+  need Premium to learn what size truck they need.
+
+No commission rate or booking rate is known, since no affiliate agreement
+exists; the figures above are what those rates would have to be, not forecasts.
+Confirm Apple's current commission terms before setting a price.
+
+**Recommended rule:** let the eval choose. If the sweep proves *more accurate*,
+choose A and fund it from booking commissions, capped per device. If it proves
+*as accurate, with less effort*, choose B – it sells convenience and pays for
+itself, but waits on billing. **Either way, start the affiliate applications
+now:** the free tier loses money on every started move until a commission
+arrives, so they fund both scenarios, and the 09-08 round-table already noted
+their lead time. This question is therefore tied to the still-open revenue
+posture decision from 09-08 – with no revenue, both scenarios are paid for by
+investors.
+
+### Still open from the memo
+
+Approving phases 0–2, an owner and date for the 20 eval photos (none exist yet),
+re-adding `expo-camera` and `expo-sensors`, and accepting roughly $0.28–$0.57
+of model cost per move with no v1 revenue.
+
+---
+
 ## 2026-09-08 — Full round-table
 
 **Headline: the build compiles clean on Josh's Mac.** Confirmed by Josh this
