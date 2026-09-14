@@ -40,6 +40,8 @@ interface DetectBody {
   roomId?: unknown;
   roomName?: unknown;
   photos?: unknown;
+  /** Inches. Optional; checked and range-limited by buildDetectBody, never trusted. */
+  ceilingHeightIn?: unknown;
 }
 
 function json(body: unknown, status: number): Response {
@@ -95,7 +97,11 @@ export async function POST(request: Request): Promise<Response> {
         'x-api-key': API_KEY,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(buildDetectBody(MODEL, roomName, photos)),
+      body: JSON.stringify(
+        buildDetectBody(MODEL, roomName, photos, {
+          ceilingHeightIn: typeof body.ceilingHeightIn === 'number' ? body.ceilingHeightIn : null,
+        }),
+      ),
     });
 
     if (!upstream.ok) {

@@ -92,3 +92,36 @@ test('the upload size the eval prepares to is the one the app uploads at', () =>
   assert.equal(UPLOAD_LONG_EDGE, 1568);
   assert.equal(UPLOAD_QUALITY, 0.8);
 });
+
+/* ------------------------------------------------------------- ceiling height */
+
+// The user message exactly as it was before the ceiling question existed, captured
+// from the pre-change userTurn on main. A standard or unanswered ceiling must still
+// produce these byte for byte.
+const BEFORE_ONE_PHOTO =
+  'Room label given by the user: "Den"\n\n\nList every object in this room that will be loaded onto the moving truck.\nReturn only JSON of the form {"items":[...]}, with no prose and no markdown.';
+const BEFORE_THREE_PHOTOS =
+  'Room label given by the user: "Den"\n\nThe 3 images above are different views of this ONE room. Every physical object exists once and must appear exactly once in your output.\n\nList every object in this room that will be loaded onto the moving truck.\nReturn only JSON of the form {"items":[...]}, with no prose and no markdown.';
+
+test('a standard or unanswered ceiling leaves the message exactly as it was', () => {
+  for (const ceiling of [undefined, null, 96]) {
+    assert.equal(userTurn('Den', 1, ceiling), BEFORE_ONE_PHOTO, `ceiling ${ceiling}`);
+    assert.equal(userTurn('Den', 3, ceiling), BEFORE_THREE_PHOTOS, `ceiling ${ceiling}`);
+  }
+  assert.equal(
+    JSON.stringify(buildDetectBody('claude-opus-5', 'Den', ['A'], { ceilingHeightIn: 96 })),
+    JSON.stringify(buildDetectBody('claude-opus-5', 'Den', ['A'])),
+  );
+});
+
+test('a non-standard ceiling is told to the model before the instruction to list', () => {
+  const turn = userTurn('Den', 1, 108);
+  assert.match(turn, /The ceilings in this home are 108 in \(9 ft\) high, as the user told us/);
+  assert.match(turn, /not the typical 96 in/);
+  assert.ok(turn.indexOf('108 in') < turn.indexOf('List every object'), 'the height comes before the ask');
+  // The system prompt – and so its cacheable prefix – is untouched either way.
+  assert.equal(
+    buildDetectBody('m', 'Den', ['A'], { ceilingHeightIn: 108 }).system,
+    buildDetectBody('m', 'Den', ['A']).system,
+  );
+});

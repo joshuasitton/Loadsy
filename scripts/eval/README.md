@@ -123,6 +123,10 @@ accuracy, and would validate exactly the shared priors that cause the failure mo
   nearest inch.
 - A mattress and its frame are two items; so are things stacked on each other.
 
+- **Ceiling height, if it isn't 8 ft:** add `"ceilingFt": 9` to the room. It reaches the
+  model exactly as the app's answer to "Are your ceilings the standard 8ft high?" does, so
+  the eval measures that question as well. Leave it out for a standard 8 ft ceiling.
+
 Keys written in the older one-photo format — `"bedroom.jpg"` — still work.
 
 ## Running it

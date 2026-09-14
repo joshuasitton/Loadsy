@@ -1,5 +1,6 @@
 import type { InventoryItem } from '../domain/types';
 import { assessDimensions } from '../domain/plausibility';
+import { ceilingForDetection } from '../domain/ceiling';
 import { cubicFeetFor } from '../domain/volume';
 import { finiteNumber, isRecord, nonEmptyString, oneOf } from '../lib/guards';
 import { ApiError, apiFetch, mockDelay, USE_MOCKS } from './client';
@@ -25,6 +26,12 @@ export interface DetectRequest {
    * So deduplication has to happen where the pixels are.
    */
   photos: CapturedPhoto[];
+  /**
+   * The home's ceiling height in inches, from the question asked before the first
+   * photo. Sent only when it is not the standard 8 ft, so an ordinary move's
+   * request body is unchanged.
+   */
+  ceilingHeightIn?: number | null;
 }
 
 interface DetectResponseItem {
@@ -64,6 +71,8 @@ export async function detectItems(request: DetectRequest): Promise<InventoryItem
       roomId: request.roomId,
       roomName: request.roomName,
       photos: request.photos,
+      // `undefined` is dropped by JSON.stringify, so a standard ceiling adds nothing.
+      ceilingHeightIn: ceilingForDetection(request.ceilingHeightIn) ?? undefined,
     }),
   });
 

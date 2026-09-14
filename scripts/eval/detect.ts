@@ -34,6 +34,7 @@ import { mockDetect } from '../../src/api/mocks/detect';
 import { MAX_PHOTOS } from '../../src/domain/capture';
 import { recommendTruckSize, TRUCK_CAPACITY } from '../../src/domain/truck';
 import type { TruckSize } from '../../src/domain/types';
+import { ceilingForDetection, formatCeiling, normaliseCeilingHeight } from '../../src/domain/ceiling';
 import { cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../../src/domain/volume';
 import {
   buildDetectBody,
@@ -53,6 +54,12 @@ interface TruthItem {
 interface TruthRoom {
   roomName: string;
   items: TruthItem[];
+  /**
+   * The room's ceiling height in feet, as measured – optional. Passed to the model
+   * exactly as the app passes the answer to "Are your ceilings the standard 8ft
+   * high?", so the eval measures the question too. Absent means standard.
+   */
+  ceilingFt?: number;
 }
 
 type Outcome =
@@ -111,6 +118,11 @@ function loadTruth(): Map<string, TruthRoom> {
   return new Map(Object.entries(raw).map(([key, room]) => [roomKeyOf(key), room]));
 }
 
+/** A truth room's ceiling in inches, or null when it has none or it is not a plausible height. */
+function ceilingInches(room: TruthRoom | undefined): number | null {
+  return typeof room?.ceilingFt === 'number' ? normaliseCeilingHeight(room.ceilingFt * 12) : null;
+}
+
 /** Numbers every photo's intermediates in the work directory, so no two collide. */
 let photoCounter = 0;
 
@@ -127,7 +139,9 @@ async function detectLive(key: string, room: TruthRoom, photos: readonly string[
     return { ok: false, reason: error instanceof Error ? error.message : 'could not prepare photos', ms: 0 };
   }
 
-  const body = buildDetectBody(model, room.roomName, prepared.map((photo) => photo.base64));
+  const body = buildDetectBody(model, room.roomName, prepared.map((photo) => photo.base64), {
+    ceilingHeightIn: ceilingInches(room),
+  });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   const started = Date.now();
@@ -329,7 +343,9 @@ async function dryRun(rooms: Map<string, string[]>, truth: Map<string, TruthRoom
       roomImageTokens += estimateImageTokens(photo.width, photo.height);
     });
 
-    const body = buildDetectBody(model, label, prepared.map((photo) => photo.base64));
+    const ceiling = ceilingInches(room);
+    if (ceilingForDetection(ceiling) !== null) console.log(`  ceiling ${formatCeiling(ceiling!)} – told to the model`);
+    const body = buildDetectBody(model, label, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceiling });
     const text = body.messages[0]!.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('');
     // Only rooms a live run would actually send – ground truth present, within the
     // photo limit – count towards the estimate, so it prices the run you'd really do.
