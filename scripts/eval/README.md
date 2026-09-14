@@ -160,11 +160,22 @@ every live run:**
 npm run eval:detect -- --dry-run
 ```
 
-**Live** — needs the vision key in your own terminal; nobody else should handle it:
+**Live** — asks for the vision key, with nothing echoed, and checks it before sending
+anything. Run it in your own terminal; nobody else should handle the key:
 
 ```bash
-VISION_API_KEY=sk-ant-... npm run eval:detect -- --label first-look
+npm run eval:detect -- --label first-look
 ```
+
+The eval asks rather than reading an environment variable you set by hand, because
+doing that in zsh failed three ways on the first real run, each looking like "not set" or
+a bare 401: a variable set but not exported, so npm never saw it; an older key still
+exported in the same window; and stray characters from a copy. Pasted keys have a
+terminal's paste markers and line endings taken off; a character no key contains, such
+as a smart dash, is refused rather than repaired. The key stays in the process's memory
+and is never written or printed — only its length and an 8-character fingerprint.
+`VISION_API_KEY`, if it is set, is used instead of asking; `unset VISION_API_KEY` to be
+asked. `--check-key` tests a key with two tiny requests and says what is wrong with it.
 
 **Inventory** — a live run with no measurements at all: only photos and the ceiling height,
 which the app asks before the first photo. It prints what the app would have found – every
@@ -173,7 +184,7 @@ ones the app would ask you to check, and the truck for the photographed rooms �
 the answer like any other run:
 
 ```bash
-VISION_API_KEY=sk-ant-... npm run eval:detect -- --inventory --ceiling-ft 9
+npm run eval:detect -- --inventory --ceiling-ft 9
 ```
 
 `--ceiling-ft` is required, because the app will not open the camera without an answer:

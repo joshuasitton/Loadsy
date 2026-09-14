@@ -26,8 +26,8 @@
  *                   No photos, no key, no cost – proves the scoring works.
  *   --dry-run       Prepare every photo and build every request exactly as a live run
  *                   would, then send nothing. Run this first, before spending money.
- *   (neither)       Live. Needs VISION_API_KEY in the environment. Every answer is
- *                   saved to eval-results/ as it arrives.
+ *   (neither)       Live. Asks for the vision key, hidden, unless VISION_API_KEY is set.
+ *                   Every answer is saved to eval-results/ as it arrives.
  *   --from <file>   Score a saved run again against today's truth.json. No key, no cost.
  *   --check-key     Checks VISION_API_KEY the way the eval uses it – two tiny requests, no
  *                   photos, well under a cent – and says what is wrong. Never prints the key.
@@ -62,6 +62,7 @@ import {
   UPSTREAM_TIMEOUT_MS,
   type VisionRequestBody,
 } from '../../src/vision/detectRequest';
+import { askForKey, cleanKey, describeKey, keyProblem } from './key';
 import { estimateImageTokens, groupPhotosByRoom, roomKeyOf } from './photos';
 import { preparePhoto, type PreparedPhoto } from './prepare';
 import { compareLines, costEstimate, inventoryLines, roomLines, summaryLines } from './report';
@@ -268,9 +269,8 @@ async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
 /* ------------------------------------------------------------------ modes */
 
 async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
-  // Checked before anything is prepared, so a missing key fails at once.
-  const apiKey = process.env.VISION_API_KEY ?? '';
-  if (!apiKey) fail('VISION_API_KEY is not set. Try --dry-run first, which needs no key and sends nothing.');
+  // Asked for before anything is prepared, so a bad key fails at once.
+  const apiKey = await getApiKey();
 
   const rooms = photoRooms();
   const startedAt = new Date().toISOString();
@@ -331,6 +331,10 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
       done += 1;
       const outcome = attempt.error ?? `${(attempt.ms / 1000).toFixed(1)}s, ${attempt.outputTokens} tokens out`;
       console.log(`  [${done}/${total}] ${key} run ${r + 1}: ${outcome}`);
+      // A refused key is refused for every request after it; stop rather than repeat it.
+      if (attempt.error?.startsWith('HTTP 401')) {
+        fail('\nThe API refused the key, so the run stopped. `npm run eval:detect -- --check-key` says why.');
+      }
     }
   }
   console.log(
@@ -428,20 +432,35 @@ function report(run: SavedRun, truth: Map<string, TruthRoom>) {
 }
 
 /**
+ * The vision key: VISION_API_KEY when it is set, otherwise asked for with the input
+ * hidden – see key.ts for why. Either way it is cleaned of paste wrapping and checked
+ * before use, and what was received is described without the key itself.
+ */
+async function getApiKey(): Promise<string> {
+  const fromEnvironment = process.env.VISION_API_KEY;
+  const useEnvironment = fromEnvironment !== undefined && fromEnvironment.trim() !== '';
+  const raw = useEnvironment ? fromEnvironment : await askForKey('Vision API key – paste it and press Return (nothing will show): ');
+  if (raw === null) fail('There is no terminal to ask for the key in. Run this in a Terminal window.');
+
+  const cleaned = cleanKey(raw);
+  const problem = keyProblem(cleaned);
+  if (problem) {
+    fail(useEnvironment ? `${problem}\nThat was the key in VISION_API_KEY. Run \`unset VISION_API_KEY\` and the eval will ask for the key instead.` : problem);
+  }
+  console.log(
+    `key                   ${describeKey(cleaned)}, ${useEnvironment ? 'from VISION_API_KEY' : 'entered at the prompt'}, fingerprint ${sha256(cleaned.key).slice(0, 8)}`,
+  );
+  return cleaned.key;
+}
+
+/**
  * Diagnoses the key from inside the eval's own process: the same variable, the same
  * fetch, the same headers. A key that works in curl can still fail here – unexported,
  * a different value in this window, a stray character – and guessing which from outside
  * wastes an afternoon. Prints the key's shape, never the key.
  */
 async function checkKey() {
-  const key = process.env.VISION_API_KEY;
-  if (key === undefined) {
-    fail('VISION_API_KEY is not in this process. If `echo ${#VISION_API_KEY}` shows a length, it is set but not exported: run `export VISION_API_KEY`.');
-  }
-  const shape = /^sk-ant-api\d\d-/.test(key) ? 'a regular API key' : /^sk-ant-admin/.test(key) ? 'an ADMIN key – it cannot call models' : 'NOT a Console API key (should start sk-ant-api03-)';
-  const odd = [...key].filter((c) => !/[A-Za-z0-9_-]/.test(c)).length;
-  console.log(`key in this process   ${key.length} characters, ${shape}${odd ? `, ${odd} unexpected character(s) – re-copy it` : ', no unexpected characters'}`);
-  console.log(`fingerprint           ${sha256(key).slice(0, 8)}   (compare between windows: same 8 characters, same key)`);
+  const key = await getApiKey();
   const proxies = ['HTTPS_PROXY', 'https_proxy', 'NODE_USE_ENV_PROXY', 'ANTHROPIC_BASE_URL'].filter((name) => process.env[name]);
   if (proxies.length) console.log(`note                  ${proxies.join(', ')} set in this environment`);
 
@@ -469,7 +488,7 @@ async function checkKey() {
     const result = await describe(message);
     console.log(`call ${model.padEnd(17)}${result}`);
     if (message.ok) console.log('\nThe key works from the eval. Run the inventory now, in this same window.');
-    else if (message.status === 401) console.log('\nRefused as a key. If list models said 200 with the same fingerprint, tell Claude – that is not a key problem.');
+    else if (message.status === 401) console.log('\nRefused as a key: disabled, deleted, or not the key you think. Create a new one in the Console and paste it at the prompt.');
     else if (message.status === 403) console.log('\nThe key is valid but not allowed to do this – check the workspace and organization permissions in the Console.');
     else if (message.status === 404) console.log(`\nThe key works, but this account cannot use ${model}.`);
     else console.log('\nThe key authenticated; the error above is about the account or the request, not the key.');
