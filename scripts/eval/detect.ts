@@ -231,8 +231,16 @@ async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      // The status only. An error body can echo the request, and the request is photos.
-      return { ...empty, error: `HTTP ${response.status}`, ms: Date.now() - started };
+      // The status and the error's type – `authentication_error`, `overloaded_error` – and
+      // never its message: an error message can echo the request, and the request is photos.
+      let type = '';
+      try {
+        const detail = ((await response.json()) as { error?: { type?: unknown } }).error?.type;
+        if (typeof detail === 'string' && /^[a-z_]{1,40}$/.test(detail)) type = ` ${detail}`;
+      } catch {
+        // Not JSON; the status says enough.
+      }
+      return { ...empty, error: `HTTP ${response.status}${type}`, ms: Date.now() - started };
     }
     const payload = (await response.json()) as {
       content?: { type: string; text?: string }[];
