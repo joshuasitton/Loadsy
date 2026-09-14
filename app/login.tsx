@@ -47,9 +47,12 @@ export default function LoginScreen() {
     setBusy(true);
     setError(null);
     setNotice(null);
-    const failure = await run();
-    if (failure) {
-      setError(failure);
+    try {
+      const failure = await run();
+      if (failure) setError(failure);
+    } catch {
+      setError('Something went wrong. Try again.');
+    } finally {
       setBusy(false);
     }
   }

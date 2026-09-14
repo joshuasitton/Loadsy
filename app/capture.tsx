@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
+import { ApiError } from '../src/api/client';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
 import { prepareUpload } from '../src/media/prepareUpload';
 import { resolveRoomId } from '../src/domain/rooms';
@@ -213,24 +214,23 @@ export default function CaptureScreen() {
       for (const angle of angles) dispatch({ type: 'addPhoto', roomId, photoId: angle.photoId });
       dispatch({ type: 'addItems', roomId, items });
       router.replace('/inventory');
-    } catch {
+    } catch (err) {
       // launchCameraAsync rejects outright on the iOS Simulator, which has no
       // camera. Every await above is inside this try so that failure surfaces as
       // an explanation rather than an unhandled rejection and a dead button.
       if (!mounted.current) return;
-      {
-        // Rendered inline, not as an Alert: this one has a path forward, and the
-        // banner is where every other capture failure already speaks.
-        setRejection({
-          ok: false,
-          code: 'noFurniture',
-          title: "Couldn't measure that room",
-          message:
-            'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
-          recoverable: true,
-        });
-        return;
-      }
+      // Rendered inline, not as an Alert: this one has a path forward, and the
+      // banner is where every other capture failure already speaks.
+      const isNetwork = !(err instanceof ApiError);
+      setRejection({
+        ok: false,
+        code: isNetwork ? 'network' : 'noFurniture',
+        title: isNetwork ? 'Connection problem' : "Couldn't measure that room",
+        message: isNetwork
+          ? "Couldn't reach our servers. Check your connection and try again, or add the items by hand."
+          : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
+        recoverable: true,
+      });
     } finally {
       inFlight.current = false;
       if (mounted.current) setBusy(false);

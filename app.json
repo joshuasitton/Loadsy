@@ -24,7 +24,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#F0F8F3"
         }
       ],
       [
@@ -52,7 +52,7 @@
       "package": "com.loadsy.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F1B2D"
+        "backgroundColor": "#F0F8F3"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
