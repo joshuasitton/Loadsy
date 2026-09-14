@@ -141,6 +141,8 @@ export interface SeenItem {
   heightIn: number;
   cubicFeet: number;
   confidence: 'high' | 'low' | null;
+  /** Why the app would ask the user to check it – set when confidence is low. */
+  confidenceReason?: string | null;
 }
 
 export type Answer = { ok: true; items: SeenItem[] } | { ok: false; reason: string };
@@ -169,9 +171,41 @@ export function readAnswer(text: string, stopReason: string | null, roomName: st
         ...parsed.dimensions,
         cubicFeet: parsed.cubicFeet,
         confidence: parsed.confidence,
+        confidenceReason: parsed.confidenceReason,
       })),
     ),
   };
+}
+
+/**
+ * An answer as a person reads an inventory: identical objects counted together.
+ *
+ * The model lists one entry per physical object, so four matching chairs are four
+ * entries. They are grouped only when name and size both match – two "Bookshelf"
+ * entries of different sizes are two different bookshelves and stay two lines.
+ * Largest total volume first, since that is what sizes the truck.
+ */
+export interface SeenGroup {
+  item: SeenItem;
+  count: number;
+  /** How many of the group the app would ask the user to check, and the first reason it gives. */
+  lowCount: number;
+  lowReason: string | null;
+}
+
+export function groupSeen(items: readonly SeenItem[]): SeenGroup[] {
+  const groups = new Map<string, SeenGroup>();
+  for (const item of items) {
+    const key = [item.name.trim().toLowerCase(), item.lengthIn, item.widthIn, item.heightIn].join('|');
+    const group = groups.get(key) ?? { item, count: 0, lowCount: 0, lowReason: null };
+    group.count += 1;
+    if (item.confidence === 'low') {
+      group.lowCount += 1;
+      group.lowReason ??= item.confidenceReason ?? null;
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => b.item.cubicFeet * b.count - a.item.cubicFeet * a.count);
 }
 
 /* ---------------------------------------------------------------- pairing */

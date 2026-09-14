@@ -142,7 +142,7 @@ invented, and it is what `--mock` scores against.
 
 ## Running it
 
-Four modes, cheapest first.
+Five modes, cheapest first.
 
 **Mock** — scores the mock detector against `example-truth.json`. Reads no photos, needs
 no key, costs nothing. Proves the scoring works:
@@ -166,6 +166,24 @@ npm run eval:detect -- --dry-run
 VISION_API_KEY=sk-ant-... npm run eval:detect -- --label first-look
 ```
 
+**Inventory** — a live run with no measurements at all: only photos and the ceiling height,
+which the app asks before the first photo. It prints what the app would have found – every
+item with its size and volume, identical objects counted together (`Dining Chair ×4`), the
+ones the app would ask you to check, and the truck for the photographed rooms – and saves
+the answer like any other run:
+
+```bash
+VISION_API_KEY=sk-ant-... npm run eval:detect -- --inventory --ceiling-ft 9
+```
+
+`--ceiling-ft` is required, because the app will not open the camera without an answer:
+`8` for standard, otherwise the real height (`9`, `9.5`, `9'6"`). Runs once per room unless
+`--runs` says otherwise. Nothing in it is scored, so it says nothing about accuracy yet —
+**once `truth.json` is written, score that same saved answer with `--from`.** That is worth
+doing in this order: the answer was given before any measurement existed, so it cannot have
+been influenced by one. The reverse risk is yours, not the model's — measure with a tape
+and don't copy its numbers into `truth.json`, or the eval scores the model against itself.
+
 **Saved run** — scores an earlier live run again, against today's `truth.json`. No key, no
 cost:
 
@@ -177,7 +195,8 @@ Options for any of them:
 
 | Option | What it does |
 |---|---|
-| `--runs <n>` | Asks the model n times per room. Default **3**. |
+| `--runs <n>` | Asks the model n times per room. Default **3**, or 1 with `--inventory`. |
+| `--ceiling-ft <h>` | The home's ceiling, told to the model for every room as the app does. Overrides `ceilingFt` in `truth.json`. |
 | `--label <text>` | Names the saved file, so `e2-before` and `e2-after` can be found again. |
 | `--compare <file>` | Prints this run beside a saved one. |
 | `--max-photos <n>` | Sends only each room's first n photos. |

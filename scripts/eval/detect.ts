@@ -29,9 +29,14 @@
  *   (neither)       Live. Needs VISION_API_KEY in the environment. Every answer is
  *                   saved to eval-results/ as it arrives.
  *   --from <file>   Score a saved run again against today's truth.json. No key, no cost.
+ *   --inventory     Live, but blind: no measurements needed, only the ceiling height.
+ *                   Prints what the app would find – items, sizes, counts, truck – and
+ *                   saves it, so it can be scored with --from once truth.json is written.
  *
  * Options:
- *   --runs <n>        Ask the model n times per room (default 3). Answers vary; one is an anecdote.
+ *   --runs <n>        Ask the model n times per room (default 3, or 1 with --inventory).
+ *   --ceiling-ft <h>  The home's ceiling height, as the app asks it: 8 for standard, 9, 9'6".
+ *                     Required with --inventory.
  *   --max-photos <n>  Send only each room's first n photos – compare one angle against several.
  *   --label <text>    Name the saved run: --label e2-before.
  *   --compare <file>  Print this run beside a saved one.
@@ -46,7 +51,7 @@ import { basename, join } from 'node:path';
 
 import { mockDetect } from '../../src/api/mocks/detect';
 import { MAX_PHOTOS } from '../../src/domain/capture';
-import { ceilingForDetection, formatCeiling, normaliseCeilingHeight } from '../../src/domain/ceiling';
+import { ceilingForDetection, formatCeiling, normaliseCeilingHeight, parseCeilingFeet } from '../../src/domain/ceiling';
 import {
   buildDetectBody,
   DEFAULT_VISION_MODEL,
@@ -57,7 +62,7 @@ import {
 } from '../../src/vision/detectRequest';
 import { estimateImageTokens, groupPhotosByRoom, roomKeyOf } from './photos';
 import { preparePhoto, type PreparedPhoto } from './prepare';
-import { compareLines, costEstimate, roomLines, summaryLines } from './report';
+import { compareLines, costEstimate, inventoryLines, roomLines, summaryLines } from './report';
 import {
   isSavedRun,
   readTruth,
@@ -102,11 +107,23 @@ const fromFile = option('--from');
 const modes = [args.includes('--mock') && 'mock', args.includes('--dry-run') && 'dry-run', fromFile && 'from'].filter(Boolean);
 if (modes.length > 1) fail('Choose one of --mock, --dry-run or --from.');
 const mode = (modes[0] || 'live') as 'mock' | 'dry-run' | 'from' | 'live';
+const inventory = args.includes('--inventory');
+if (inventory && (mode === 'mock' || mode === 'from')) fail('--inventory is a live run; it cannot be combined with --mock or --from.');
+
+/*
+ * The ceiling, asked the way the app asks it – once for the home, before any photo –
+ * and read by the app's own parser. Required for a blind run because it is the one
+ * thing the app knows before detection that changes every size.
+ */
+const ceilingArg = option('--ceiling-ft');
+const ceilingFlagIn = ceilingArg === null ? null : parseCeilingFeet(ceilingArg);
+if (ceilingArg !== null && ceilingFlagIn === null) fail(`--ceiling-ft "${ceilingArg}" is not a ceiling height. Use feet: 8, 9, 9.5 or 9'6".`);
+if (inventory && ceilingFlagIn === null) fail('--inventory needs the ceiling height, as the app asks for it: --ceiling-ft 8 for standard, or the real height.');
 
 const photoDir = option('--dir') ?? './eval-photos';
-const runs = wholeNumber('--runs', 3, 10);
+const runs = wholeNumber('--runs', inventory ? 1 : 3, 10);
 const maxPhotos = wholeNumber('--max-photos', MAX_PHOTOS, MAX_PHOTOS);
-const label = option('--label') ?? (maxPhotos < MAX_PHOTOS ? `max-${maxPhotos}-photos` : 'live');
+const label = option('--label') ?? (inventory ? 'inventory' : maxPhotos < MAX_PHOTOS ? `max-${maxPhotos}-photos` : 'live');
 const compareFile = option('--compare');
 const everyAnswer = args.includes('--every-answer');
 const model = process.env.VISION_MODEL ?? DEFAULT_VISION_MODEL;
@@ -136,9 +153,10 @@ function loadTruth(path: string | URL, required: boolean): Map<string, TruthRoom
   const { rooms, problems } = readTruth(raw, roomKeyOf);
   if (problems.length > 0) {
     // A typo in a measurement changes every number printed after it, so nothing runs
-    // until truth.json is right – a dry run only warns, since it spends nothing.
+    // until truth.json is right – a dry run and a blind run only warn, since neither
+    // uses a measurement.
     console.error(`${String(path)} needs fixing first:\n${problems.map((p) => `  ✗ ${p}`).join('\n')}\n`);
-    if (mode !== 'dry-run') process.exit(1);
+    if (mode !== 'dry-run' && !inventory) process.exit(1);
   }
   return rooms;
 }
@@ -154,9 +172,18 @@ function readRun(path: string): SavedRun {
   return raw;
 }
 
-/** A truth room's ceiling in inches, or null when it has none or it is not a plausible height. */
+/**
+ * The ceiling told to the model: --ceiling-ft when given, as the app's one answer for
+ * the home; otherwise the room's measured ceilingFt from truth.json.
+ */
 function ceilingInches(room: TruthRoom | undefined): number | null {
+  if (ceilingFlagIn !== null) return ceilingFlagIn;
   return typeof room?.ceilingFt === 'number' ? normaliseCeilingHeight(room.ceilingFt * 12) : null;
+}
+
+/** The label the app would be given: truth.json's name, else the photo name – `living-room` → "Living Room". */
+function roomNameFor(key: string, room: TruthRoom | undefined): string {
+  return room?.roomName ?? key.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function sha256(data: string | Uint8Array): string {
@@ -259,10 +286,11 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
   const requests: { key: string; body: VisionRequestBody }[] = [];
   for (const [key, photos] of rooms) {
     const room = truth.get(key);
-    if (!room) {
-      console.log(`  ! ${key}: no ground truth in truth.json – not sent`);
+    if (!room && !inventory) {
+      console.log(`  ! ${key}: no ground truth in truth.json – not sent (--inventory sends rooms without it)`);
       continue;
     }
+    const roomName = roomNameFor(key, room);
     const chosen = photos.slice(0, maxPhotos);
     let prepared: PreparedPhoto[];
     try {
@@ -273,14 +301,15 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
     }
     const photoHashes = chosen.map((name) => sha256(readFileSync(join(photoDir, name))));
     const ceilingIn = ceilingInches(room);
-    const body = buildDetectBody(model, room.roomName, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceilingIn });
-    run.rooms[key] = { roomName: room.roomName, photoCount: chosen.length, ceilingIn, photoHashes, requestHash: requestHash(body, photoHashes), attempts: [] };
+    const body = buildDetectBody(model, roomName, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceilingIn });
+    run.rooms[key] = { roomName, photoCount: chosen.length, ceilingIn, photoHashes, requestHash: requestHash(body, photoHashes), attempts: [] };
     requests.push({ key, body });
   }
-  if (requests.length === 0) fail('Nothing to send: no room has both photos and ground truth.');
+  if (requests.length === 0) fail(inventory ? 'Nothing to send: no room has photos that could be prepared.' : 'Nothing to send: no room has both photos and ground truth.');
 
   const total = requests.length * runs;
-  console.log(`LIVE · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model} · saving to ${file}\n`);
+  const ceilingNote = ceilingFlagIn === null ? '' : ` · ceiling ${formatCeiling(ceilingFlagIn)}${ceilingForDetection(ceilingFlagIn) === null ? ' (standard, nothing added to the prompt)' : ' told to the model'}`;
+  console.log(`${inventory ? 'INVENTORY' : 'LIVE'} · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model}${ceilingNote}\nsaving to ${file}\n`);
 
   let done = 0;
   for (let r = 0; r < runs; r++) {
@@ -294,7 +323,11 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
       console.log(`  [${done}/${total}] ${key} run ${r + 1}: ${outcome}`);
     }
   }
-  console.log(`\nSaved. Score it again any time, free: npm run eval:detect -- --from ${file}\n`);
+  console.log(
+    inventory
+      ? `\nSaved. Once truth.json has your measurements, score this same answer, free: npm run eval:detect -- --from ${file}\n`
+      : `\nSaved. Score it again any time, free: npm run eval:detect -- --from ${file}\n`,
+  );
   return run;
 }
 
@@ -330,9 +363,9 @@ function dryRun(truth: Map<string, TruthRoom>) {
   for (const [key, photos] of rooms) {
     const room = truth.get(key);
     const notes: string[] = [];
-    if (!room) notes.push(`no ground truth yet – add "${key}" to truth.json`);
+    if (!room && !inventory) notes.push(`no ground truth yet – add "${key}" to truth.json, or use --inventory`);
     if (photos.length > maxPhotos) notes.push(`${photos.length} photos; sending the first ${maxPhotos}`);
-    console.log(`${room?.roomName ?? key}${notes.length ? `   ! ${notes.join('; ')}` : ''}`);
+    console.log(`${roomNameFor(key, room)}${notes.length ? `   ! ${notes.join('; ')}` : ''}`);
 
     const chosen = photos.slice(0, maxPhotos);
     let prepared: PreparedPhoto[];
@@ -351,11 +384,11 @@ function dryRun(truth: Map<string, TruthRoom>) {
     });
     const ceiling = ceilingInches(room);
     if (ceilingForDetection(ceiling) !== null) console.log(`  ceiling ${formatCeiling(ceiling!)} – told to the model`);
-    const body = buildDetectBody(model, room?.roomName ?? key, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceiling });
+    const body = buildDetectBody(model, roomNameFor(key, room), prepared.map((photo) => photo.base64), { ceilingHeightIn: ceiling });
     const text = body.messages[0]!.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('');
 
-    // Only rooms a live run would send – those with ground truth – are priced.
-    if (room) {
+    // Only rooms a live run would send are priced: those with ground truth, or all of them blind.
+    if (room || inventory) {
       ready += 1;
       inputTokens += roomTokens + Math.ceil((SYSTEM_PROMPT.length + text.length) / 4);
     }
@@ -364,7 +397,7 @@ function dryRun(truth: Map<string, TruthRoom>) {
 
   const cost = costEstimate(inputTokens * runs, ready * runs, DETECT_MAX_TOKENS);
   console.log('— dry run: nothing was sent —');
-  console.log(`rooms ready to score         ${ready} of ${rooms.size}`);
+  console.log(`${inventory ? 'rooms ready to send   ' : 'rooms ready to score  '}       ${ready} of ${rooms.size}`);
   console.log(`requests a live run sends    ${ready * runs}   (${ready} room${ready === 1 ? '' : 's'} × ${runs} run${runs === 1 ? '' : 's'})`);
   console.log(`estimated live cost          ≈ $${cost.likely.toFixed(2)}, at most $${cost.worst.toFixed(2)}   (~1,500 output tokens an answer; at most the whole ${DETECT_MAX_TOKENS.toLocaleString()}-token budget)\n`);
 }
@@ -392,14 +425,19 @@ async function main() {
     return;
   }
 
-  const truth = loadTruth(join(photoDir, 'truth.json'), mode !== 'dry-run');
+  const truth = loadTruth(join(photoDir, 'truth.json'), mode !== 'dry-run' && !inventory);
   if (mode === 'dry-run') return dryRun(truth);
   if (mode === 'from') {
     const run = readRun(fromFile!);
     console.log(`SAVED RUN · ${basename(fromFile!)} · "${run.label}" · ${run.model} · scored against today's truth.json\n`);
     return report(run, truth);
   }
-  report(await live(truth), truth);
+  const run = await live(truth);
+  if (inventory) {
+    console.log(inventoryLines(run, everyAnswer).join('\n'));
+    return;
+  }
+  report(run, truth);
 }
 
 void main();

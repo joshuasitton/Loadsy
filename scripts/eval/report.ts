@@ -4,8 +4,12 @@
  */
 
 import { TRUCK_SIZES } from '../../src/domain/types';
+import { formatCeiling, ceilingForDetection } from '../../src/domain/ceiling';
+import { DEFAULT_PACKING_BUFFER_PCT } from '../../src/domain/volume';
 import {
+  groupSeen,
   headline,
+  readAnswer,
   median,
   missCounts,
   spread,
@@ -254,4 +258,66 @@ export function costEstimate(inputTokens: number, requests: number, maxTokens: n
     likely: input + (requests * 1500 * OPUS_5_PRICE.output) / 1e6,
     worst: input + (requests * maxTokens * OPUS_5_PRICE.output) / 1e6,
   };
+}
+
+/**
+ * A blind run: what the app would have shown, with nothing to score it against.
+ *
+ * Room by room, the inventory from the first answer – identical objects counted
+ * together, low-confidence items marked with the reason the app would give – then
+ * the photographed rooms added up and sized as one truck through the app's own
+ * buffer. Only those rooms: it is a truck for what was photographed, not the move.
+ */
+export function inventoryLines(run: SavedRun, everyAnswer: boolean): string[] {
+  const lines: string[] = [];
+  const perRun: (number | null)[] = [];
+
+  for (const saved of Object.values(run.rooms)) {
+    const ceiling = saved.ceilingIn === null ? '' : ` · ceiling ${formatCeiling(saved.ceilingIn)}${ceilingForDetection(saved.ceilingIn) === null ? ' (standard)' : ''}`;
+    lines.push(`${saved.roomName} · ${saved.photoCount} photo${saved.photoCount === 1 ? '' : 's'}${ceiling}`);
+
+    saved.attempts.forEach((attempt, i) => {
+      const usage = `${seconds(attempt.ms)}${attempt.ms > run.deadlineMs ? ' LATE – the app would have given up' : ''} · ${attempt.outputTokens.toLocaleString()} tokens out${attempt.stopReason ? ` · ${attempt.stopReason}` : ''}`;
+      const answer = attempt.text === null ? { ok: false as const, reason: attempt.error ?? 'no answer' } : readAnswer(attempt.text, attempt.stopReason, saved.roomName);
+      if (!answer.ok) {
+        lines.push(`  answer ${i + 1}  FAILED – ${answer.reason}   ${usage}`);
+        perRun[i] = null;
+        return;
+      }
+      const total = answer.items.reduce((n, item) => n + item.cubicFeet, 0);
+      const low = answer.items.filter((item) => item.confidence === 'low').length;
+      if (perRun[i] !== null) perRun[i] = (perRun[i] ?? 0) + total;
+      lines.push(`  answer ${i + 1}  ${answer.items.length} items · ${cuft(total)}${low ? ` · ${low} the app would ask you to check` : ''}   ${usage}`);
+
+      if (i > 0 && !everyAnswer) return;
+      for (const { item, count, lowCount, lowReason } of groupSeen(answer.items)) {
+        const name = count > 1 ? `${item.name} ×${count}` : item.name;
+        const volume = count > 1 ? `${cuft(item.cubicFeet)} each = ${cuft(item.cubicFeet * count)}` : cuft(item.cubicFeet);
+        const which = count > 1 ? ` ${lowCount} of ${count}` : '';
+        const flag = lowCount > 0 ? `   check${which}: ${lowReason ?? 'low confidence'}` : '';
+        lines.push(`    ${fit(name, 34)} ${dims(item).padEnd(18)}${volume.padStart(24)}${flag}`);
+      }
+    });
+    lines.push('');
+  }
+
+  const rooms = Object.keys(run.rooms).length;
+  perRun.forEach((raw, i) => {
+    const label = perRun.length > 1 ? `run ${i + 1}: ` : '';
+    if (raw === null || raw === undefined) {
+      lines.push(`${label}a room failed, so there is no total – as in the app`);
+      return;
+    }
+    const buffered = raw * (1 + DEFAULT_PACKING_BUFFER_PCT);
+    lines.push(
+      `${label}${rooms === 1 ? 'this room' : `these ${rooms} rooms`}: ${cuft(raw)} of furniture and items, ${cuft(buffered)} with the ${Math.round(DEFAULT_PACKING_BUFFER_PCT * 100)}% packing buffer → ${truckFor(raw)} truck`,
+    );
+  });
+  lines.push(
+    '',
+    '  This is the model unchecked – no measurements, nothing scored. Measure with a tape anyway,',
+    "  and don't copy these numbers into truth.json: that would score the model against itself.",
+    '',
+  );
+  return lines;
 }

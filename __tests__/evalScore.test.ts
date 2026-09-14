@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   expandTruth,
+  groupSeen,
   headline,
   median,
   missCounts,
@@ -71,6 +72,24 @@ const LIVING = {
     { name: 'Armchair', lengthIn: 36, widthIn: 34, heightIn: 34 },
   ],
 };
+
+/* -------------------------------------------------------------- inventory */
+
+test('a blind inventory counts identical objects together, and keeps different sizes apart', () => {
+  const chair = seen('Dining Chair', 18, 20, 36);
+  const hidden = { ...chair, confidence: 'low' as const, confidenceReason: 'Mostly behind the table' };
+  const groups = groupSeen([seen('Bookshelf', 30, 12, 70), chair, chair, hidden, seen('dining chair', 18, 20, 36), seen('Bookshelf', 36, 12, 84)]);
+
+  // Largest total volume first: four chairs (30 ft³), then each bookshelf by size.
+  assert.deepEqual(
+    groups.map((g) => [g.item.name, g.item.heightIn, g.count, g.lowCount, g.lowReason]),
+    [
+      ['Dining Chair', 36, 4, 1, 'Mostly behind the table'],
+      ['Bookshelf', 84, 1, 0, null],
+      ['Bookshelf', 70, 1, 0, null],
+    ],
+  );
+});
 
 /* ------------------------------------------------------------------ names */
 
