@@ -15,6 +15,17 @@
  * case, the privacy label has to change with it.
  */
 
+/**
+ * Photos accepted per room.
+ *
+ * Defined once, in src/domain/capture.ts, and imported by app/capture.tsx too.
+ * It used to be declared here and mirrored there by hand, with a comment in
+ * place of a mechanism: had the two drifted, the screen would have offered a
+ * fifth angle and this route would have answered 400 on a capture the user had
+ * already spent four photographs building.
+ */
+import { MAX_PHOTOS } from '../../src/domain/capture';
+
 /** Set in EAS Hosting environment secrets. Never an EXPO_PUBLIC_ var — those ship. */
 const API_KEY = process.env.VISION_API_KEY;
 const MODEL = process.env.VISION_MODEL ?? 'claude-opus-5';
@@ -30,15 +41,6 @@ const UPSTREAM_TIMEOUT_MS = 11_000;
 /** Roughly a 1568x1176 JPEG at quality 0.8, plus base64 overhead and headroom. */
 const MAX_IMAGE_BYTES = 3_000_000;
 
-/**
- * Photos accepted per room.
- *
- * Every extra angle is billed and adds latency against the client's deadline, and
- * the returns fall off fast — the third shot of a room mostly re-photographs what
- * the first two already showed. Four is generous for a room and still fits inside
- * the timeout.
- */
-const MAX_PHOTOS = 4;
 
 interface DetectBody {
   roomId?: unknown;
