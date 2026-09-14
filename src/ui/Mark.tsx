@@ -1,27 +1,24 @@
 import { Platform } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import {
   CORNER_R,
   GRID,
-  MARK_INK,
-  MARK_PINE,
-  MARK_WHITE,
-  RESERVE,
+  LAST,
+  MARK_GROUND,
+  MARK_LAST,
+  MARK_PIECE,
+  PIECES,
   TILE_R,
-  TRUCK_BODY,
-  TRUCK_CAB,
-  TRUCK_R,
-  TRUCK_WHEELS,
-  markPath,
+  type Box,
 } from './markGeometry';
 
 /**
  * The Loadsy mark, drawn from the same numbers as the app icon.
  *
- * `tile` is the difference between a logo and an app icon: on the ink tile it is
- * the thing on the home screen, and unmounted it is a mark that can sit on any
- * light surface. Both come from one geometry — see `markGeometry.ts` for why
- * that matters.
+ * `tile` is the difference between a logo and an app icon: on the green tile it
+ * is the thing on the home screen, and without it the mark can sit on any light
+ * surface. Both come from one geometry — see `markGeometry.ts` for why that
+ * matters.
  */
 export function Mark({
   size = 40,
@@ -29,49 +26,31 @@ export function Mark({
   accessibilityLabel,
 }: {
   size?: number;
-  /** Draw the ink ground behind it. False gives the mark alone, for light surfaces. */
+  /** Draw the green ground behind it. False gives the pieces alone, for light surfaces. */
   tile?: boolean;
   accessibilityLabel?: string;
 }) {
+  // Off the tile the white pieces would vanish into a white screen, so they take
+  // the ground's green instead. The last piece is ink either way.
+  const piece = tile ? MARK_PIECE : MARK_GROUND;
+
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${GRID} ${GRID}`} {...a11y(accessibilityLabel)}>
-      {tile ? <Rect width={GRID} height={GRID} rx={TILE_R} fill={MARK_INK} /> : null}
-      <Path d={markPath()} fill={tile ? MARK_WHITE : MARK_INK} />
-      <Rect
-        x={RESERVE.x0}
-        y={RESERVE.y0}
-        width={RESERVE.x1 - RESERVE.x0}
-        height={RESERVE.y1 - RESERVE.y0}
-        rx={CORNER_R}
-        fill={MARK_PINE}
-      />
-      {/*
-        Painted in ink rather than masked out. On the tile the ground IS ink, so
-        this is a true knockout; off the tile the L is ink too, so a dark truck on
-        the green square reads the same. One fill covers both, and an SVG <Mask>
-        would have needed a unique id per instance for no visible gain.
-      */}
-      <Rect
-        x={TRUCK_BODY.x0}
-        y={TRUCK_BODY.y0}
-        width={TRUCK_BODY.x1 - TRUCK_BODY.x0}
-        height={TRUCK_BODY.y1 - TRUCK_BODY.y0}
-        rx={TRUCK_R}
-        fill={MARK_INK}
-      />
-      <Rect
-        x={TRUCK_CAB.x0}
-        y={TRUCK_CAB.y0}
-        width={TRUCK_CAB.x1 - TRUCK_CAB.x0}
-        height={TRUCK_CAB.y1 - TRUCK_CAB.y0}
-        rx={TRUCK_R}
-        fill={MARK_INK}
-      />
-      {TRUCK_WHEELS.map((wheel) => (
-        <Circle key={wheel.cx} cx={wheel.cx} cy={wheel.cy} r={wheel.r} fill={MARK_INK} />
+      {tile ? <Rect width={GRID} height={GRID} rx={TILE_R} fill={MARK_GROUND} /> : null}
+      {PIECES.map((box) => (
+        <Rect
+          key={`${box.x0},${box.y0}`}
+          {...rect(box)}
+          rx={CORNER_R}
+          fill={box === LAST ? MARK_LAST : piece}
+        />
       ))}
     </Svg>
   );
+}
+
+function rect(box: Box) {
+  return { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 };
 }
 
 /**

@@ -52,7 +52,7 @@
       "package": "com.loadsy.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0D2430"
+        "backgroundColor": "#0B7A62"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

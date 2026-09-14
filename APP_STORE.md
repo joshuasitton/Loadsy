@@ -81,10 +81,10 @@ sufficient — someone needs to swipe through every screen with the screen curta
 ## Outstanding
 
 **Icon and splash screen — done**
-The mark is an L built from two cargo blocks, with a green square filling the notch the
-L leaves and a truck cut out of the square. The truck is knocked out rather than drawn in
-place of the square: the square's mass is what keeps the mark legible at 16px, and a
-silhouette with wheels and a stepped cab merges into a blob well before that.
+The mark is the cargo bed seen end-on, packed with four pieces and no gap between them – three
+white, and the last piece in drawn dark – on Loadsy's green. It is the view the load diagram
+uses. The dark piece is 3.03:1 against the ground, just over the 3:1 floor for graphics, and the
+verifier pins that ratio.
 
 All four assets are generated from one geometry in `src/ui/markGeometry.ts` by
 `npm run brand:icons`, which also verifies what it wrote. The app's own `<Mark />` reads
@@ -100,7 +100,7 @@ Per-platform decisions worth not undoing:
   is deliberate: a launcher may mask to a circle, and a square inscribed in a circle is
   smaller than one inscribed in a square by a factor of √2.
 - `splash.png` is rounded, unlike the iOS master, because nothing masks a splash — it has
-  to bring its own tile shape or it reads as a dark rectangle instead of as the icon.
+  to bring its own tile shape or it reads as a green rectangle instead of as the icon.
 
 **Screenshots from Screens 2–5**
 The spec calls these the strongest visual sell: inventory, recommendation, prices,

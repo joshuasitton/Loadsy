@@ -27,19 +27,14 @@ import { fileURLToPath } from 'node:url';
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets');
 
 import {
-  BAR,
   CORNER_R,
-  FOOT,
   GRID as G,
-  MARK_INK,
-  MARK_PINE,
-  MARK_WHITE,
-  RESERVE,
+  LAST,
+  MARK_GROUND,
+  MARK_LAST,
+  MARK_PIECE,
+  PIECES,
   TILE_R,
-  TRUCK_BODY,
-  TRUCK_CAB,
-  TRUCK_R,
-  TRUCK_WHEELS,
 } from '../../src/ui/markGeometry.ts';
 
 /* -------------------------------------------------------------------- shape */
@@ -50,39 +45,11 @@ const hex = (value) => [
   parseInt(value.slice(5, 7), 16),
 ];
 
-const INK = hex(MARK_INK);
-const WHITE = hex(MARK_WHITE);
-const PINE = hex(MARK_PINE);
-
-/**
- * The five convex corners, each with the direction the shape extends into.
- *
- * Derived from the same boxes the SVG path is, so a change to the geometry moves
- * the raster and the in-app mark together.
- */
-const CONVEX = [
-  { x: BAR.x0, y: BAR.y0, sx: 1, sy: 1 },
-  { x: BAR.x1, y: BAR.y0, sx: -1, sy: 1 },
-  { x: FOOT.x1, y: FOOT.y0, sx: -1, sy: 1 },
-  { x: FOOT.x1, y: FOOT.y1, sx: -1, sy: -1 },
-  { x: FOOT.x0, y: FOOT.y1, sx: 1, sy: -1 },
-];
+const GROUND = hex(MARK_GROUND);
+const PIECE = hex(MARK_PIECE);
+const LAST_COLOUR = hex(MARK_LAST);
 
 const inRect = (x, y, r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
-
-function inL(x, y) {
-  if (!inRect(x, y, BAR) && !inRect(x, y, FOOT)) return false;
-  for (const c of CONVEX) {
-    // Inside the corner's r-by-r box, the shape is the quarter disc only.
-    const dx = (x - c.x) * c.sx;
-    const dy = (y - c.y) * c.sy;
-    if (dx < 0 || dx > CORNER_R || dy < 0 || dy > CORNER_R) continue;
-    const cx = CORNER_R - dx;
-    const cy = CORNER_R - dy;
-    if (cx * cx + cy * cy > CORNER_R * CORNER_R) return false;
-  }
-  return true;
-}
 
 function inRoundedRect(x, y, r, radius) {
   if (!inRect(x, y, r)) return false;
@@ -97,28 +64,14 @@ function inRoundedRect(x, y, r, radius) {
 /**
  * The colour at one point on the grid, or null for transparent.
  *
- * `tile` decides whether the ground is painted at all: the Android foreground
- * layer and the splash both sit on a colour the OS supplies, so they ship the
- * mark alone.
+ * `ground` is null on the Android foreground layer, which sits on a colour the
+ * OS supplies from app.json: there the gaps between the pieces are genuinely
+ * transparent, rather than a second copy of the background baked in.
  */
-/** The cut-out truck: two overlapping rounded boxes and two wheels. */
-function inTruck(x, y) {
-  if (inRoundedRect(x, y, TRUCK_BODY, TRUCK_R)) return true;
-  if (inRoundedRect(x, y, TRUCK_CAB, TRUCK_R)) return true;
-  for (const wheel of TRUCK_WHEELS) {
-    const dx = x - wheel.cx;
-    const dy = y - wheel.cy;
-    if (dx * dx + dy * dy <= wheel.r * wheel.r) return true;
-  }
-  return false;
-}
-
 function sample(x, y, { ground, tileRadius }) {
-  // The knockout takes the ground's colour, which is `null` on the Android layer
-  // — so there it is genuinely transparent and app.json's ink shows through,
-  // rather than baking a second copy of the background into the foreground.
-  if (inRoundedRect(x, y, RESERVE, CORNER_R)) return inTruck(x, y) ? ground : PINE;
-  if (inL(x, y)) return WHITE;
+  for (const box of PIECES) {
+    if (inRoundedRect(x, y, box, CORNER_R)) return box === LAST ? LAST_COLOUR : PIECE;
+  }
   if (ground === null) return null;
   if (tileRadius <= 0) return ground;
   const full = { x0: 0, y0: 0, x1: G, y1: G };
@@ -229,7 +182,7 @@ const OUTPUTS = [
   {
     file: 'icon.png',
     size: 1024,
-    opts: { ground: INK, tileRadius: 0 },
+    opts: { ground: GROUND, tileRadius: 0 },
     why: 'iOS master. Square to the edge and no alpha in the artwork — the OS applies its own mask, and a pre-rounded corner gets rounded twice.',
   },
   {
@@ -241,13 +194,13 @@ const OUTPUTS = [
   {
     file: 'favicon.png',
     size: 48,
-    opts: { ground: INK, tileRadius: 0 },
+    opts: { ground: GROUND, tileRadius: 0 },
     why: 'Browser tab. Square to the edge, because at 48px a corner radius costs more of the mark than it buys.',
   },
   {
     file: 'splash.png',
     size: 1024,
-    opts: { ground: INK, tileRadius: TILE_R },
+    opts: { ground: GROUND, tileRadius: TILE_R },
     why: 'Launch screen, drawn at 200pt on white. Rounded here because nothing masks it — it should read as the icon, so the launch is the icon growing into the app.',
   },
 ];
