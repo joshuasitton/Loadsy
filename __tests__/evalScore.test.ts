@@ -266,6 +266,17 @@ test('a late answer fails as a user would see it, and is still scored as the mod
   assert.equal(patient.truckUnder, 0);
 });
 
+test('sizing is judged on measured items only; an estimated box still counts toward the room', () => {
+  const truth = new Map([
+    ['den', { roomName: 'Den', items: [SOFA, { name: 'Medium Box', lengthIn: 18, widthIn: 18, heightIn: 16, estimated: true }] }],
+  ]);
+  const saved = run({ den: savedRoom('Den', [attempt(answerText([['Sofa', 92, 36, 34], ['Medium Box', 18, 18, 16]]))]) });
+  const { rooms } = scoreRun(saved, truth);
+  const h = headline(rooms, false);
+  assert.ok(h.sides!.long > 0.09, 'the sofa error is not diluted by a perfect-looking box');
+  assert.ok(rooms[0]!.measuredCuFt > 60, 'the box is still part of the room');
+});
+
 test('rooms without ground truth are listed, not scored', () => {
   const saved = run({ garage: savedRoom('Garage', [attempt(answerText([]))]) });
   assert.deepEqual(scoreRun(saved, new Map()).unscored, ['garage']);

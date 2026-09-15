@@ -644,7 +644,10 @@ export function headline(rooms: readonly RoomResult[], respectDeadline: boolean)
 
   const trucks = scores.map((score) => ({ truth: truckFor(score.measuredCuFt), seen: truckFor(score.seenCuFt) }));
   const share = (n: number) => (scores.length === 0 ? null : n / scores.length);
-  const pairs = scores.flatMap((score) => score.pairs);
+  // Sizing is judged on tape-measured items only. An estimated item – a box count, a
+  // lamp judged from a photo – pairs with the model's own box at identical dimensions and
+  // would report a perfect size for something nobody measured.
+  const pairs = scores.flatMap((score) => score.pairs).filter((pair) => !pair.measured.estimated);
   const measured = sum(scores.map((score) => score.measuredCuFt));
   const extras = scores.flatMap((score) => score.extras);
 
