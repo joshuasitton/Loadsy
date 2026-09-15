@@ -342,6 +342,9 @@ export interface Extra {
   duplicateOf: string | null;
 }
 
+/** How alike in size an extra must be to what it duplicates – 1 is identical. */
+const DUPLICATE_SIZE_SIMILARITY = 0.75;
+
 export interface RoomScore {
   measuredCuFt: number;
   seenCuFt: number;
@@ -396,7 +399,15 @@ export function scoreRoom(measured: readonly MeasuredItem[], seen: readonly Seen
     .filter((_, s) => !takenS.has(s))
     .map((found) => ({
       seen: found,
-      duplicateOf: pairs.find((pair) => nameSimilarity(pair.measured.names, found.name) > 0)?.measured.name ?? null,
+      // Same kind of thing AND about the same size as what it would duplicate. On the
+      // first real room, kind alone called a console table a second count of an 18 in
+      // side table – a different object, in fact in another room.
+      duplicateOf:
+        pairs.find(
+          (pair) =>
+            nameSimilarity(pair.measured.names, found.name) > 0 &&
+            Math.max(sizeSimilarity(pair.seen, found), sizeSimilarity(pair.measured, found)) >= DUPLICATE_SIZE_SIMILARITY,
+        )?.measured.name ?? null,
     }));
 
   const measuredCuFt = sum(measured.map((item) => item.cubicFeet));

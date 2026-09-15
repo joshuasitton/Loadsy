@@ -155,6 +155,11 @@ test('the same object counted twice shows as a likely duplicate', () => {
   assert.equal(score.pairs.length, 1);
   assert.equal(score.pairs[0]!.seen.name, 'Sofa', 'the closer size takes the pairing');
   assert.equal(score.extras[0]!.duplicateOf, 'Sofa');
+
+  // Same kind, very different size: another object, not a second count. (The first
+  // real room: a 36 in console table flagged as a duplicate of an 18 in side table.)
+  const tables = scoreRoom([measured('Side Table', 18, 18, 24)], [seen('Side Table', 18, 18, 22), seen('Console Table', 36, 16, 30)]);
+  assert.equal(tables.extras[0]!.duplicateOf, null);
 });
 
 test('of two same-kind items, sizes decide which pairs with which', () => {
