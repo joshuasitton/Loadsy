@@ -4,6 +4,7 @@ import {
   assessDimensions,
   MAX_EDGE_IN,
   MAX_ITEM_CUBIC_FEET,
+  objectName,
   volumePriorFor,
 } from '../src/domain/plausibility';
 import { cubicFeetFor } from '../src/domain/volume';
@@ -229,5 +230,49 @@ test('a more specific rule always wins over the general one it lives inside', ()
       expected,
       `"${name}" matched the wrong rule — check ordering`,
     );
+  }
+});
+
+test('an item is judged by what it is, not by what the detector says it sits beside', () => {
+  // The first real room (15 September): six of twenty review flags were these, each
+  // judged against the furniture named in its description.
+  const falseAlarms: [string, number, number, number][] = [
+    ['Small Round Accent Table (left of recliner)', 18, 18, 24],
+    ['Throw Pillow (light grey, corner of sectional)', 18, 18, 6],
+    ['Ceramic Vase with Faux Flowers (on sideboard)', 10, 10, 22],
+    ['Wicker Storage Basket (small, on sideboard)', 14, 10, 6],
+    ['Assorted Sideboard Top Items - Cards, Toys, Tumblers', 18, 18, 16],
+    ['Assorted Books Stack (on side table)', 14, 11, 10],
+    ['Laptop Lap Desk with Folding Legs', 26, 14, 12],
+  ];
+  const flagged = falseAlarms
+    .map(([name, l, w, h]) => [name, assessDimensions(name, dims(l, w, h))] as const)
+    .filter(([, verdict]) => !verdict.plausible)
+    .map(([name, verdict]) => `${name}: ${verdict.reason}`);
+  assert.deepEqual(flagged, [], flagged.join('\n'));
+});
+
+test('a described name still gets its own rule, and a gross error is still caught', () => {
+  assert.equal(objectName('Small Round Accent Table (left of recliner)'), 'Small Round Accent Table');
+  assert.equal(objectName('Wood Side Table with Drawer'), 'Wood Side Table');
+  assert.equal(objectName('Round Dark Side Table / Drum Table'), 'Round Dark Side Table');
+  assert.equal(objectName('Chest of Drawers'), 'Chest of Drawers');
+  assert.equal(volumePriorFor('Wood Side Table with Drawer')?.label, 'a side table');
+  assert.equal(volumePriorFor('Tall Ceramic Table Lamp with Mosaic Shade')?.label, 'a lamp');
+  assert.equal(volumePriorFor('Leather Sectional Sofa (L-shape with chaise)')?.label, 'a sectional');
+  assert.equal(volumePriorFor('Medium Box')?.label, 'a box');
+  // A generic last word does not override the specific one before it.
+  assert.equal(volumePriorFor('Upholstered Power Recliner Chair')?.label, 'a recliner');
+  assert.equal(assessDimensions('Upholstered Power Recliner Chair', dims(40, 34, 44)).plausible, true);
+  assert.equal(volumePriorFor('TV Stand')?.label, 'a media console');
+  assert.equal(volumePriorFor('Sideboard Top Items'), null);
+
+  assert.equal(assessDimensions('3-Seat Sofa (by the window)', dims(840, 36, 34)).plausible, false);
+  assert.equal(assessDimensions('Nightstand (left of bed)', dims(72, 40, 40)).plausible, false);
+});
+
+test('the box sizes the prompt asks for pass without a flag', () => {
+  for (const [name, l, w, h] of [['Small Box', 16, 12, 12], ['Medium Box', 18, 18, 16], ['Large Box', 18, 18, 24]] as const) {
+    assert.equal(assessDimensions(name, dims(l, w, h)).plausible, true, name);
   }
 });

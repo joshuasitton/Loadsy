@@ -133,10 +133,38 @@ test('a non-standard ceiling is told to the model before the instruction to list
 
 /* ------------------------------------------------------------ thinking (E2) */
 
-test('the default request carries no thinking, effort or budget change – exactly what the route sent', () => {
+test('thinking is off by default, and always stated – omitted, Opus 5 thinks', () => {
+  // Omitted, Claude Opus 5 runs adaptive thinking out of the answer's budget. On the
+  // first real room that spent all 4,000 tokens and 60 seconds and returned nothing.
   const body = buildDetectBody('claude-opus-5', 'Den', ['AAA']);
-  assert.equal(body.max_tokens, 4000);
-  assert.deepEqual(Object.keys(body), ['model', 'max_tokens', 'system', 'messages']);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.equal(body.max_tokens, DETECT_MAX_TOKENS);
+  assert.ok(DETECT_MAX_TOKENS >= 8000, 'a full room took 6,695 tokens before the shorter format');
+  assert.equal(body.output_config, undefined);
+});
+
+test('the prompt counts sections, stays in its room, and boxes the small things', () => {
+  // Each rule answers a measured error on the first real room (15 September).
+  // An L-shaped sectional reported as one 108x84 rectangle: 178.5 ft³ against 88.1 measured.
+  assert.match(SYSTEM_PROMPT, /sectional or modular sofa is one entry per section/);
+  assert.match(SYSTEM_PROMPT, /Never report an L- or U-shaped arrangement as one rectangle/);
+  // A console table, its lamp and vase counted from the next room, through an opening.
+  assert.match(SYSTEM_PROMPT, /Objects in another room are not in this one/);
+  // 26 small items listed one by one – most of the review flags and half the tokens.
+  assert.match(SYSTEM_PROMPT, /count boxes instead of listing it/);
+  for (const box of ['Small Box', 'Medium Box', 'Large Box']) assert.match(SYSTEM_PROMPT, new RegExp(`"${box}"`));
+});
+
+test('the answer format asks only for what the app reads', () => {
+  // Every output token is latency. These three were written for every item and read by
+  // nothing: the app recomputes cubic feet from the dimensions.
+  const schema = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('## Output'));
+  for (const unread of ['cubicFeet', 'dimensionSource', 'scaleAnchorNote']) {
+    assert.doesNotMatch(SYSTEM_PROMPT, new RegExp(unread), unread);
+  }
+  for (const read of ['name', 'category', 'lengthIn', 'confidence', 'confidenceReason', 'isFragile', 'estimatedWeightClass']) {
+    assert.match(schema, new RegExp(`"${read}"`), read);
+  }
 });
 
 test('thinking, effort and budget reach the request only when asked for', () => {
@@ -144,7 +172,10 @@ test('thinking, effort and budget reach the request only when asked for', () => 
   assert.equal(body.max_tokens, 8000);
   assert.deepEqual(body.thinking, { type: 'disabled' });
   assert.deepEqual(body.output_config, { effort: 'medium' });
-  // Opus 5 returns a 400 for this pairing, so it is refused before any request.
+  // Opus 5 returns a 400 for this pairing, so it is refused before any request –
+  // including when thinking is off only by default.
   assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'disabled', effort: 'max' }));
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { effort: 'xhigh' }));
+  assert.doesNotThrow(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'adaptive', effort: 'max' }));
   assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { maxTokens: 0 }));
 });

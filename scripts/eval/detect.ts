@@ -37,9 +37,9 @@
  *
  * Options:
  *   --runs <n>        Ask the model n times per room (default 3, or 1 with --inventory).
- *   --thinking <t>    adaptive | off – E2. Unset sends what the app sends (adaptive, by default).
+ *   --thinking <t>    adaptive | off – E2. Unset sends what the app sends (off).
  *   --effort <e>      low | medium | high | xhigh | max – E2. Unset sends no effort.
- *   --max-tokens <n>  The response budget, thinking included. Unset: the app's 4,000.
+ *   --max-tokens <n>  The response budget, thinking included. Unset: the app's DETECT_MAX_TOKENS.
  *   --ceiling-ft <h>  The home's ceiling height, as the app asks it: 8 for standard, 9, 9'6".
  *                     Required with --inventory.
  *   --max-photos <n>  Send only each room's first n photos – compare one angle against several.
@@ -143,7 +143,9 @@ if (thinkingArg !== null && thinkingArg !== 'off' && thinkingArg !== 'adaptive')
 const effortArg = option('--effort');
 const EFFORTS: readonly Effort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 if (effortArg !== null && !EFFORTS.includes(effortArg as Effort)) fail(`--effort must be one of ${EFFORTS.join(', ')}.`);
-if (thinkingArg === 'off' && (effortArg === 'xhigh' || effortArg === 'max')) fail('Opus 5 cannot turn thinking off at effort xhigh or max.');
+if (thinkingArg !== 'adaptive' && (effortArg === 'xhigh' || effortArg === 'max')) {
+  fail('Opus 5 cannot run with thinking off at effort xhigh or max, and thinking is off unless --thinking adaptive.');
+}
 const maxTokensArg = option('--max-tokens') === null ? null : wholeNumber('--max-tokens', DETECT_MAX_TOKENS, 128_000);
 const tuning: Pick<DetectOptions, 'thinking' | 'effort' | 'maxTokens'> = {
   ...(thinkingArg ? { thinking: thinkingArg === 'off' ? ('disabled' as const) : ('adaptive' as const) } : {}),
@@ -347,7 +349,7 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
 
   const total = requests.length * runs;
   const ceilingNote = ceilingFlagIn === null ? '' : ` · ceiling ${formatCeiling(ceilingFlagIn)}${ceilingForDetection(ceilingFlagIn) === null ? ' (standard, nothing added to the prompt)' : ' told to the model'}`;
-  const tuningNote = tuningLabel ? ` · ${tuningLabel.replace(/-/g, ' ')} (not what the app sends yet)` : '';
+  const tuningNote = tuningLabel ? ` · ${tuningLabel.replace(/-/g, ' ')} (an experiment – the app sends its defaults)` : '';
   console.log(`${inventory ? 'INVENTORY' : 'LIVE'} · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model}${ceilingNote}${tuningNote}\nsaving to ${file}\n`);
 
   let done = 0;
