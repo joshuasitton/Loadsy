@@ -33,8 +33,10 @@ A tape-measured family room, asked 50 times:
    wait on, fewer openings to count through, and a cheaper mistake. Draft listing copy is in
    `APP_STORE.md`.
 3. **Pile mode is tested in the eval before anything is built,** after launch.
-4. **Keep it simple.** Acting as the customer's agent with rental companies, and valet
-   service, were raised and set aside.
+4. **Keep it simple, and low-overhead.** "We do not want to be a high-overhead company."
+   Acting as the customer's agent with rental companies, and valet service, were raised and
+   set aside: both need people, vehicles and insurance. Features, revenue and infrastructure
+   should run without staff – self-serve, serverless, referrals rather than services.
 
 **Still needed:** how the app waits for a 30-second answer; the vision key as an EAS secret;
 the revenue posture; Anthropic's data-retention terms.
