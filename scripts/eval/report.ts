@@ -91,7 +91,8 @@ export function roomLines(room: RoomResult, deadlineMs: number, everyAnswer: boo
   const measuredCount = room.attempts.find((a) => a.ok)?.score;
   const lines = [
     `${room.roomName}${room.photoCount > 0 ? ` · ${room.photoCount} photo${room.photoCount === 1 ? '' : 's'}` : ''} · measured ${cuft(room.measuredCuFt)}` +
-      (measuredCount ? ` (${measuredCount.pairs.length + measuredCount.missed.length} items)` : ''),
+      (measuredCount ? ` (${measuredCount.pairs.length + measuredCount.missed.length} items)` : '') +
+      estimatedNote(room),
     ...room.attempts.map((attempt, i) => attemptLine(i, attempt, deadlineMs)),
   ];
 
@@ -110,6 +111,12 @@ export function roomLines(room: RoomResult, deadlineMs: number, everyAnswer: boo
     lines.push('', `  answer ${i + 1}, item by item${everyAnswer ? '' : '   (--every-answer shows the rest)'}`, ...pairingLines(attempt.score));
   });
   return [...lines, ''];
+}
+
+/** " – 49.2 ft³ of it estimated, not measured" when truth.json marks items as estimates. */
+function estimatedNote(room: RoomResult): string {
+  const estimated = room.measured.filter((item) => item.estimated).reduce((n, item) => n + item.cubicFeet, 0);
+  return estimated > 0 ? ` – ${cuft(estimated)} of it estimated, not measured` : '';
 }
 
 function headlineLines(h: Headline): string[] {

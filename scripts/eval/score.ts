@@ -43,6 +43,12 @@ export interface TruthItem {
   count?: number;
   /** Other names the model might reasonably use: `["couch"]`. Corrects a pairing. */
   aka?: string[];
+  /**
+   * Not tape-measured – an estimate, such as a box count judged from the photos. Scored
+   * like any item, but reported apart, because an estimate from another model measures
+   * agreement with it rather than accuracy.
+   */
+  estimated?: boolean;
 }
 
 export interface TruthRoom {
@@ -68,6 +74,7 @@ export interface MeasuredItem {
   widthIn: number;
   heightIn: number;
   cubicFeet: number;
+  estimated: boolean;
 }
 
 /**
@@ -113,6 +120,10 @@ export function readTruth(
         problems.push(`${label}: "aka" must be a list of names`);
         return;
       }
+      if (item.estimated !== undefined && typeof item.estimated !== 'boolean') {
+        problems.push(`${label}: "estimated" must be true or false`);
+        return;
+      }
       items.push(item as unknown as TruthItem);
     });
     if (value.complete !== undefined && typeof value.complete !== 'boolean') {
@@ -146,6 +157,7 @@ export function expandTruth(room: TruthRoom): MeasuredItem[] {
       widthIn: item.widthIn,
       heightIn: item.heightIn,
       cubicFeet: cubicFeetFor({ ...item, isEstimated: false }),
+      estimated: item.estimated === true,
     };
     return Array.from({ length: count }, (_, i) => (count === 1 ? one : { ...one, name: `${item.name} (${i + 1} of ${count})` }));
   });
@@ -253,6 +265,8 @@ const PHRASES: [RegExp, string][] = [
   [/\bwashing machine\b/g, 'washer'],
   [/\bfoot ?stool\b/g, 'ottoman'],
   [/\b(hutch|china|display|curio) cabinet\b/g, 'hutch'],
+  // A shadow box or display case hangs on a wall; it is not a packing box.
+  [/\b(shadow box|display case)\b/g, 'displaycase'],
 ];
 
 /** Different words for the same kind of object. */

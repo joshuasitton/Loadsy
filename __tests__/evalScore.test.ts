@@ -126,6 +126,7 @@ test('names from the first real room pair with what was measured', () => {
   assert.ok(nameSimilarity(['Sectional Sofa (77 in piece)'], 'Sectional Sofa Long Run') > 0);
   assert.ok(nameSimilarity(['Sectional Sofa (64 in piece)'], 'Sectional Chaise Section') > 0);
   assert.ok(nameSimilarity(['Wood Side Table with Drawer'], 'Wood End Table') > 0);
+  assert.equal(nameSimilarity(['Large Box'], 'Printer Tray Shadow Box'), 0);
   assert.ok(nameSimilarity(['Framed World Map Canvas'], 'Framed World Map') > nameSimilarity(['Framed World Map Canvas'], 'Birch Forest Canvas Art'));
 });
 
@@ -402,6 +403,10 @@ test('truth.json checks the set-up fields too', () => {
   });
   assert.equal(problems.length, 2, problems.join('\n'));
   assert.equal(rooms.get('hall')!.complete, true);
+  // An estimate is kept, and marked, so the report can say it was not measured.
+  const boxes = expandTruth({ roomName: 'Hall', items: [{ name: 'Medium Box', lengthIn: 18, widthIn: 18, heightIn: 16, count: 2, estimated: true }] });
+  assert.deepEqual(boxes.map((b) => b.estimated), [true, true]);
+  assert.equal(readTruth({ den: { roomName: 'Den', items: [{ name: 'Box', lengthIn: 1, widthIn: 1, heightIn: 1, estimated: 'yes' }] } }).problems.length, 1);
   assert.equal(rooms.get('den')!.complete, undefined);
 });
 
