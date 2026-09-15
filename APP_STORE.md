@@ -78,6 +78,41 @@ sufficient — someone needs to swipe through every screen with the screen curta
 
 ---
 
+## Who the listing is for – apartment moves
+
+**Decided 15 September: aim v1 at apartment moves – studio to two bedrooms – with the same
+code.** Nothing in the app is removed or gated; a house still works. What changes is who
+the listing, the screenshots and the demo speak to.
+
+The reason is measured, not a hunch. Every weakness the detection eval found grows with
+the size of the move. Each room takes about 30 seconds to detect, so a house of ten rooms
+is five minutes of waiting and an apartment of four is two. Furniture seen through an
+opening gets counted in two rooms – the first measured family room listed the next
+room's hutch, console table and chalkboard across 50 answers – and an apartment has fewer
+rooms and fewer openings between them. And a truck one size too large costs a house move
+far more than a studio. An apartment is also the most common move there is, and the one
+most often done without movers – the person this app is for.
+
+Draft listing copy, to settle in E11. Every claim here has to stay true to the build:
+prices are estimates, not live quotes, and the affiliate disclosure waits on the
+revenue decision.
+
+- **Subtitle** (30 characters max): *Apartment moves, sized right* (28)
+- **Promotional text:** Photograph each room. Loadsy lists what's there, sizes the truck
+  your apartment needs, and shows estimated prices nearby.
+- **Description, opening:** Moving out of an apartment? Take a photo of each room and
+  Loadsy lists your furniture, estimates the boxes, and tells you which truck fits it –
+  so you don't pay for too much truck, or leave a dresser on the curb. Check anything it
+  wasn't sure about, compare estimated prices from rental companies near you, and get a
+  load plan you can follow piece by piece. Works for houses too; built for the studio,
+  one- and two-bedroom moves most people do themselves.
+- **Keywords** (100 characters max, no spaces after commas, no competitor names – Apple
+  rejects trademarks in keywords): `apartment,moving,truck,rental,move,boxes,inventory,packing,van,studio,estimate,relocation`
+- **Screenshots:** the 2-bedroom demo, not the house – a 2BR is the upper end of the
+  audience and still fills the inventory shot. The confidence banner stays visible.
+- **Reviewer notes:** say what to photograph – a room of an apartment, or any room with
+  furniture in it.
+
 ## Outstanding
 
 **Icon and splash screen — done**
@@ -105,7 +140,7 @@ Per-platform decisions worth not undoing:
 **Screenshots from Screens 2–5**
 The spec calls these the strongest visual sell: inventory, recommendation, prices,
 packing plan. Generate at 6.7" and 6.1". Populate with a realistic 2BR inventory rather
-than the mock catalogue — and make sure the confidence banner is visible in the
+than the mock catalogue – the audience is apartment moves, decided 15 September — and make sure the confidence banner is visible in the
 inventory shot, since the correction workflow is the differentiator.
 
 **TestFlight internal build, tested against the Josh persona**

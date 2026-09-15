@@ -10,6 +10,51 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-15 — Detection measured on real rooms; Chairman decisions on positioning and double counts
+
+### What the eval found
+
+The first real rooms went through the eval today: a family room tape-measured item by
+item, then asked 50 times. Three findings changed the plan.
+
+- **Thinking left on returned nothing.** Opus 5 thinks unless told not to, and the first
+  live request spent its whole 4,000-token budget and 60 seconds doing so. Thinking is now
+  off by default with an 8,000-token budget. Answers still take 25–38 seconds against the
+  route's 11-second limit – every one of 50. That limit is the launch blocker; the decision
+  on how to wait (progress screen, streaming, or a faster model) is still open.
+- **Sizing is close; the truck is not.** Median room error 9.6%, never under-sized – but
+  the model runs about 13% large and this room sits 4% below the 10 ft / 15 ft line, so 44
+  of 50 answers chose the larger truck. Asking several times and taking the median made
+  answers steadier and the truck worse, because the bias is on the wrong side of the line.
+- **The next room gets counted.** The breakfast room's chalkboard appeared in 49 of 50
+  family-room answers, its console table in 35 and its 54 ft³ hutch in 11 – seen through
+  an opening, despite an instruction not to count such things.
+
+### Chairman decisions
+
+1. **Double counts are caught by the move, not the photo (option B).** Rooms are still
+   captured one at a time; once they are in, the same kind of object at about the same size
+   in two rooms is put to the user – "Which room is it in?" – before the truck is sized.
+   Only kinds a home usually has one of are checked, so beds, nightstands and boxes never
+   ask. **Built and in PR #7.** Capturing a whole floor in one request was considered and
+   not chosen: it would roughly triple the wait and put every room's accuracy on one
+   request.
+2. **v1 is aimed at apartment moves – studio to two bedrooms – with the same code.** Every
+   weakness above grows with the size of the move: the wait, the double counts, and the
+   cost of a wrong truck. The listing, screenshots and demo lead with apartments; a house
+   still works. Draft copy is in `APP_STORE.md`.
+3. **"Pile mode" – photograph one pile of things to move – is tested before it is built.**
+   Two measured piles go through the eval; a product decision comes after launch, with the
+   data. The risk to test is that a pile has fewer scale references and more hidden objects
+   than a room.
+
+**Still needed from the Chairman:** how the app waits for an answer that takes 30 seconds;
+the vision key as an EAS secret; the revenue posture, which the listing's affiliate
+disclosure depends on; Anthropic's data-retention terms, now more pressing because the eval
+photos include a child's face and name.
+
+---
+
 ## 2026-09-14 — Sprint start, and Chairman decisions on sweep capture and the mark
 
 ### Sprint started: ready to submit by Friday 25 September
