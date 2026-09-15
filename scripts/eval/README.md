@@ -210,6 +210,7 @@ Options for any of them:
 | `--ceiling-ft <h>` | The home's ceiling, told to the model for every room as the app does. Overrides `ceilingFt` in `truth.json`. |
 | `--label <text>` | Names the saved file, so `e2-before` and `e2-after` can be found again. |
 | `--compare <file>` | Prints this run beside a saved one. |
+| `--from <file>` (repeated) | Scores several saved runs as one, so rooms run separately make moves. |
 | `--max-photos <n>` | Sends only each room's first n photos. |
 | `--every-answer` | Item-by-item detail for every answer, not just each room's first. |
 | `--room <name>` | Only this room, by its photo name – `--room breakfast-room`. Repeat it for several. |
@@ -274,6 +275,31 @@ number the app actually shows. Latency, the largest answer against the 4,000-tok
 how many were cut off at `max_tokens`, and the real cost from the API close it.
 `unparseable answer (stop_reason: max_tokens)` means the model's thinking used up the
 response budget before the JSON was finished — sprint item E2.
+
+### Moves: combinations of rooms
+
+With two or more measured rooms, the report scores **every combination of them as one
+move** – four rooms make eleven moves, from a two-room flat to the whole house – using
+the answers already saved, so it costs nothing extra. Each line shows the truck the move
+needs, how close its load sits to a truck line (a move 2% from a line changes truck on a
+2% error; one 30% away does not), and every answer's truck. Anything listed in one room
+but measured in another is called out: **counted twice** when its own room listed it too,
+**in the wrong room** when it did not. The family room's first answers counted the
+breakfast room's hutch and console table through an open doorway, which is why this exists.
+
+Moves share room answers, so eleven moves are not eleven independent trials: one bad
+room answer appears in every move that contains it. Rooms run on different days still
+combine – repeat `--from`:
+
+```bash
+npm run eval:detect -- --from eval-results/<family-room run>.json --from eval-results/<other rooms run>.json
+```
+
+A room can be set up in `truth.json` before it is measured – `"items": []`, a
+`"toMeasure"` checklist – and its answers are saved and left unscored until it is. Mark a
+room `"complete": true` once everything on its truck is in `items`, boxes included; until
+then its numbers are labelled provisional, because an unmeasured box count reads as the
+model over-estimating.
 
 ### How much to trust a small run
 
