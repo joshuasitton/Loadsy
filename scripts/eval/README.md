@@ -212,6 +212,7 @@ Options for any of them:
 | `--compare <file>` | Prints this run beside a saved one. |
 | `--max-photos <n>` | Sends only each room's first n photos. |
 | `--every-answer` | Item-by-item detail for every answer, not just each room's first. |
+| `--room <name>` | Only this room, by its photo name – `--room breakfast-room`. Repeat it for several. |
 | `--dir <folder>` | Photos somewhere other than `./eval-photos`. |
 
 ### Why three runs, and why answers are saved

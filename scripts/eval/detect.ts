@@ -46,6 +46,7 @@
  *   --label <text>    Name the saved run: --label e2-before.
  *   --compare <file>  Print this run beside a saved one.
  *   --every-answer    Item-by-item detail for every answer, not only each room's first.
+ *   --room <key>      Only this room – repeatable: --room breakfast-room. Saves re-asking about rooms already run.
  *   --dir <path>      Photo folder. Default ./eval-photos.
  */
 
@@ -158,6 +159,8 @@ const label =
   option('--label') ??
   [inventory ? 'inventory' : maxPhotos < MAX_PHOTOS ? `max-${maxPhotos}-photos` : 'live', tuningLabel].filter(Boolean).join('-');
 const everyAnswer = args.includes('--every-answer');
+const onlyRooms = args.flatMap((arg, i) => (arg === '--room' && args[i + 1] && !args[i + 1]!.startsWith('--') ? [args[i + 1]!.toLowerCase()] : []));
+if (args.includes('--room') && onlyRooms.length === 0) fail('--room needs a room name, as in the photo names: --room breakfast-room.');
 const model = process.env.VISION_MODEL ?? DEFAULT_VISION_MODEL;
 
 /*
@@ -245,7 +248,10 @@ function photoRooms(): Map<string, string[]> {
   }
   const rooms = groupPhotosByRoom(files);
   if (rooms.size === 0) fail(`No photos in ${photoDir}. Name them by room: living-room-1.jpg, living-room-2.jpg, …`);
-  return rooms;
+  if (onlyRooms.length === 0) return rooms;
+  const unknown = onlyRooms.filter((key) => !rooms.has(key));
+  if (unknown.length > 0) fail(`No photos for ${unknown.join(', ')}. Rooms in ${photoDir}: ${[...rooms.keys()].join(', ')}.`);
+  return new Map([...rooms].filter(([key]) => onlyRooms.includes(key)));
 }
 
 /* --------------------------------------------------------------- the model */
