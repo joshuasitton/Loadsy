@@ -18,7 +18,7 @@ import { colors, radius, space, type } from '../src/ui/theme';
 interface StepRow {
   status: MoveStatus;
   title: string;
-  href: '/inventory' | '/trip' | '/packing' | null;
+  href: '/inventory' | '/truck' | '/packing' | null;
   detail: (ctx: ReturnType<typeof useMove>) => string;
   /**
    * Why this row cannot be opened yet, or null when it can.
@@ -81,11 +81,9 @@ const ROWS: StepRow[] = [
   },
   {
     status: 'truckAndPrice',
-    title: 'Trip, Truck & Price',
-    // The trip is the front of this stage: where the move goes decides the
-    // mileage and the drop fee, and both are priced two screens later.
-    href: '/trip',
-    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · estimated prices from 5 vendors`,
+    title: 'Truck & Where to Rent',
+    href: '/truck',
+    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · where to rent one`,
     lockedReason: inventoryGate,
     premium: false,
   },

@@ -16,52 +16,25 @@ complaining. `ITSAppUsesNonExemptEncryption: false` is set, which saves a compli
 round-trip at upload.
 
 Still to do in App Store Connect: fill in the nutrition label itself. Loadsy collects
-no data — photos are processed and discarded, ZIP stays on device — so the answers are
+no data — photos are processed and discarded — so the answers are
 "Data Not Collected" throughout. Confirm that is still true if the Vision agent starts
 retaining images server-side.
 
-**Location permission — ZIP autofill only, never stored**
+**No location permission, no addresses, no prices – removed 15 September**
 
-`NSLocationWhenInUseUsageDescription` in `app.json` states plainly that location is
-used only to fill in the ZIP and can be typed instead. Loadsy never prompts on first
-paint: `app/prices.tsx` autofills only when permission is ALREADY granted, and users
-who have not granted get an explicit "Use my current location" button sitting next to
-the copy explaining why. Every failure path — denied, services off, no postal code,
-web — falls back to manual entry with a non-blocking note.
+v1 has no price service, so prices came out, and with them the trip step and the
+location permission, which existed only to price the truck. The build asks for camera
+and photo library access and nothing else, and holds no address. The trip, quote and
+geocoding code remains in `src/` for a later version; if it comes back, the location
+purpose string, the address note in `src/domain/address.ts` and the privacy label all
+come back into question.
 
-Only the resulting five-digit ZIP is persisted; the coordinate is discarded and never
-leaves the device by our hand. Note for the nutrition label: iOS resolves the postal
-code through the OS geocoder, so **Apple** sees the coordinate even though Loadsy does
-not retain it. The honest answer is still "Data Not Collected" for Loadsy's own
-collection, but if a reviewer asks about Precise Location, that is the explanation.
-Background location is explicitly disabled in the plugin config.
+**Rental companies – plain links, nothing paid**
 
-**Addresses — entered by the user, stored on device, never transmitted**
-
-`app/trip.tsx` collects a street address for each end of the move. This is the
-most personal thing Loadsy holds — where somebody lives and where they are about
-to live — and it never leaves the device. The quote request carries the ZIP and
-the mileage and nothing else; no vendor, model or analytics service sees the
-street line. Only the ZIP is required, so a user who does not want to enter an
-address does not have to.
-
-That keeps the nutrition label at "Data Not Collected". **The moment a geocoding
-or routing service is added, the address crosses the network and this answer
-changes** — see the privacy note at the top of `src/domain/address.ts`.
-
-**"Estimated" language on every price surface**
-
-Not just the breakdown sheet. Every price renders through the `EstimateTag` component,
-the Screen 4 header states it outright, each quote card carries an `EST.` tag, and the
-breakdown sheet distinguishes amber (Loadsy estimate) from green (vendor-stated) per
-line item, with a legend. No copy anywhere promises a guaranteed or final price.
-
-**Affiliate / deep-link disclosure**
-
-Appears twice: once at the foot of the Screen 4 quote list, and again directly above
-the "Continue on <vendor>" button in the breakdown sheet — i.e. near the View Deal
-action, as the spec preferred. Copy states we do not add fees and that commission never
-changes the price or the ranking. The app description still needs the same disclosure.
+The Where to Rent screen lists five companies with a link to each one's own site. The
+links carry no affiliate code and the screen says Loadsy isn't paid to list them. If
+affiliate links are added, that sentence and the store description both need a
+disclosure.
 
 **Accessibility — VoiceOver labels on all icon-only buttons**
 
@@ -85,12 +58,11 @@ same code. A house still works; the listing just leads with apartments. Every we
 detection eval found – the wait per room, furniture counted in two rooms, the cost of a
 wrong truck – grows with the size of the move.
 
-Draft copy for E11. Prices are estimates, and the affiliate disclosure waits on the revenue
-decision.
+Draft copy for E11. v1 shows no prices (decided 15 September), so no copy may promise them.
 
 - **Subtitle:** *Apartment moves, sized right*
 - **Promotional text:** Photograph each room. Loadsy lists what's there, sizes the truck
-  your apartment needs, and shows estimated prices nearby.
+  your apartment needs, and shows where to rent it.
 - **Keywords** (no competitor names – Apple rejects them):
   `apartment,moving,truck,rental,move,boxes,inventory,packing,van,studio,estimate,relocation`
 - **Screenshots:** the 2-bedroom demo.
@@ -120,8 +92,8 @@ Per-platform decisions worth not undoing:
   to bring its own tile shape or it reads as a green rectangle instead of as the icon.
 
 **Screenshots from Screens 2–5**
-The spec calls these the strongest visual sell: inventory, recommendation, prices,
-packing plan. Generate at 6.7" and 6.1". Populate with a realistic 2BR inventory rather
+The spec calls these the strongest visual sell: inventory, recommendation, where to
+rent, packing plan. Generate at 6.7" and 6.1". Populate with a realistic 2BR inventory rather
 than the mock catalogue – the audience is apartment moves, decided 15 September — and make sure the confidence banner is visible in the
 inventory shot, since the correction workflow is the differentiator.
 

@@ -8,7 +8,7 @@
  * open, or the reverse.
  *
  * The line itself: Free takes you from a pile of photographs to a truck size and
- * five real prices. That is a whole, useful product — somebody who never pays
+ * where to rent it. That is a whole, useful product — somebody who never pays
  * still leaves with the answer they came for. Premium is the work that happens
  * after the truck is booked: what order to load it in, and where each piece
  * goes. Charging for the answer and giving away the setup would be the same
@@ -89,8 +89,8 @@ export const FREE_FEATURES: readonly TierFeature[] = [
     built: true,
   },
   {
-    title: 'Local prices',
-    body: 'Five vendors priced on your dates and your mileage, compared like for like.',
+    title: 'Where to rent',
+    body: 'The rental companies to check for that size, a tap away.',
     built: true,
   },
 ] as const;

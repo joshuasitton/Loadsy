@@ -134,7 +134,7 @@ export function DemoBar() {
 
           <Text style={styles.note}>
             Prepared inventories, so a walkthrough never depends on a camera. Everything
-            downstream — sizing, prices, the load plan — is computed from them exactly as
+            downstream — sizing, where to rent, the load plan — is computed from them exactly as
             it would be from photographs.
           </Text>
         </View>
