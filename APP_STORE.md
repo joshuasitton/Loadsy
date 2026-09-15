@@ -80,38 +80,20 @@ sufficient — someone needs to swipe through every screen with the screen curta
 
 ## Who the listing is for – apartment moves
 
-**Decided 15 September: aim v1 at apartment moves – studio to two bedrooms – with the same
-code.** Nothing in the app is removed or gated; a house still works. What changes is who
-the listing, the screenshots and the demo speak to.
+**Decided 15 September:** v1 is aimed at apartment moves, studio to two bedrooms, with the
+same code. A house still works; the listing just leads with apartments. Every weakness the
+detection eval found – the wait per room, furniture counted in two rooms, the cost of a
+wrong truck – grows with the size of the move.
 
-The reason is measured, not a hunch. Every weakness the detection eval found grows with
-the size of the move. Each room takes about 30 seconds to detect, so a house of ten rooms
-is five minutes of waiting and an apartment of four is two. Furniture seen through an
-opening gets counted in two rooms – the first measured family room listed the next
-room's hutch, console table and chalkboard across 50 answers – and an apartment has fewer
-rooms and fewer openings between them. And a truck one size too large costs a house move
-far more than a studio. An apartment is also the most common move there is, and the one
-most often done without movers – the person this app is for.
+Draft copy for E11. Prices are estimates, and the affiliate disclosure waits on the revenue
+decision.
 
-Draft listing copy, to settle in E11. Every claim here has to stay true to the build:
-prices are estimates, not live quotes, and the affiliate disclosure waits on the
-revenue decision.
-
-- **Subtitle** (30 characters max): *Apartment moves, sized right* (28)
+- **Subtitle:** *Apartment moves, sized right*
 - **Promotional text:** Photograph each room. Loadsy lists what's there, sizes the truck
   your apartment needs, and shows estimated prices nearby.
-- **Description, opening:** Moving out of an apartment? Take a photo of each room and
-  Loadsy lists your furniture, estimates the boxes, and tells you which truck fits it –
-  so you don't pay for too much truck, or leave a dresser on the curb. Check anything it
-  wasn't sure about, compare estimated prices from rental companies near you, and get a
-  load plan you can follow piece by piece. Works for houses too; built for the studio,
-  one- and two-bedroom moves most people do themselves.
-- **Keywords** (100 characters max, no spaces after commas, no competitor names – Apple
-  rejects trademarks in keywords): `apartment,moving,truck,rental,move,boxes,inventory,packing,van,studio,estimate,relocation`
-- **Screenshots:** the 2-bedroom demo, not the house – a 2BR is the upper end of the
-  audience and still fills the inventory shot. The confidence banner stays visible.
-- **Reviewer notes:** say what to photograph – a room of an apartment, or any room with
-  furniture in it.
+- **Keywords** (no competitor names – Apple rejects them):
+  `apartment,moving,truck,rental,move,boxes,inventory,packing,van,studio,estimate,relocation`
+- **Screenshots:** the 2-bedroom demo.
 
 ## Outstanding
 
