@@ -9,7 +9,7 @@ import {
   TRUCK_ROOM_EQUIVALENCE,
 } from '../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../src/domain/types';
-import { unresolvedCount, confidenceBannerCopy } from '../src/domain/confidence';
+import { inventoryBlockedReason } from '../src/domain/confidence';
 import { useMove } from '../src/state/moveStore';
 import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -155,11 +155,7 @@ export default function TruckScreen() {
         <StepNav
           current="/truck"
           blockedReason={
-            move.rooms.length === 0
-              ? 'Add a room before looking up prices'
-              : unresolvedCount(move) > 0
-                ? confidenceBannerCopy(unresolvedCount(move))
-                : null
+            move.rooms.length === 0 ? 'Add a room before looking up prices' : inventoryBlockedReason(move)
           }
           onAdvance={() => dispatch({ type: 'setStatus', status: 'truckAndPrice' })}
         />

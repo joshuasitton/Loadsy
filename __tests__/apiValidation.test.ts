@@ -72,6 +72,7 @@ test('a detected item with no cubicFeet cannot reach the truck recommendation', 
     destinationZip: null,
     tripMiles: null,
     ceilingHeightIn: null,
+    keptDuplicates: [],
     moveDate: null,
     status: 'inventory' as const,
   };
