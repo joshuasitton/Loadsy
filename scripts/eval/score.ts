@@ -468,6 +468,8 @@ export interface Attempt {
   ms: number;
   inputTokens: number;
   outputTokens: number;
+  /** How many times a rate-limited or overloaded request was retried before this answer. */
+  retries?: number;
 }
 
 export interface SavedRoom {
@@ -847,6 +849,110 @@ export function moveScenarios(rooms: readonly RoomResult[], minRooms = 2): MoveS
       };
     })
     .sort((a, b) => a.measuredCuFt - b.measuredCuFt);
+}
+
+/* -------------------------------------------------------------- simulation */
+
+/** A small seeded generator (mulberry32), so a simulation prints the same numbers twice. */
+export function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export type Combine = 'one answer' | 'median' | 'largest';
+
+export interface EnsembleResult {
+  k: number;
+  combine: Combine;
+  exact: number;
+  over: number;
+  under: number;
+  medianAbsError: number;
+  p90AbsError: number;
+  /** The middle 80% of room totals this way of answering produces. */
+  p10CuFt: number;
+  p90CuFt: number;
+}
+
+export interface Simulation {
+  answers: number;
+  draws: number;
+  truth: TruckSize;
+  results: EnsembleResult[];
+  /** The exact-truck rate as estimated from the first n real answers – where it settles. */
+  convergence: { n: number; exact: number }[];
+  /** Half-width of the 95% interval on the one-answer exact rate, from the real answers. */
+  exactInterval: number;
+}
+
+function quantile(sorted: readonly number[], q: number): number {
+  return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
+}
+
+/**
+ * Resamples a room's real answers into many simulated moves, to see how the truck turns
+ * out when the app asks once, or asks k times and takes the median or the largest total.
+ *
+ * What it can show: how often one answer gives the right truck, and whether combining
+ * answers would help – the only sense in which more runs make detection better, because
+ * the model does not learn between requests. What it cannot show: anything the real
+ * answers did not contain. Every simulated move is built from them, so with a handful
+ * of real answers a thousand simulated moves repeat the same few; the interval on the
+ * real answers, not the number of simulated moves, is the precision.
+ *
+ * Deadline ignored, and a room's total is its whole answer, as the app would sum it.
+ */
+export function simulateRoom(room: RoomResult, draws: number, ks: readonly number[] = [1, 2, 3, 5], seed = 1): Simulation | null {
+  const totals = room.attempts.flatMap((attempt) => (attempt.ok ? [attempt.score.seenCuFt] : []));
+  if (totals.length === 0) return null;
+  const truth = truckFor(room.measuredCuFt);
+  const random = seededRandom(seed);
+  const verdict = (cuFt: number) => Math.sign(TRUCK_SIZES.indexOf(truckFor(cuFt)) - TRUCK_SIZES.indexOf(truth));
+
+  const results: EnsembleResult[] = [];
+  for (const k of ks) {
+    for (const combine of k === 1 ? (['one answer'] as const) : (['median', 'largest'] as const)) {
+      const simulated: number[] = [];
+      for (let d = 0; d < draws; d++) {
+        const picked = Array.from({ length: k }, () => totals[Math.floor(random() * totals.length)]!).sort((a, b) => a - b);
+        simulated.push(combine === 'largest' ? picked[picked.length - 1]! : combine === 'median' ? median(picked)! : picked[0]!);
+      }
+      const verdicts = simulated.map(verdict);
+      const errors = simulated.map((cuFt) => Math.abs(cuFt - room.measuredCuFt) / room.measuredCuFt).sort((a, b) => a - b);
+      const sortedTotals = [...simulated].sort((a, b) => a - b);
+      results.push({
+        k,
+        combine,
+        exact: verdicts.filter((v) => v === 0).length / draws,
+        over: verdicts.filter((v) => v > 0).length / draws,
+        under: verdicts.filter((v) => v < 0).length / draws,
+        medianAbsError: median(errors)!,
+        p90AbsError: quantile(errors, 0.9),
+        p10CuFt: quantile(sortedTotals, 0.1),
+        p90CuFt: quantile(sortedTotals, 0.9),
+      });
+    }
+  }
+
+  const exactFlags = totals.map((cuFt) => (verdict(cuFt) === 0 ? 1 : 0));
+  const checkpoints = [1, 2, 3, 5, 10, 20, 30, 50, 75, 100].filter((n) => n <= totals.length);
+  if (checkpoints[checkpoints.length - 1] !== totals.length) checkpoints.push(totals.length);
+  const p = sum(exactFlags) / totals.length;
+  return {
+    answers: totals.length,
+    draws,
+    truth,
+    results,
+    convergence: checkpoints.map((n) => ({ n, exact: sum(exactFlags.slice(0, n)) / n })),
+    // Normal approximation, floored so a handful of identical answers is not read as certainty.
+    exactInterval: Math.max(1.96 * Math.sqrt((p * (1 - p)) / totals.length), 1 / Math.sqrt(totals.length)),
+  };
 }
 
 /* ---------------------------------------------------------------- helpers */

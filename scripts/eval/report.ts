@@ -12,9 +12,11 @@ import {
   median,
   missCounts,
   moveScenarios,
+  simulateRoom,
   spread,
   truckFor,
   type MoveScenario,
+  type Simulation,
   type AttemptScore,
   type Headline,
   type RoomResult,
@@ -375,5 +377,35 @@ export function scenarioLines(scenarios: readonly MoveScenario[]): string[] {
         '   (moves share room answers – not independent trials)',
     );
   }
+  return lines;
+}
+
+/**
+ * A room's resampled moves: the truck from one answer, and from the median or largest of
+ * several – with the warning that matters most printed first when there are few real answers.
+ */
+export function simulationLines(room: RoomResult, draws: number): string[] {
+  const sim: Simulation | null = simulateRoom(room, draws);
+  if (sim === null) return [`${room.roomName}: no usable answers to simulate from`];
+  const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
+  const lines = [
+    `— simulation: ${room.roomName}, ${sim.draws.toLocaleString()} moves resampled from ${sim.answers} real answer${sim.answers === 1 ? '' : 's'} (no requests sent; deadline ignored) —`,
+    `    measured ${cuft(room.measuredCuFt)} → ${sim.truth} truck${room.complete ? '' : '   (provisional: the room is not marked complete)'}`,
+  ];
+  if (sim.answers < 20) {
+    lines.push(`    ! only ${sim.answers} real answers: every simulated move is built from those, so this shows little they did not. 30–50 is where it steadies.`);
+  }
+  lines.push(`    ${'asking'.padEnd(26)}${'truck exact'.padEnd(13)}${'over'.padEnd(7)}${'UNDER'.padEnd(8)}${'median error'.padEnd(14)}${'90th pct error'.padEnd(16)}middle 80% of totals`);
+  for (const r of sim.results) {
+    const label = r.k === 1 ? 'once' : `${r.k} times, ${r.combine}`;
+    lines.push(
+      `    ${label.padEnd(26)}${pct(r.exact).padEnd(13)}${pct(r.over).padEnd(7)}${pct(r.under).padEnd(8)}${pct(r.medianAbsError).padEnd(14)}${pct(r.p90AbsError).padEnd(16)}${cuft(r.p10CuFt)} – ${cuft(r.p90CuFt)}`,
+    );
+  }
+  lines.push(
+    `    one-answer exact rate from the real answers: ${pct(sim.convergence[sim.convergence.length - 1]!.exact)} ± ${pct(sim.exactInterval)}` +
+      `   — as more real answers came in: ${sim.convergence.map((c) => `${c.n}: ${pct(c.exact)}`).join(' · ')}`,
+    '    The model does not learn between requests: more runs sharpen this picture, they do not change the model.',
+  );
   return lines;
 }

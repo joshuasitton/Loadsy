@@ -206,7 +206,10 @@ Options for any of them:
 
 | Option | What it does |
 |---|---|
-| `--runs <n>` | Asks the model n times per room. Default **3**, or 1 with `--inventory`. |
+| `--runs <n>` | Asks the model n times per room (up to 100). Default **3**, or 1 with `--inventory`. |
+| `--concurrency <n>` | Up to 6 requests at once; rate-limited ones are retried. |
+| `--simulate <n>` | Resamples saved answers into n simulated moves. No requests. |
+| `--yes` | Confirms a live run of more than 20 requests. |
 | `--ceiling-ft <h>` | The home's ceiling, told to the model for every room as the app does. Overrides `ceilingFt` in `truth.json`. |
 | `--label <text>` | Names the saved file, so `e2-before` and `e2-after` can be found again. |
 | `--compare <file>` | Prints this run beside a saved one. |
@@ -300,6 +303,33 @@ A room can be set up in `truth.json` before it is measured – `"items": []`, a
 room `"complete": true` once everything on its truck is in `items`, boxes included; until
 then its numbers are labelled provisional, because an unmeasured box count reads as the
 model over-estimating.
+
+### Many answers, and what "more runs" can and cannot show
+
+The model does not learn between requests: nothing about one answer changes the next,
+and a thousand runs describe the same model a thousand times. What more answers buy is a
+sharper picture – how often one answer gets the truck right, and how much answers vary –
+and a way to test combining them, which is the one sense in which asking more often can
+make detection better.
+
+Collect the answers with several requests at a time (rate limits are retried; runs of
+more than 20 requests wait for `--yes`, after printing what they will cost):
+
+```bash
+npm run eval:detect -- --room family-room --runs 50 --concurrency 4 --yes
+```
+
+Then resample them into as many simulated moves as you like, for free:
+
+```bash
+npm run eval:detect -- --from eval-results/<that run>.json --simulate 1000
+```
+
+For each room it shows the truck from one answer, and from the median or the largest of
+2, 3 or 5 answers – whether "ask twice, take the median" would be worth building – plus
+how the estimated exact-truck rate settled as real answers came in. A simulation is
+built only from the real answers, so its precision is theirs: from three answers, a
+thousand simulated moves repeat three answers. Thirty to fifty is where it steadies.
 
 ### How much to trust a small run
 

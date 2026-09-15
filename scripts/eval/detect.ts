@@ -48,6 +48,10 @@
  *   --label <text>    Name the saved run: --label e2-before.
  *   --compare <file>  Print this run beside a saved one.
  *   --every-answer    Item-by-item detail for every answer, not only each room's first.
+ *   --concurrency <n> Send up to n requests at once (1–6, default 1). Rate-limited requests are retried.
+ *   --simulate <n>    Resample each scored room's saved answers into n simulated moves, and show
+ *                     how combining 1, 2, 3 or 5 answers per room changes the truck. No requests.
+ *   --yes             Confirms a live run of more than 20 requests.
  *   --room <key>      Only this room – repeatable: --room breakfast-room. Saves re-asking about rooms already run.
  *   --dir <path>      Photo folder. Default ./eval-photos.
  */
@@ -73,7 +77,7 @@ import {
 import { askForKey, cleanKey, describeKey, keyProblem, safeErrorMessage } from './key';
 import { estimateImageTokens, groupPhotosByRoom, roomKeyOf } from './photos';
 import { preparePhoto, type PreparedPhoto } from './prepare';
-import { compareLines, costEstimate, inventoryLines, roomLines, summaryLines } from './report';
+import { compareLines, costEstimate, inventoryLines, roomLines, simulationLines, summaryLines } from './report';
 import {
   isSavedRun,
   mergeRuns,
@@ -135,7 +139,10 @@ if (ceilingArg !== null && ceilingFlagIn === null) fail(`--ceiling-ft "${ceiling
 if (inventory && ceilingFlagIn === null) fail('--inventory needs the ceiling height, as the app asks for it: --ceiling-ft 8 for standard, or the real height.');
 
 const photoDir = option('--dir') ?? './eval-photos';
-const runs = wholeNumber('--runs', inventory ? 1 : 3, 10);
+const runs = wholeNumber('--runs', inventory ? 1 : 3, 100);
+const concurrency = wholeNumber('--concurrency', 1, 6);
+const simulateDraws = option('--simulate') === null ? null : wholeNumber('--simulate', 1000, 100_000);
+const confirmed = args.includes('--yes');
 const maxPhotos = wholeNumber('--max-photos', MAX_PHOTOS, MAX_PHOTOS);
 const compareFile = option('--compare');
 
@@ -261,7 +268,30 @@ function photoRooms(): Map<string, string[]> {
 
 /* --------------------------------------------------------------- the model */
 
-async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
+/** Statuses that mean "try again shortly", not "this request is wrong". */
+const RETRYABLE = new Set([429, 500, 502, 503, 529]);
+const MAX_RETRIES = 4;
+
+/**
+ * One request, retried when the API is rate-limiting or overloaded – which a long run
+ * sent several at a time will meet, and which says nothing about detection. Waits as long
+ * as `retry-after` asks, or backs off. The retries are recorded on the attempt, and an
+ * error that survives them is kept as the answer, as the app would see it.
+ */
+async function askWithRetry(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
+  let attempt = await ask(body, apiKey);
+  for (let retry = 1; retry <= MAX_RETRIES; retry++) {
+    const status = Number(/^HTTP (\d{3})/.exec(attempt.error ?? '')?.[1]);
+    if (!RETRYABLE.has(status)) break;
+    const wait = (attempt.retryAfterS ?? 2 ** retry) * 1000 + Math.random() * 500;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    attempt = { ...(await ask(body, apiKey)), retries: retry };
+  }
+  const { retryAfterS: _unused, ...saved } = attempt;
+  return saved;
+}
+
+async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt & { retryAfterS?: number }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PATIENCE_MS);
   const started = Date.now();
@@ -284,7 +314,13 @@ async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
       } catch {
         // Not JSON; the status says enough.
       }
-      return { ...empty, error: `HTTP ${response.status}${type}`, ms: Date.now() - started };
+      const retryAfter = Number(response.headers.get('retry-after'));
+      return {
+        ...empty,
+        error: `HTTP ${response.status}${type}`,
+        ms: Date.now() - started,
+        ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterS: Math.min(retryAfter, 60) } : {}),
+      };
     }
     const payload = (await response.json()) as {
       content?: { type: string; text?: string }[];
@@ -359,26 +395,45 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
   if (requests.length === 0) fail(inventory ? 'Nothing to send: no room has photos that could be prepared.' : 'Nothing to send: no room has both photos and ground truth.');
 
   const total = requests.length * runs;
+  // A long run is a real bill. Past twenty requests it waits for --yes, with the estimate.
+  if (total > 20 && !confirmed) {
+    const perRequest = 0.13;
+    fail(
+      `This sends ${total} requests – about $${(total * perRequest).toFixed(2)} at Opus 5 list prices (≈$${perRequest} a room, measured on the family room)` +
+        ` and ~${Math.ceil((total * 30) / concurrency / 60)} minutes at --concurrency ${concurrency}.\nAdd --yes to send it.`,
+    );
+  }
   const ceilingNote = ceilingFlagIn === null ? '' : ` · ceiling ${formatCeiling(ceilingFlagIn)}${ceilingForDetection(ceilingFlagIn) === null ? ' (standard, nothing added to the prompt)' : ' told to the model'}`;
   const tuningNote = tuningLabel ? ` · ${tuningLabel.replace(/-/g, ' ')} (an experiment – the app sends its defaults)` : '';
   console.log(`${inventory ? 'INVENTORY' : 'LIVE'} · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model}${ceilingNote}${tuningNote}\nsaving to ${file}\n`);
 
+  // Filled by run index, so every room's n-th answer lines up for the moves, even when
+  // several requests are in flight and finish out of order.
+  const slots = new Map(requests.map(({ key }) => [key, new Array<Attempt | undefined>(runs)]));
+  const save = () => {
+    for (const [key, answers] of slots) run.rooms[key]!.attempts = answers.filter((a): a is Attempt => a !== undefined);
+    writeFileSync(file, JSON.stringify(run, null, 2), { mode: 0o600 });
+  };
+  const jobs = Array.from({ length: runs }, (_, r) => requests.map((request) => ({ ...request, r }))).flat();
   let done = 0;
-  for (let r = 0; r < runs; r++) {
-    for (const { key, body } of requests) {
-      const attempt = await ask(body, apiKey);
-      run.rooms[key]!.attempts.push(attempt);
+  let next = 0;
+  let refused = false;
+  const worker = async () => {
+    while (next < jobs.length && !refused) {
+      const { key, body, r } = jobs[next++]!;
+      const attempt = await askWithRetry(body, apiKey);
+      slots.get(key)![r] = attempt;
       // Written after every answer, so an interrupted run keeps what it paid for.
-      writeFileSync(file, JSON.stringify(run, null, 2), { mode: 0o600 });
+      save();
       done += 1;
       const outcome = attempt.error ?? `${(attempt.ms / 1000).toFixed(1)}s, ${attempt.outputTokens} tokens out`;
-      console.log(`  [${done}/${total}] ${key} run ${r + 1}: ${outcome}`);
+      console.log(`  [${done}/${total}] ${key} run ${r + 1}: ${outcome}${attempt.retries ? ` (after ${attempt.retries} retr${attempt.retries === 1 ? 'y' : 'ies'})` : ''}`);
       // A refused key is refused for every request after it; stop rather than repeat it.
-      if (attempt.error?.startsWith('HTTP 401')) {
-        fail('\nThe API refused the key, so the run stopped. `npm run eval:detect -- --check-key` says why.');
-      }
+      if (attempt.error?.startsWith('HTTP 401')) refused = true;
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker));
+  if (refused) fail('\nThe API refused the key, so the run stopped. `npm run eval:detect -- --check-key` says why.');
   console.log(
     inventory
       ? `\nSaved. Once truth.json has your measurements, score this same answer, free: npm run eval:detect -- --from ${file}\n`
@@ -469,6 +524,9 @@ function report(run: SavedRun, truth: Map<string, TruthRoom>) {
   }
   for (const room of rooms) console.log(roomLines(room, run.deadlineMs, everyAnswer).join('\n'));
   console.log(summaryLines(run, rooms, unscored, unmeasured).join('\n'));
+  if (simulateDraws !== null) {
+    for (const room of rooms) console.log(['', ...simulationLines(room, simulateDraws)].join('\n'));
+  }
   console.log('');
 
   if (compareFile) {

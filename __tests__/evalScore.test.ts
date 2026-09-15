@@ -8,6 +8,8 @@ import {
   groupSeen,
   mergeRuns,
   moveScenarios,
+  seededRandom,
+  simulateRoom,
   truckLineMargin,
   headline,
   median,
@@ -401,4 +403,37 @@ test('truth.json checks the set-up fields too', () => {
   assert.equal(problems.length, 2, problems.join('\n'));
   assert.equal(rooms.get('hall')!.complete, true);
   assert.equal(rooms.get('den')!.complete, undefined);
+});
+
+/* -------------------------------------------------------------- simulation */
+
+test('a simulation resamples the real answers, the same way every time', () => {
+  const answers = [270, 300, 350, 290, 340].map((l) => attempt(answerText([['Sofa', l, 36, 34]])));
+  const room = scoreRun(run({ 'family-room': savedRoom('Family Room', answers) }), new Map([['family-room', { roomName: 'Family Room', items: [SOFA] }]])).rooms[0]!;
+
+  const a = simulateRoom(room, 500, [1, 3])!;
+  const b = simulateRoom(room, 500, [1, 3])!;
+  assert.deepEqual(a, b, 'seeded: two runs print the same numbers');
+  assert.equal(a.answers, 5);
+  assert.deepEqual(a.results.map((r) => `${r.k} ${r.combine}`), ['1 one answer', '3 median', '3 largest']);
+  for (const r of a.results) assert.ok(Math.abs(r.exact + r.over + r.under - 1) < 1e-9);
+  // Taking the largest of three can only raise totals over taking their median.
+  const [, med, big] = a.results;
+  assert.ok(big!.p10CuFt >= med!.p10CuFt && big!.under <= med!.under);
+  assert.deepEqual(a.convergence.map((c) => c.n), [1, 2, 3, 5]);
+});
+
+test('with no usable answer there is nothing to simulate', () => {
+  const room = scoreRun(run({ den: savedRoom('Den', [attempt(null)]) }), new Map([['den', { roomName: 'Den', items: [SOFA] }]])).rooms[0]!;
+  assert.equal(simulateRoom(room, 100), null);
+});
+
+test('the seeded generator stays between 0 and 1 and repeats for the same seed', () => {
+  const r1 = seededRandom(7);
+  const r2 = seededRandom(7);
+  for (let i = 0; i < 1000; i++) {
+    const x = r1();
+    assert.ok(x >= 0 && x < 1);
+    assert.equal(x, r2());
+  }
 });
