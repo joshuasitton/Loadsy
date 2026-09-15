@@ -29,6 +29,8 @@
  *   (neither)       Live. Asks for the vision key, hidden, unless VISION_API_KEY is set.
  *                   Every answer is saved to eval-results/ as it arrives.
  *   --from <file>   Score a saved run again against today's truth.json. No key, no cost.
+ *                   Repeat it to score runs made separately as one – rooms run on different
+ *                   days still combine into moves.
  *   --check-key     Checks VISION_API_KEY the way the eval uses it – two tiny requests, no
  *                   photos, well under a cent – and says what is wrong. Never prints the key.
  *   --inventory     Live, but blind: no measurements needed, only the ceiling height.
@@ -74,6 +76,7 @@ import { preparePhoto, type PreparedPhoto } from './prepare';
 import { compareLines, costEstimate, inventoryLines, roomLines, summaryLines } from './report';
 import {
   isSavedRun,
+  mergeRuns,
   readTruth,
   scoreRun,
   type Attempt,
@@ -112,7 +115,9 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const fromFile = option('--from');
+const fromFiles = args.flatMap((arg, i) => (arg === '--from' && args[i + 1] && !args[i + 1]!.startsWith('--') ? [args[i + 1]!] : []));
+if (args.includes('--from') && fromFiles.length === 0) fail('--from needs a saved run file.');
+const fromFile = fromFiles[0] ?? null;
 const modes = [args.includes('--mock') && 'mock', args.includes('--dry-run') && 'dry-run', fromFile && 'from'].filter(Boolean);
 if (modes.length > 1) fail('Choose one of --mock, --dry-run or --from.');
 const mode = (modes[0] || 'live') as 'mock' | 'dry-run' | 'from' | 'live';
@@ -406,6 +411,7 @@ function dryRun(truth: Map<string, TruthRoom>) {
   const rooms = photoRooms();
   console.log(`DRY RUN · ${rooms.size} room(s) · nothing will be sent\n`);
   for (const key of truth.keys()) {
+    if (onlyRooms.length > 0 && !onlyRooms.includes(key)) continue;
     if (!rooms.has(key)) console.log(`  ! "${key}" is in truth.json but no photo is named ${key}-1.jpg\n`);
   }
 
@@ -456,10 +462,13 @@ function dryRun(truth: Map<string, TruthRoom>) {
 /* ------------------------------------------------------------------- main */
 
 function report(run: SavedRun, truth: Map<string, TruthRoom>) {
-  const { rooms, unscored } = scoreRun(run, truth);
-  if (rooms.length === 0) fail('No room in this run has ground truth to score against.');
+  const { rooms, unscored, unmeasured } = scoreRun(run, truth);
+  if (rooms.length === 0) {
+    const waiting = unmeasured.length > 0 ? ` ${unmeasured.join(', ')} ${unmeasured.length === 1 ? 'is' : 'are'} set up but not measured yet – the answers are saved.` : '';
+    fail(`No room in this run has measurements to score against.${waiting}`);
+  }
   for (const room of rooms) console.log(roomLines(room, run.deadlineMs, everyAnswer).join('\n'));
-  console.log(summaryLines(run, rooms, unscored).join('\n'));
+  console.log(summaryLines(run, rooms, unscored, unmeasured).join('\n'));
   console.log('');
 
   if (compareFile) {
@@ -546,8 +555,9 @@ async function main() {
   const truth = loadTruth(join(photoDir, 'truth.json'), mode !== 'dry-run' && !inventory);
   if (mode === 'dry-run') return dryRun(truth);
   if (mode === 'from') {
-    const run = readRun(fromFile!);
-    console.log(`SAVED RUN · ${basename(fromFile!)} · "${run.label}" · ${run.model} · scored against today's truth.json\n`);
+    const { run, mismatch } = mergeRuns(fromFiles.map(readRun));
+    console.log(`SAVED RUN · ${fromFiles.map((file) => basename(file)).join(' + ')} · "${run.label}" · ${run.model} · scored against today's truth.json\n`);
+    if (mismatch) console.log(`  ! ${mismatch} – moves built across them mix two versions\n`);
     return report(run, truth);
   }
   const run = await live(truth);

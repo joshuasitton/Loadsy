@@ -28,7 +28,7 @@
 import { parseDetectedItem, type DetectRequest } from '../../src/api/detect';
 import { normaliseCeilingHeight } from '../../src/domain/ceiling';
 import { objectName } from '../../src/domain/plausibility';
-import { recommendTruckSize, TRUCK_CAPACITY } from '../../src/domain/truck';
+import { recommendTruckSize, TRUCK_CAPACITY, usableCapacityCuFt } from '../../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../../src/domain/types';
 import { cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../../src/domain/volume';
 
@@ -50,6 +50,14 @@ export interface TruthRoom {
   items: TruthItem[];
   /** Measured ceiling height in feet; absent means standard. */
   ceilingFt?: number;
+  /**
+   * True once everything that goes on the truck is in `items`, boxes included. Until
+   * then the room's numbers are provisional: an unmeasured box count reads as the model
+   * over-estimating. Absent means not yet.
+   */
+  complete?: boolean;
+  /** What is still to measure – a checklist for the person with the tape. Not scored. */
+  toMeasure?: string[];
 }
 
 /** One physical object as measured – a truth item with its count expanded. */
@@ -107,12 +115,23 @@ export function readTruth(
       }
       items.push(item as unknown as TruthItem);
     });
+    if (value.complete !== undefined && typeof value.complete !== 'boolean') {
+      problems.push(`"${rawKey}": "complete" must be true or false`);
+    }
+    if (value.toMeasure !== undefined && !(Array.isArray(value.toMeasure) && value.toMeasure.every((t) => typeof t === 'string'))) {
+      problems.push(`"${rawKey}": "toMeasure" must be a list of reminders`);
+    }
     if (value.ceilingFt !== undefined) {
       if (typeof value.ceilingFt !== 'number' || normaliseCeilingHeight(value.ceilingFt * 12) === null) {
         problems.push(`"${rawKey}": "ceilingFt" must be a height in feet between 6 and 20`);
       }
     }
-    rooms.set(key, { roomName: value.roomName, items, ...(typeof value.ceilingFt === 'number' ? { ceilingFt: value.ceilingFt } : {}) });
+    rooms.set(key, {
+      roomName: value.roomName,
+      items,
+      ...(typeof value.ceilingFt === 'number' ? { ceilingFt: value.ceilingFt } : {}),
+      ...(value.complete === true ? { complete: true } : {}),
+    });
   }
   return { rooms, problems };
 }
@@ -233,6 +252,7 @@ const PHRASES: [RegExp, string][] = [
   [/\bbook ?(shelf|shelves|case)\b/g, 'shelf'],
   [/\bwashing machine\b/g, 'washer'],
   [/\bfoot ?stool\b/g, 'ottoman'],
+  [/\b(hutch|china|display|curio) cabinet\b/g, 'hutch'],
 ];
 
 /** Different words for the same kind of object. */
@@ -486,6 +506,9 @@ export interface RoomResult {
   roomName: string;
   photoCount: number;
   measuredCuFt: number;
+  measured: MeasuredItem[];
+  /** Whether truth.json says everything in the room is measured. */
+  complete: boolean;
   attempts: AttemptScore[];
 }
 
@@ -497,10 +520,20 @@ export function scoreAttempt(attempt: Attempt, measured: readonly MeasuredItem[]
   return { ok: true, late: attempt.ms > deadlineMs, score: scoreRoom(measured, answer.items), ...common };
 }
 
-/** Every room of a saved run that has ground truth, scored against it. */
-export function scoreRun(run: SavedRun, truth: ReadonlyMap<string, TruthRoom>): { rooms: RoomResult[]; unscored: string[] } {
+/**
+ * Every room of a saved run that has measurements, scored against them.
+ *
+ * A room in truth.json with no items yet is set up but not measured: it is listed as
+ * unmeasured, not scored, because against nothing every item is an "extra" and the room
+ * would read as a wildly wrong answer.
+ */
+export function scoreRun(
+  run: SavedRun,
+  truth: ReadonlyMap<string, TruthRoom>,
+): { rooms: RoomResult[]; unscored: string[]; unmeasured: string[] } {
   const rooms: RoomResult[] = [];
   const unscored: string[] = [];
+  const unmeasured: string[] = [];
   for (const [key, saved] of Object.entries(run.rooms)) {
     const room = truth.get(key);
     if (!room) {
@@ -508,15 +541,42 @@ export function scoreRun(run: SavedRun, truth: ReadonlyMap<string, TruthRoom>): 
       continue;
     }
     const measured = expandTruth(room);
+    if (measured.length === 0) {
+      unmeasured.push(key);
+      continue;
+    }
     rooms.push({
       key,
       roomName: room.roomName,
       photoCount: saved.photoCount,
       measuredCuFt: sum(measured.map((item) => item.cubicFeet)),
+      measured,
+      complete: room.complete === true,
       attempts: saved.attempts.map((attempt) => scoreAttempt(attempt, measured, room.roomName, run.deadlineMs)),
     });
   }
-  return { rooms, unscored };
+  return { rooms, unscored, unmeasured };
+}
+
+/**
+ * Several saved runs as one, so rooms run on different days make one move.
+ *
+ * A move is scored from the n-th answer of every room, and those answers are
+ * independent requests whether they were sent together or not. Where two runs hold
+ * the same room, the later file wins. The first run's model and deadline describe the
+ * whole; `mismatch` says when the runs disagree on them, so a comparison built across
+ * different requests is labelled rather than trusted.
+ */
+export function mergeRuns(runs: readonly SavedRun[]): { run: SavedRun; mismatch: string | null } {
+  if (runs.length === 0) throw new Error('mergeRuns: no runs');
+  const first = runs[0]!;
+  const rooms: Record<string, SavedRoom> = {};
+  for (const run of runs) Object.assign(rooms, run.rooms);
+  const models = new Set(runs.map((run) => `${run.model} · ${run.maxTokens} tokens`));
+  return {
+    run: { ...first, label: runs.map((run) => run.label).join(' + '), rooms },
+    mismatch: models.size > 1 ? `the merged runs used different requests: ${[...models].join(' / ')}` : null,
+  };
 }
 
 /* ------------------------------------------------------------- summaries */
@@ -652,6 +712,141 @@ export function wholeMove(rooms: readonly RoomResult[]): { measuredCuFt: number;
     return { seenCuFt, truth: truckFor(measuredCuFt), seen: truckFor(seenCuFt) };
   });
   return { measuredCuFt, runs };
+}
+
+/* ------------------------------------------------------------ move scenarios */
+
+/** Every combination of at least `minSize` items, smallest combinations first, in input order. */
+export function combinations<T>(items: readonly T[], minSize: number): T[][] {
+  const out: T[][] = [];
+  for (let mask = 1; mask < 1 << items.length; mask++) {
+    const picked = items.filter((_, i) => (mask >> i) & 1);
+    if (picked.length >= minSize) out.push(picked);
+  }
+  return out.sort((a, b) => a.length - b.length);
+}
+
+/**
+ * How close a raw volume's buffered load sits to the nearest truck line, as a fraction
+ * of that line. A move 2% from a line changes truck on a 2% error; one 30% away does
+ * not. It is what makes a wrong truck on one move forgivable and on another a failure.
+ */
+export function truckLineMargin(rawCuFt: number): number {
+  const buffered = rawCuFt * (1 + DEFAULT_PACKING_BUFFER_PCT);
+  return Math.min(...TRUCK_SIZES.map((size) => Math.abs(buffered - usableCapacityCuFt(size)) / usableCapacityCuFt(size)));
+}
+
+/** An item listed in one room that was measured in another room of the same move. */
+export interface CrossRoomItem {
+  name: string;
+  cubicFeet: number;
+  listedIn: string;
+  belongsTo: string;
+  /** True when its own room listed it too – counted twice in the move, not only misplaced. */
+  countedTwice: boolean;
+}
+
+export interface MoveAnswer {
+  seenCuFt: number;
+  seen: TruckSize;
+  verdict: 'exact' | 'over' | 'UNDER';
+  crossRoom: CrossRoomItem[];
+}
+
+export interface MoveScenario {
+  keys: string[];
+  roomNames: string[];
+  measuredCuFt: number;
+  truth: TruckSize;
+  margin: number;
+  /** Every room in it is marked complete in truth.json. */
+  complete: boolean;
+  /** One per run; null where a room in the move had no usable answer, as in the app. */
+  answers: (MoveAnswer | null)[];
+}
+
+/**
+ * Items listed in one room of a move that belong to another: same kind, about the same
+ * size, as an item measured in that other room. The family room's first answers counted
+ * the breakfast room's hutch and console table this way; in a move of both rooms that
+ * volume is on the truck twice.
+ */
+export function crossRoomItems(rooms: readonly RoomResult[], run: number): CrossRoomItem[] {
+  const found: CrossRoomItem[] = [];
+  for (const room of rooms) {
+    const attempt = room.attempts[run];
+    if (!attempt?.ok) continue;
+    // Extras, and pairings that fit an item in another room clearly better than the item
+    // they were paired with: the family room's "Narrow Console Table" was paired with one
+    // of its own 14 in side tables, which hid a console table from the next room.
+    const candidates = [
+      ...attempt.score.extras.map((extra) => ({ seen: extra.seen, ownFit: 0 })),
+      ...attempt.score.pairs.map((pair) => ({ seen: pair.seen, ownFit: sizeSimilarity(pair.measured, pair.seen) })),
+    ];
+    for (const { seen, ownFit } of candidates) {
+      for (const other of rooms) {
+        if (other === room) continue;
+        const match = other.measured.find((item) => {
+          const fit = sizeSimilarity(item, seen);
+          return nameSimilarity(item.names, seen.name) > 0 && fit >= DUPLICATE_SIZE_SIMILARITY && fit > ownFit + BETTER_FIT_MARGIN;
+        });
+        if (!match) continue;
+        const own = other.attempts[run];
+        found.push({
+          name: seen.name,
+          cubicFeet: seen.cubicFeet,
+          listedIn: room.roomName,
+          belongsTo: other.roomName,
+          countedTwice: own?.ok === true && own.score.pairs.some((pair) => pair.measured === match),
+        });
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/** How much better an item must fit another room's measurement to be called misplaced. */
+const BETTER_FIT_MARGIN = 0.15;
+
+/**
+ * Every combination of two or more measured rooms, scored as one move from the answers
+ * already saved – no further requests. Four rooms make eleven moves of different sizes,
+ * so truck accuracy is tested across several truck lines, not only at whatever size one
+ * house happens to be.
+ *
+ * The combinations share answers, so they are not independent evidence: one bad room
+ * answer shows up in every move containing it. Read them for which truck lines a given
+ * error crosses, not as eleven separate trials.
+ */
+export function moveScenarios(rooms: readonly RoomResult[], minRooms = 2): MoveScenario[] {
+  return combinations(rooms, minRooms)
+    .map((combo) => {
+      const measuredCuFt = sum(combo.map((room) => room.measuredCuFt));
+      const truth = truckFor(measuredCuFt);
+      const count = Math.max(0, ...combo.map((room) => room.attempts.length));
+      const answers = Array.from({ length: count }, (_, i): MoveAnswer | null => {
+        let seenCuFt = 0;
+        for (const room of combo) {
+          const attempt = room.attempts[i];
+          if (!attempt?.ok) return null;
+          seenCuFt += attempt.score.seenCuFt;
+        }
+        const seen = truckFor(seenCuFt);
+        const order = TRUCK_SIZES.indexOf(seen) - TRUCK_SIZES.indexOf(truth);
+        return { seenCuFt, seen, verdict: order === 0 ? 'exact' : order > 0 ? 'over' : 'UNDER', crossRoom: crossRoomItems(combo, i) };
+      });
+      return {
+        keys: combo.map((room) => room.key),
+        roomNames: combo.map((room) => room.roomName),
+        measuredCuFt,
+        truth,
+        margin: truckLineMargin(measuredCuFt),
+        complete: combo.every((room) => room.complete),
+        answers,
+      };
+    })
+    .sort((a, b) => a.measuredCuFt - b.measuredCuFt);
 }
 
 /* ---------------------------------------------------------------- helpers */

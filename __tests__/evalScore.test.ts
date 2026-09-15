@@ -2,8 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  combinations,
+  crossRoomItems,
   expandTruth,
   groupSeen,
+  mergeRuns,
+  moveScenarios,
+  truckLineMargin,
   headline,
   median,
   missCounts,
@@ -302,4 +307,98 @@ test('median is the middle value, or the mean of the middle two', () => {
   assert.equal(median([]), null);
   assert.equal(median([3, 1, 2]), 2);
   assert.equal(median([4, 1, 3, 2]), 2.5);
+});
+
+/* ---------------------------------------------------------- move scenarios */
+
+const HUTCH = { name: 'Hutch', lengthIn: 72, widthIn: 20, heightIn: 80 };
+const SOFA = { name: 'Sofa', lengthIn: 84, widthIn: 36, heightIn: 34 };
+
+function twoRoomRun(family: Attempt[], breakfast: Attempt[]): SavedRun {
+  return run({ 'family-room': savedRoom('Family Room', family), 'breakfast-room': savedRoom('Breakfast Room', breakfast) });
+}
+
+const TWO_ROOMS = new Map([
+  ['family-room', { roomName: 'Family Room', complete: true, items: [SOFA] }],
+  ['breakfast-room', { roomName: 'Breakfast Room', items: [HUTCH] }],
+]);
+
+test('combinations come smallest first, with every set of at least the minimum size', () => {
+  assert.deepEqual(combinations(['a', 'b', 'c'], 2), [['a', 'b'], ['a', 'c'], ['b', 'c'], ['a', 'b', 'c']]);
+  assert.equal(combinations([1, 2, 3, 4], 2).length, 11, 'four rooms make eleven moves');
+});
+
+test('the truck-line margin is how far the buffered load sits from the nearest line', () => {
+  // 10 ft usable capacity is 341.7 ft³; 284.75 raw is 341.7 buffered – on the line.
+  assert.ok(truckLineMargin(284.75) < 0.001);
+  assert.ok(truckLineMargin(200) > 0.1);
+});
+
+test('an item listed in the wrong room of a move is found, and counted twice only when its own room listed it too', () => {
+  const hutchAndSofa = answerText([['Sofa', 84, 36, 34], ['Hutch', 72, 20, 80]]);
+  const sofaOnly = answerText([['Sofa', 84, 36, 34]]);
+  const { rooms } = scoreRun(twoRoomRun([attempt(hutchAndSofa), attempt(hutchAndSofa)], [attempt(answerText([['Hutch', 70, 20, 78]])), attempt(answerText([]))]), TWO_ROOMS);
+
+  const first = crossRoomItems(rooms, 0);
+  assert.deepEqual(first.map((item) => [item.name, item.listedIn, item.belongsTo, item.countedTwice]), [['Hutch', 'Family Room', 'Breakfast Room', true]]);
+  // Answer 2: the breakfast room missed its own hutch, so the move has it once – misplaced.
+  assert.equal(crossRoomItems(rooms, 1)[0]!.countedTwice, false);
+  // Paired with the wrong item in its own room, it is still found when it fits the other
+  // room's measurement clearly better – and a hutch named "cabinet" is still a hutch.
+  const truth = new Map([
+    ['family-room', { roomName: 'Family Room', items: [SOFA, { name: 'Side Table', lengthIn: 14, widthIn: 14, heightIn: 22 }] }],
+    ['breakfast-room', { roomName: 'Breakfast Room', items: [HUTCH, { name: 'Console Table', lengthIn: 38, widthIn: 16, heightIn: 30 }] }],
+  ]);
+  const hidden = scoreRun(
+    twoRoomRun(
+      [attempt(answerText([['Sofa', 84, 36, 34], ['Narrow Console Table', 36, 16, 32], ['Glass-Front Hutch Cabinet', 70, 20, 76]]))],
+      [attempt(answerText([['Hutch', 72, 20, 80], ['Console Table', 38, 16, 30]]))],
+    ),
+    truth,
+  ).rooms;
+  assert.deepEqual(crossRoomItems(hidden, 0).map((item) => item.name).sort(), ['Glass-Front Hutch Cabinet', 'Narrow Console Table']);
+
+  // Nothing to find when the family room lists only its own sofa.
+  const clean = scoreRun(twoRoomRun([attempt(sofaOnly)], [attempt(answerText([['Hutch', 72, 20, 80]]))]), TWO_ROOMS).rooms;
+  assert.deepEqual(crossRoomItems(clean, 0), []);
+});
+
+test('each move is sized from every room answer together, and a failed room leaves that answer out', () => {
+  const sofa = answerText([['Sofa', 84, 36, 34]]);
+  const hutch = answerText([['Hutch', 72, 20, 80]]);
+  const { rooms } = scoreRun(twoRoomRun([attempt(sofa), attempt(sofa)], [attempt(hutch), attempt(null)]), TWO_ROOMS);
+  const [move] = moveScenarios(rooms);
+
+  assert.deepEqual(move!.keys, ['family-room', 'breakfast-room']);
+  assert.equal(move!.answers[0]!.verdict, 'exact');
+  assert.equal(move!.answers[1], null);
+  // One room is not marked complete, so the move is provisional.
+  assert.equal(move!.complete, false);
+});
+
+test('a room set up in truth.json but not measured is saved for later, not scored against nothing', () => {
+  const truth = new Map([...TWO_ROOMS, ['kids-room', { roomName: 'Kids Room', items: [] }]]);
+  const saved = run({ ...twoRoomRun([attempt(answerText([]))], [attempt(answerText([]))]).rooms, 'kids-room': savedRoom('Kids Room', [attempt(answerText([['Bed', 80, 40, 20]]))]) });
+  const scored = scoreRun(saved, truth);
+  assert.deepEqual(scored.unmeasured, ['kids-room']);
+  assert.deepEqual(scored.rooms.map((room) => room.key).sort(), ['breakfast-room', 'family-room']);
+});
+
+test('runs made separately merge into one, and say when they used different requests', () => {
+  const a = run({ 'family-room': savedRoom('Family Room', [attempt(answerText([]))]) });
+  const b = { ...run({ 'kids-room': savedRoom('Kids Room', [attempt(answerText([]))]) }), maxTokens: 8000 };
+  const merged = mergeRuns([a, b]);
+  assert.deepEqual(Object.keys(merged.run.rooms).sort(), ['family-room', 'kids-room']);
+  assert.match(merged.mismatch!, /different requests/);
+  assert.equal(mergeRuns([a, a]).mismatch, null);
+});
+
+test('truth.json checks the set-up fields too', () => {
+  const { rooms, problems } = readTruth({
+    den: { roomName: 'Den', items: [], complete: 'yes', toMeasure: 'the sofa' },
+    hall: { roomName: 'Hall', items: [], complete: true, toMeasure: ['Coat rack'] },
+  });
+  assert.equal(problems.length, 2, problems.join('\n'));
+  assert.equal(rooms.get('hall')!.complete, true);
+  assert.equal(rooms.get('den')!.complete, undefined);
 });

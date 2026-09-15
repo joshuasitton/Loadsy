@@ -3,7 +3,6 @@
  * lines and prints nothing, so `detect.ts` owns the terminal and this owns the wording.
  */
 
-import { TRUCK_SIZES } from '../../src/domain/types';
 import { formatCeiling, ceilingForDetection } from '../../src/domain/ceiling';
 import { DEFAULT_PACKING_BUFFER_PCT } from '../../src/domain/volume';
 import {
@@ -12,9 +11,10 @@ import {
   readAnswer,
   median,
   missCounts,
+  moveScenarios,
   spread,
   truckFor,
-  wholeMove,
+  type MoveScenario,
   type AttemptScore,
   type Headline,
   type RoomResult,
@@ -167,12 +167,23 @@ function usageLines(run: SavedRun, rooms: readonly RoomResult[]): string[] {
   ];
 }
 
-export function summaryLines(run: SavedRun, rooms: readonly RoomResult[], unscored: readonly string[]): string[] {
+export function summaryLines(
+  run: SavedRun,
+  rooms: readonly RoomResult[],
+  unscored: readonly string[],
+  unmeasured: readonly string[] = [],
+): string[] {
   const shipped = headline(rooms, true);
   const patient = headline(rooms, false);
   const lines: string[] = [];
 
   for (const key of unscored) lines.push(`  ! "${key}" was in this run but has no ground truth in truth.json – not scored`);
+  for (const key of unmeasured) lines.push(`  · "${key}" is set up in truth.json but not measured yet – its answers are saved, and scored once it is`);
+  const provisional = rooms.filter((room) => !room.complete).map((room) => room.key);
+  if (provisional.length > 0) {
+    lines.push(`  · provisional: ${provisional.join(', ')} not marked "complete" in truth.json – unmeasured items and boxes read as over-estimates`);
+  }
+  if (unscored.length + unmeasured.length + provisional.length > 0) lines.push('');
 
   lines.push('— as a user would get it (answers after the deadline count as failures) —', ...headlineLines(shipped));
   if (shipped.scored !== patient.scored) {
@@ -180,11 +191,7 @@ export function summaryLines(run: SavedRun, rooms: readonly RoomResult[], unscor
   }
   lines.push('', '— item by item (deadline ignored) —', ...itemLines(patient));
 
-  const move = wholeMove(rooms);
-  if (rooms.length > 1 && move.runs.length > 0) {
-    const answers = move.runs.map((r) => (r === null ? 'a room failed' : `${cuft(r.seenCuFt)} → ${r.seen}${r.seen !== r.truth ? (TRUCK_SIZES.indexOf(r.seen) < TRUCK_SIZES.indexOf(r.truth) ? ' UNDER' : ' over') : ''}`));
-    lines.push(`${rooms.length === 2 ? 'both rooms' : `all ${rooms.length} rooms`} as one move`.padEnd(29) + `measured ${cuft(move.measuredCuFt)} → ${truckFor(move.measuredCuFt)}; run by run: ${answers.join(' · ')}`);
-  }
+  if (rooms.length > 1) lines.push('', ...scenarioLines(moveScenarios(rooms)));
 
   const usage = usageLines(run, rooms);
   if (usage.length > 0) lines.push('', ...usage);
@@ -319,5 +326,54 @@ export function inventoryLines(run: SavedRun, everyAnswer: boolean): string[] {
     "  and don't copy these numbers into truth.json: that would score the model against itself.",
     '',
   );
+  return lines;
+}
+
+function scenarioName(scenario: MoveScenario, total: number): string {
+  return scenario.keys.length === total && total > 2 ? `all ${total} rooms` : scenario.keys.join(' + ');
+}
+
+/**
+ * Every combination of measured rooms as one move, smallest first: the truck it needs,
+ * how close that is to a truck line, and each answer's truck – with anything counted in
+ * the wrong room of that move called out.
+ */
+export function scenarioLines(scenarios: readonly MoveScenario[]): string[] {
+  if (scenarios.length === 0) return [];
+  const total = Math.max(...scenarios.map((scenario) => scenario.keys.length));
+  const lines = [
+    '— moves: every combination of measured rooms, from the same saved answers (deadline ignored) —',
+    `    ${'rooms'.padEnd(52)}${'measured → truck'.padEnd(22)}${'line'.padEnd(7)}answers`,
+  ];
+  const tally = { exact: 0, over: 0, UNDER: 0 };
+  for (const scenario of scenarios) {
+    const answers = scenario.answers.map((answer) => {
+      if (answer === null) return 'failed';
+      tally[answer.verdict] += 1;
+      return `${answer.seen}${answer.verdict === 'exact' ? ' ✓' : answer.verdict === 'over' ? ' over' : ' UNDER'}`;
+    });
+    lines.push(
+      `    ${fit(scenarioName(scenario, total), 51)} ${`${cuft(scenario.measuredCuFt)} → ${scenario.truth}`.padEnd(22)}${`±${(scenario.margin * 100).toFixed(0)}%`.padEnd(7)}${answers.join(' · ')}` +
+        (scenario.complete ? '' : '  (provisional)'),
+    );
+    scenario.answers.forEach((answer, i) => {
+      const twice = answer?.crossRoom.filter((item) => item.countedTwice) ?? [];
+      const misplaced = answer?.crossRoom.filter((item) => !item.countedTwice) ?? [];
+      if (twice.length > 0) {
+        lines.push(`        answer ${i + 1} counted twice: ${twice.map((item) => `"${item.name}" (${item.belongsTo}, also in ${item.listedIn}) ${cuft(item.cubicFeet)}`).join(' · ')}`);
+      }
+      if (misplaced.length > 0) {
+        lines.push(`        answer ${i + 1} in the wrong room: ${misplaced.map((item) => `"${item.name}" listed in ${item.listedIn}, belongs to ${item.belongsTo}`).join(' · ')}`);
+      }
+    });
+  }
+  const answered = tally.exact + tally.over + tally.UNDER;
+  if (answered > 0) {
+    const share = (n: number) => `${((n / answered) * 100).toFixed(0)}%`;
+    lines.push(
+      `    trucks across ${answered} move answers: exact ${share(tally.exact)} · over ${share(tally.over)} · UNDER ${share(tally.UNDER)}` +
+        '   (moves share room answers – not independent trials)',
+    );
+  }
   return lines;
 }
