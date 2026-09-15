@@ -196,9 +196,9 @@ If nothing in the frame gives you a scale reference, estimate from the kind of o
 
 ## What to include
 
-List one entry for each thing that travels loose on the truck: furniture, mattresses, free-standing appliances, televisions, mirrors and framed art too large for a box, floor lamps, rugs, bicycles, large plants, instruments, and anything else that will not fit in a moving box.
+List one entry for each thing that travels loose on the truck: furniture, mattresses, free-standing appliances, televisions, mirrors, rugs, bicycles, large plants, instruments – and anything else too big for a Large Box (18 x 18 x 24 in), however little space it takes: a tall lamp, a tower fan, a dog bed, framed art wider than the box.
 
-Everything else goes into boxes, so count boxes instead of listing it. Pillows, throws, books, magazines, ornaments, vases, photo frames, table lamps, small electronics, toys, kitchenware and clothes are packed by the user; the truck carries the boxes, not the objects. Do not list them one by one. Estimate how many boxes this room's small belongings will fill – on shelves, on surfaces and on the floor – and emit one entry per box:
+Everything that would fit in a Large Box goes into boxes, so count boxes instead of listing it. The test is size, not type: a lamp that fits in a Large Box is boxed, and one too tall for it is listed. Pillows, throws, books, magazines, ornaments, vases, photo frames, small electronics, toys, kitchenware and clothes are packed by the user; the truck carries the boxes, not the objects. Do not list them one by one. Estimate how many boxes this room's small belongings will fill – on shelves, on surfaces and on the floor – and emit one entry per box:
 
   Small Box    16 x 12 x 12 in   books, heavy or dense things
   Medium Box   18 x 18 x 16 in   most household things

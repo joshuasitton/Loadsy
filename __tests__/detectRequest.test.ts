@@ -153,6 +153,10 @@ test('the prompt counts sections, stays in its room, and boxes the small things'
   // 26 small items listed one by one – most of the review flags and half the tokens.
   assert.match(SYSTEM_PROMPT, /count boxes instead of listing it/);
   for (const box of ['Small Box', 'Medium Box', 'Large Box']) assert.match(SYSTEM_PROMPT, new RegExp(`"${box}"`));
+  // Decided 15 September: boxed or loose is decided by whether it fits a Large Box, not
+  // by what it is – a tall lamp, a tower fan or a dog bed stays on the list.
+  assert.match(SYSTEM_PROMPT, /anything else too big for a Large Box \(18 x 18 x 24 in\)/);
+  assert.match(SYSTEM_PROMPT, /The test is size, not type/);
 });
 
 test('the answer format asks only for what the app reads', () => {
