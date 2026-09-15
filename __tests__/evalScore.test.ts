@@ -127,6 +127,7 @@ test('names from the first real room pair with what was measured', () => {
   assert.ok(nameSimilarity(['Sectional Sofa (64 in piece)'], 'Sectional Chaise Section') > 0);
   assert.ok(nameSimilarity(['Wood Side Table with Drawer'], 'Wood End Table') > 0);
   assert.equal(nameSimilarity(['Large Box'], 'Printer Tray Shadow Box'), 0);
+  assert.ok(nameSimilarity(['Sideboard'], 'Fluted Sideboard Cabinet') > 0);
   assert.ok(nameSimilarity(['Framed World Map Canvas'], 'Framed World Map') > nameSimilarity(['Framed World Map Canvas'], 'Birch Forest Canvas Art'));
 });
 

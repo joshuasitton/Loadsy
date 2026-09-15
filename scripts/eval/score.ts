@@ -265,6 +265,8 @@ const PHRASES: [RegExp, string][] = [
   [/\bwashing machine\b/g, 'washer'],
   [/\bfoot ?stool\b/g, 'ottoman'],
   [/\b(hutch|china|display|curio) cabinet\b/g, 'hutch'],
+  // "Fluted Sideboard Cabinet" is a sideboard: it went unpaired in 16 of 50 answers.
+  [/\b(sideboard|buffet|credenza) cabinet\b/g, 'sideboard'],
   // A shadow box or display case hangs on a wall; it is not a packing box.
   [/\b(shadow box|display case)\b/g, 'displaycase'],
 ];
