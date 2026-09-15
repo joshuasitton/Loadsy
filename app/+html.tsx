@@ -24,7 +24,7 @@ export default function Root({ children }: PropsWithChildren) {
         <title>Loadsy — Right size truck. Right price. Right plan.</title>
         <meta
           name="description"
-          content="Photograph your rooms and Loadsy works out how much truck you actually need, what it costs nearby, and the order to load it in."
+          content="Photograph your rooms and Loadsy works out how much truck you actually need, where to rent it, and the order to load it in."
         />
         <meta name="theme-color" content="#FFFFFF" />
 

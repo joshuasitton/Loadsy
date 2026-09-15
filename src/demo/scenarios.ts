@@ -348,6 +348,7 @@ export function buildDemoMove(scenario: DemoScenario): Move {
     destinationZip: scenario.destination?.postalCode ?? null,
     tripMiles: null,
     ceilingHeightIn: null,
+    keptDuplicates: [],
     moveDate: null,
     // Deliberately the first step. A scenario supplies the inventory and stops —
     // walking forward through sizing and the load plan is the demo, and starting

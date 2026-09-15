@@ -72,6 +72,8 @@ type Action =
   | { type: 'setDestinationAddress'; address: Address | null }
   | { type: 'setTripMiles'; miles: number | null }
   | { type: 'setCeilingHeight'; inches: number }
+  /** "I have two": the pair stays, and is not asked about again. */
+  | { type: 'keepDuplicate'; key: string }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
   /**
@@ -94,6 +96,7 @@ function newMove(): Move {
     destinationZip: null,
     tripMiles: null,
     ceilingHeightIn: null,
+    keptDuplicates: [],
     moveDate: null,
     status: 'inventory',
   };
@@ -239,6 +242,11 @@ function reducer(state: MoveState, action: Action): MoveState {
       // Through the same range check persistence uses, so a slip – inches typed as
       // feet – can never reach the detector and scale every measurement by it.
       return { ...state, move: { ...state.move, ceilingHeightIn: normaliseCeilingHeight(action.inches) } };
+
+    case 'keepDuplicate':
+      return state.move.keptDuplicates.includes(action.key)
+        ? state
+        : { ...state, move: { ...state.move, keptDuplicates: [...state.move.keptDuplicates, action.key] } };
 
     case 'setMoveDate':
       return { ...state, move: { ...state.move, moveDate: action.iso } };

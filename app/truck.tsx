@@ -9,7 +9,7 @@ import {
   TRUCK_ROOM_EQUIVALENCE,
 } from '../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../src/domain/types';
-import { unresolvedCount, confidenceBannerCopy } from '../src/domain/confidence';
+import { inventoryBlockedReason } from '../src/domain/confidence';
 import { useMove } from '../src/state/moveStore';
 import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -25,7 +25,7 @@ const SIZE_GUIDE = [
   { size: '10ft' as const, body: 'A studio or small one-bedroom. Bed, sofa, dresser, and around fifteen boxes.' },
   { size: '15ft' as const, body: 'A one or two-bedroom apartment. The most common choice for apartment moves.' },
   { size: '20ft' as const, body: 'A two or three-bedroom home, including appliances and a garage worth of gear.' },
-  { size: '26ft' as const, body: 'A four-bedroom home and up. If you are close to this, price a second trip too.' },
+  { size: '26ft' as const, body: 'A four-bedroom home and up. If you are close to this, plan for a second trip too.' },
 ];
 
 export default function TruckScreen() {
@@ -67,7 +67,7 @@ export default function TruckScreen() {
             <Text style={styles.warningTitle}>This is more than one truckload</Text>
             <Text style={styles.warningBody}>
               Your inventory is past what a 26′ truck holds. Plan on two trips, or move some of it
-              separately — we&apos;ll still price the 26′ for you.
+              separately — the largest truck is still the one to rent.
             </Text>
           </Card>
         ) : null}
@@ -155,11 +155,7 @@ export default function TruckScreen() {
         <StepNav
           current="/truck"
           blockedReason={
-            move.rooms.length === 0
-              ? 'Add a room before looking up prices'
-              : unresolvedCount(move) > 0
-                ? confidenceBannerCopy(unresolvedCount(move))
-                : null
+            move.rooms.length === 0 ? 'Add a room before choosing a truck' : inventoryBlockedReason(move)
           }
           onAdvance={() => dispatch({ type: 'setStatus', status: 'truckAndPrice' })}
         />

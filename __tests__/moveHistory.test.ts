@@ -35,6 +35,7 @@ function emptyMove(): Move {
     destinationZip: null,
     tripMiles: null,
     ceilingHeightIn: null,
+    keptDuplicates: [],
     moveDate: null,
     status: 'inventory',
   };

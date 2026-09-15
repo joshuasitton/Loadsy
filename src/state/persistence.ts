@@ -254,6 +254,11 @@ export function parseStoredState(raw: string): ParsedState | null {
     // Absent from every payload written before the question existed, which reads
     // as "not asked" – so an existing move is asked once, never silently assumed.
     ceilingHeightIn: normaliseCeilingHeight(finiteNumber(storedMove.ceilingHeightIn)),
+    // Absent before the duplicate check existed, which reads as nothing kept – so an
+    // existing move with one object in two rooms is asked about once, not waved through.
+    keptDuplicates: Array.isArray(storedMove.keptDuplicates)
+      ? [...new Set(storedMove.keptDuplicates.filter((key): key is string => typeof key === 'string' && key.includes('|')))]
+      : [],
     moveDate: nonEmptyString(storedMove.moveDate),
     status: status ?? 'inventory',
   };

@@ -102,6 +102,11 @@ export interface Move {
    * know whether to ask. See src/domain/ceiling.ts for why it matters.
    */
   ceilingHeightIn: number | null;
+  /**
+   * Pairs of items the person has said are two real objects, not one object listed in
+   * two rooms – each the `duplicateKey` of the two item ids. See src/domain/duplicates.ts.
+   */
+  keptDuplicates: string[];
   /** ISO-8601 string; Date is not JSON-serialisable across the API boundary. */
   moveDate: string | null;
   status: MoveStatus;

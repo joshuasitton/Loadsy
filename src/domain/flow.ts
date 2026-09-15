@@ -17,7 +17,7 @@
 import type { MoveStatus } from './types';
 
 /** Kept in sync with expo-router's typed routes. */
-export type FlowRoute = '/inventory' | '/trip' | '/truck' | '/prices' | '/packing';
+export type FlowRoute = '/inventory' | '/truck' | '/rent' | '/packing';
 
 export interface FlowStep {
   route: FlowRoute;
@@ -26,20 +26,18 @@ export interface FlowStep {
   /**
    * The status this screen represents, or null where it has none.
    *
-   * Prices is a detour off Truck & Price rather than a step of its own in the
-   * spec's five-status model, so it deliberately maps to the same status.
+   * Where to Rent is the back half of the truck stage rather than a step of its own in
+   * the spec's five-status model, so it deliberately maps to the same status.
    */
   status: MoveStatus;
 }
 
 export const FLOW: readonly FlowStep[] = [
   { route: '/inventory', title: 'Inventory', status: 'inventory' },
-  // Where from and where to, before anything is priced. It shares a status with
-  // Truck Size for the same reason Prices does — the spec's five-status model has
-  // one stage for "truck and price", and this is the front of it.
-  { route: '/trip', title: 'Your Trip', status: 'truckAndPrice' },
+  // The trip and prices steps came out on 15 September: there is no price service, and
+  // the trip existed only to price the truck. See app/rent.tsx.
   { route: '/truck', title: 'Truck Size', status: 'truckAndPrice' },
-  { route: '/prices', title: 'Local Prices', status: 'truckAndPrice' },
+  { route: '/rent', title: 'Where to Rent', status: 'truckAndPrice' },
   { route: '/packing', title: 'Packing Plan', status: 'packingPlan' },
 ] as const;
 

@@ -123,18 +123,29 @@ accuracy, and would validate exactly the shared priors that cause the failure mo
   nearest inch.
 - A mattress and its frame are two items; so are things stacked on each other.
 
+- **Several identical things measured once:** `"count": 6` on the dining chair. Each
+  becomes its own item, because the model is told to list one entry per physical object.
+- **Name things plainly** — "Sofa", "Dresser", "Floor Lamp". The scorer pairs the model's
+  items with yours by name and size, and already knows a couch is a sofa and a chest of
+  drawers is a dresser. When it pairs something wrongly or misses a pairing you can see
+  is right, add the model's word: `"aka": ["end table"]`.
 - **Ceiling height, if it isn't 8 ft:** add `"ceilingFt": 9` to the room. It reaches the
   model exactly as the app's answer to "Are your ceilings the standard 8ft high?" does, so
   the eval measures that question as well. Leave it out for a standard 8 ft ceiling.
 
-Keys written in the older one-photo format — `"bedroom.jpg"` — still work.
+Keys written in the older one-photo format — `"bedroom.jpg"` — still work. The file is
+checked before anything is sent: a missing height or a zero would quietly change a room's
+volume and every number after it, so a live run refuses to start until it is fixed.
+
+`scripts/eval/example-truth.json` is a complete example to copy from. Its rooms are
+invented, and it is what `--mock` scores against.
 
 ## Running it
 
-Three modes, cheapest first.
+Five modes, cheapest first.
 
-**Mock** — scores the mock detector. Reads no photos, needs no key, costs nothing. Proves
-the scoring works:
+**Mock** — scores the mock detector against `example-truth.json`. Reads no photos, needs
+no key, costs nothing. Proves the scoring works:
 
 ```bash
 npm run eval:detect -- --mock
@@ -142,29 +153,191 @@ npm run eval:detect -- --mock
 
 **Dry run** — prepares every photo and builds every request exactly as a live run would,
 then sends nothing. Shows each photo's final size, whether it was turned upright, that its
-metadata is gone, which rooms are ready, and an estimated cost. **Run this before every
-live run:**
+metadata is gone, which rooms are ready, and what a live run would cost. **Run this before
+every live run:**
 
 ```bash
 npm run eval:detect -- --dry-run
 ```
 
-**Live** — needs the vision key in your own terminal; nobody else should handle it:
+**Live** — asks for the vision key, with nothing echoed, and checks it before sending
+anything. Run it in your own terminal; nobody else should handle the key:
 
 ```bash
-VISION_API_KEY=sk-ant-... npm run eval:detect
+npm run eval:detect -- --label first-look
 ```
 
-Add `--dir <folder>` to any of them to point somewhere other than `./eval-photos`.
+The eval asks rather than reading an environment variable you set by hand, because
+doing that in zsh failed three ways on the first real run, each looking like "not set" or
+a bare 401: a variable set but not exported, so npm never saw it; an older key still
+exported in the same window; and stray characters from a copy. Pasted keys have a
+terminal's paste markers and line endings taken off; a character no key contains, such
+as a smart dash, is refused rather than repaired. The key stays in the process's memory
+and is never written or printed — only its length and an 8-character fingerprint.
+`VISION_API_KEY`, if it is set, is used instead of asking; `unset VISION_API_KEY` to be
+asked. `--check-key` tests a key with two tiny requests and says what is wrong with it.
 
-A live run reports each room's error and truck, then the pass-bar numbers, latency p50 and
-p95 against the route's 11-second limit, and the real token count and cost from the API.
-Rooms that fail are listed with the reason. `unparseable answer (stop_reason: max_tokens)`
-means the model's thinking used up the response budget before it finished the JSON —
-sprint item E2.
+**Inventory** — a live run with no measurements at all: only photos and the ceiling height,
+which the app asks before the first photo. It prints what the app would have found – every
+item with its size and volume, identical objects counted together (`Dining Chair ×4`), the
+ones the app would ask you to check, and the truck for the photographed rooms – and saves
+the answer like any other run:
 
-The two files that shipped in `eval-photos/` are 22-byte placeholders, not photos. Mock
-mode uses them; the dry run and a live run say so and refuse to send them.
+```bash
+npm run eval:detect -- --inventory --ceiling-ft 9
+```
+
+`--ceiling-ft` is required, because the app will not open the camera without an answer:
+`8` for standard, otherwise the real height (`9`, `9.5`, `9'6"`). Runs once per room unless
+`--runs` says otherwise. Nothing in it is scored, so it says nothing about accuracy yet —
+**once `truth.json` is written, score that same saved answer with `--from`.** That is worth
+doing in this order: the answer was given before any measurement existed, so it cannot have
+been influenced by one. The reverse risk is yours, not the model's — measure with a tape
+and don't copy its numbers into `truth.json`, or the eval scores the model against itself.
+
+**Saved run** — scores an earlier live run again, against today's `truth.json`. No key, no
+cost:
+
+```bash
+npm run eval:detect -- --from eval-results/2026-09-15-10-00-first-look.json
+```
+
+Options for any of them:
+
+| Option | What it does |
+|---|---|
+| `--runs <n>` | Asks the model n times per room (up to 100). Default **3**, or 1 with `--inventory`. |
+| `--concurrency <n>` | Up to 6 requests at once; rate-limited ones are retried. |
+| `--simulate <n>` | Resamples saved answers into n simulated moves. No requests. |
+| `--yes` | Confirms a live run of more than 20 requests. |
+| `--ceiling-ft <h>` | The home's ceiling, told to the model for every room as the app does. Overrides `ceilingFt` in `truth.json`. |
+| `--label <text>` | Names the saved file, so `e2-before` and `e2-after` can be found again. |
+| `--compare <file>` | Prints this run beside a saved one. |
+| `--from <file>` (repeated) | Scores several saved runs as one, so rooms run separately make moves. |
+| `--max-photos <n>` | Sends only each room's first n photos. |
+| `--every-answer` | Item-by-item detail for every answer, not just each room's first. |
+| `--room <name>` | Only this room, by its photo name – `--room breakfast-room`. Repeat it for several. |
+| `--dir <folder>` | Photos somewhere other than `./eval-photos`. |
+
+### Why three runs, and why answers are saved
+
+The model does not give the same answer twice. One run per room is an anecdote: a sofa
+missed once might be missed one time in ten or every time, and those need different
+fixes. Three runs show the spread and which items are missed in how many answers.
+
+Every answer is written to `eval-results/` the moment it arrives — the model's raw text,
+timing and token counts, plus fingerprints of the photos and of the request. Three things
+follow from that:
+
+- **Scoring changes cost nothing.** Answers are read with the app's parser when they are
+  scored, not when they arrive, so a corrected measurement in `truth.json`, a new `aka`, or
+  a change to the parser is applied to an old run with `--from`.
+- **A change can be measured before and after.** Save a run, change the prompt or the
+  response budget, run again with `--compare`. The comparison says whether the photos were
+  identical — if they were not, a better number may just be a better photo — and whether
+  the request changed.
+- **An interrupted run keeps what it paid for.** The file is rewritten after every answer.
+
+`eval-results/` is ignored by git. It holds no photos, but it does hold an inventory of the
+rooms they show.
+
+### Waiting past the deadline
+
+The route gives up on the model at 11 seconds. The eval waits up to two minutes instead,
+and scores each answer twice: **as a user would get it**, where a late answer is a failure,
+and **as the model gave it**. A request cut off at 11 seconds costs the same and teaches
+nothing; a late one says whether the fix is speed or accuracy.
+
+### What the report shows
+
+For each room, one line per answer:
+
+```
+  answer 1   111.3 ft³   -9%   sizing -11.3 · missed +0.0 · extras +0.0   5.0s · 900 out · end_turn
+```
+
+The room's error, split into the three things that cause it, which add up to it exactly:
+
+- **sizing** — items found but measured wrong
+- **missed** — items that go on the truck and are not in the answer. The dangerous kind:
+  every one shrinks the truck.
+- **extras** — items in the answer that were not measured: one object counted twice from two
+  angles (flagged as a likely double count), something that is not there, or something left
+  out of `truth.json`
+
+Then how far the answers spread, which items were missed in how many answers, and one
+answer item by item: each pairing with the long side, short side, height and volume error.
+**Read the pairings.** They are matched by name and size, which is a guess; a wrong pairing
+is fixed with `aka`, and `--from` rescores for free.
+
+The summary gives the pass-bar numbers as a user would get them, then item-level numbers:
+how much of the measured volume was found at all, the median signed error of each side
+(minus is too small; height is where a wrong ceiling assumption shows), and the whole
+move — every room's answer added together and sized as one truck, run by run, which is the
+number the app actually shows. Latency, the largest answer against the 4,000-token budget,
+how many were cut off at `max_tokens`, and the real cost from the API close it.
+`unparseable answer (stop_reason: max_tokens)` means the model's thinking used up the
+response budget before the JSON was finished — sprint item E2.
+
+### Moves: combinations of rooms
+
+With two or more measured rooms, the report scores **every combination of them as one
+move** – four rooms make eleven moves, from a two-room flat to the whole house – using
+the answers already saved, so it costs nothing extra. Each line shows the truck the move
+needs, how close its load sits to a truck line (a move 2% from a line changes truck on a
+2% error; one 30% away does not), and every answer's truck. Anything listed in one room
+but measured in another is called out: **counted twice** when its own room listed it too,
+**in the wrong room** when it did not. The family room's first answers counted the
+breakfast room's hutch and console table through an open doorway, which is why this exists.
+
+Moves share room answers, so eleven moves are not eleven independent trials: one bad
+room answer appears in every move that contains it. Rooms run on different days still
+combine – repeat `--from`:
+
+```bash
+npm run eval:detect -- --from eval-results/<family-room run>.json --from eval-results/<other rooms run>.json
+```
+
+A room can be set up in `truth.json` before it is measured – `"items": []`, a
+`"toMeasure"` checklist – and its answers are saved and left unscored until it is. Mark a
+room `"complete": true` once everything on its truck is in `items`, boxes included; until
+then its numbers are labelled provisional, because an unmeasured box count reads as the
+model over-estimating.
+
+### Many answers, and what "more runs" can and cannot show
+
+The model does not learn between requests: nothing about one answer changes the next,
+and a thousand runs describe the same model a thousand times. What more answers buy is a
+sharper picture – how often one answer gets the truck right, and how much answers vary –
+and a way to test combining them, which is the one sense in which asking more often can
+make detection better.
+
+Collect the answers with several requests at a time (rate limits are retried; runs of
+more than 20 requests wait for `--yes`, after printing what they will cost):
+
+```bash
+npm run eval:detect -- --room family-room --runs 50 --concurrency 4 --yes
+```
+
+Then resample them into as many simulated moves as you like, for free:
+
+```bash
+npm run eval:detect -- --from eval-results/<that run>.json --simulate 1000
+```
+
+For each room it shows the truck from one answer, and from the median or the largest of
+2, 3 or 5 answers – whether "ask twice, take the median" would be worth building – plus
+how the estimated exact-truck rate settled as real answers came in. A simulation is
+built only from the real answers, so its precision is theirs: from three answers, a
+thousand simulated moves repeat three answers. Thirty to fifty is where it steadies.
+
+### How much to trust a small run
+
+One room rarely fills a van, so room-by-room truck accuracy says almost nothing: nearly
+every room is "van → van". With fewer than four rooms the report says it is a smoke test,
+and it is. What two rooms *can* show is direction — sides consistently short, a kind of
+item missed every time, one object double counted across photos. **Don't tune the prompt
+to them**: a prompt that fixes two rooms in one house has learned that house.
 
 ## Pass bar
 

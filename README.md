@@ -113,8 +113,8 @@ Sign out sits in the navigation header of **every** screen that has one, via
 It renders nothing when signed out, which is why it is invisible with demo mode
 off — there is no session to end.
 
-Back/forward `StepNav` is on the **five flow steps only**: Inventory, Your Trip,
-Truck Size, Local Prices, Packing Plan. The dashboard is the hub the flow starts
+Back/forward `StepNav` is on the **four flow steps only**: Inventory, Truck Size,
+Where to Rent, Packing Plan. The dashboard is the hub the flow starts
 from, and Capture, Truck Layout and Past Moves are detours off a step rather than
 steps — all four use the header's back control instead. Putting "Next →" on a
 screen that is not in the flow would have to invent an answer to what comes next.
@@ -167,7 +167,7 @@ not seem worth a build dependency.
 ### Free and Premium
 
 Free ends where the answer is complete. A free account photographs its rooms, gets a
-truck size and five compared prices, and never sees a wall on the way — that is the
+truck size and where to rent it, and never sees a wall on the way — that is the
 whole of steps 1 and 2 on the dashboard, and it is a product somebody can finish.
 Premium is the work that starts after the truck is booked: the load order and the
 solved layout, plus Reservations and Moving Day when they are written.
@@ -199,7 +199,7 @@ developer wants to be looking at the screen users will actually get.
 
 ### Moving through the flow
 
-The four working screens — Inventory, Truck Size, Local Prices, Packing Plan —
+The four working screens — Inventory, Truck Size, Where to Rent, Packing Plan —
 are one ordered list in `src/domain/flow.ts`, and `StepNav` derives both
 directions from it. Back and forward therefore cannot disagree about what follows
 what; `__tests__/flow.test.ts` asserts they are inverses.
@@ -294,6 +294,24 @@ Bed dimensions are U-Haul's published interiors. They deliberately do **not**
 replace `TRUCK_CAPACITY`, which is what sizing decisions are made from: the 10'
 capacity counts an over-cab compartment the deck does not describe, and the larger
 trucks lose deck to wheel wells.
+
+### No prices in v1
+
+Decided 15 September, when live testing reached the prices screen and it failed: it
+called `/v1/quotes`, which was never built. The prices every demo had shown were
+computed on the phone from a table of rental rates nobody had sourced, with availability
+dates made up per vendor – labelled "estimated", but presented as local prices. A
+release build would have shown every user the error; fixing it by showing the table
+would have shown them guesses. Live prices mean partnerships and a service to run, and
+the company is kept low-overhead. So v1 recommends the size and links to each rental
+company, whose own site gives the price.
+
+The trip step and the location permission went with it: addresses, mileage and the move
+date were collected only to price the truck, and a location prompt promising "truck
+rental rates near you" would have described something the app no longer does. The next
+section describes a screen now removed – `app/trip.tsx` is in the git history – and its
+domain code, which stays. The quote code in `src/api/rentals.ts`, `src/api/mocks/quotes.ts`
+and `src/domain/quotes.ts` is kept, tested and unused until prices return.
 
 ### Where the move starts and ends
 
@@ -424,7 +442,7 @@ npx eas-cli submit --platform ios --profile production
 
 ## What's built
 
-All seven screens from spec §3, plus the price breakdown modal from §3.1:
+The screens from spec §3, less prices – see "No prices in v1" above:
 
 | Route | Spec | What it does |
 |---|---|---|
@@ -432,8 +450,7 @@ All seven screens from spec §3, plus the price breakdown modal from §3.1:
 | `app/capture.tsx` | Screen 1 | Camera + gallery capture, tips card, photo quality gate |
 | `app/inventory.tsx` | Screen 2 | Grouped inventory, confidence gate, manual add item/room |
 | `app/truck.tsx` | Screen 3 | Recommendation with the raw → buffered → capacity breakdown |
-| `app/prices.tsx` | Screen 4 | Quote list, client-side filters, in-app browser deep links |
-| `app/quote/[id].tsx` | Screen 3.1 | Per-line price breakdown, amber/green estimate distinction |
+| `app/rent.tsx` | Screen 4 | Where to rent the recommended size – a link to each rental company |
 | `app/packing.tsx` | Screen 5 | Load Plan / By Room tabs, weight-class aware |
 | `app/layout-view.tsx` | Screen 6 | Top / 3D truck diagram, save and share |
 

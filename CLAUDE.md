@@ -52,12 +52,15 @@ npm run eval:detect   # run the detection eval over eval-photos/
 - **`honour()` in `src/billing/tier.ts`** decides what tier a build will accept
   from storage. Everything resolving a tier goes through it. `PREMIUM_FOR_SALE`
   defaults off in every environment, development included.
-- **`fetchQuotes` drops any quote whose total does not reconcile with its line
-  items** (spec §4.2), at runtime and not only in tests.
+- **v1 shows no prices and asks for no location** (decided 15 September). There is no
+  price service; the trip, quote and geocoding code in `src/` is unused until one exists.
+  If it returns, `fetchQuotes` must still drop any quote whose total does not reconcile
+  with its line items (spec §4.2), and the location permission and privacy label return
+  with it.
 - **`/v1/detect` is a strict pass-through.** The image is forwarded, the result
   returned, and neither is written to disk or into a log. `APP_STORE.md`'s "Data
-  Not Collected" answer depends on that. Adding retention, or a geocoder to
-  `trip.tsx`, changes the App Store privacy label.
+  Not Collected" answer depends on that. Adding retention changes the App Store
+  privacy label.
 - **Never put a secret in an `EXPO_PUBLIC_` variable** — they are bundled into
   the app in plaintext. The vision key is an EAS project secret.
 - `EXPO_PUBLIC_USE_MOCKS` and `EXPO_PUBLIC_DEMO_MODE` default on in development
