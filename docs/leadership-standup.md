@@ -48,6 +48,28 @@ item, then asked 50 times. Three findings changed the plan.
    data. The risk to test is that a pile has fewer scale references and more hidden objects
    than a room.
 
+### Parked for follow-up after launch: acting for the customer
+
+The Chairman raised Loadsy acting as the customer's agent with rental companies, and
+offering valet service – delivering the truck and returning it – both as paid upgrades.
+Parked, not decided. What a follow-up has to answer first:
+
+- **The renter is the driver.** Truck rental agreements are generally signed, and the vehicle
+  collected, by the person driving it, with their own licence and cover. An agent can
+  compare, reserve and manage a booking; it probably cannot rent on someone's behalf, and a
+  valet driving a truck rented in the customer's name is likely an unauthorised driver
+  unless the rental company agrees to it. Each company's terms need reading before this is
+  a plan.
+- **No booking APIs to lean on.** Real-time pricing and in-app booking are out of the MVP's
+  scope precisely because the major rental companies don't offer them openly; acting as an
+  agent means partnership agreements, or people doing it by hand.
+- **Valet is an operations business.** Drivers, insurance, damage claims, scheduling and
+  local coverage – margins and risks of a moving company, not an app.
+- **The lighter version may be most of the value.** Loadsy's real asset is an accurate
+  inventory: a precise description of the job. That is worth money to the people who already
+  run trucks and crews – labour marketplaces and moving companies – as a referral, without
+  Loadsy employing anyone. It belongs with the revenue decision below.
+
 **Still needed from the Chairman:** how the app waits for an answer that takes 30 seconds;
 the vision key as an EAS secret; the revenue posture, which the listing's affiliate
 disclosure depends on; Anthropic's data-retention terms, now more pressing because the eval
