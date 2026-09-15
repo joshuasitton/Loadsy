@@ -27,6 +27,7 @@
 
 import { parseDetectedItem, type DetectRequest } from '../../src/api/detect';
 import { normaliseCeilingHeight } from '../../src/domain/ceiling';
+import { objectName } from '../../src/domain/plausibility';
 import { recommendTruckSize, TRUCK_CAPACITY } from '../../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../../src/domain/types';
 import { cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../../src/domain/volume';
@@ -213,6 +214,8 @@ export function groupSeen(items: readonly SeenItem[]): SeenGroup[] {
 /** Words that describe an object without saying what it is. */
 const IGNORED = new Set([
   'a', 'an', 'the', 'of', 'and', 'with', 'for', 'in', 'on', 'set', 'pair', 'piece',
+  // What part of a thing it is, not what it is: "Sectional Sofa Long Run" is a sofa.
+  'run', 'section', 'module', 'part', 'end', 'corner', 'long',
   'small', 'large', 'big', 'medium', 'mini', 'tall', 'short', 'low', 'wide', 'narrow',
   'wooden', 'wood', 'metal', 'glass', 'fabric', 'leather', 'upholstered', 'plastic', 'wicker', 'rattan',
   'white', 'black', 'grey', 'gray', 'brown', 'beige', 'blue', 'green', 'red', 'cream', 'dark', 'light',
@@ -249,6 +252,8 @@ const SYNONYMS: Record<string, string> = {
   bike: 'bicycle',
   fridge: 'refrigerator',
   bedframe: 'bed', headboard: 'bed',
+  chaise: 'sofa',
+  map: 'art',
 };
 
 function singular(word: string): string {
@@ -261,7 +266,9 @@ function singular(word: string): string {
 
 /** The words of a name that say what the object is, most important – the head noun – last. */
 export function nameWords(name: string): string[] {
-  let text = name.toLowerCase().replace(/\([^)]*\)/g, ' ');
+  // The app's own reading of what an object is – location and contents clauses off, so
+  // "Wood Side Table with Drawer" is a table, not a drawer.
+  let text = objectName(name).toLowerCase();
   for (const [pattern, replacement] of PHRASES) text = text.replace(pattern, replacement);
   return text
     .split(/[^a-z]+/)

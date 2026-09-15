@@ -113,6 +113,15 @@ test('names pair only when they name the same kind of object', () => {
   assert.ok(nameSimilarity(['Coffee Table'], 'Coffee Table') > nameSimilarity(['Side Table'], 'Coffee Table'));
 });
 
+test('names from the first real room pair with what was measured', () => {
+  // Scoring the second family-room answer, these went unpaired: the model named the
+  // parts of a sectional, the truth named what a table holds, and a map is wall art.
+  assert.ok(nameSimilarity(['Sectional Sofa (77 in piece)'], 'Sectional Sofa Long Run') > 0);
+  assert.ok(nameSimilarity(['Sectional Sofa (64 in piece)'], 'Sectional Chaise Section') > 0);
+  assert.ok(nameSimilarity(['Wood Side Table with Drawer'], 'Wood End Table') > 0);
+  assert.ok(nameSimilarity(['Framed World Map Canvas'], 'Framed World Map') > nameSimilarity(['Framed World Map Canvas'], 'Birch Forest Canvas Art'));
+});
+
 test('"aka" in truth.json corrects a pairing the name rules miss', () => {
   assert.equal(nameSimilarity(['Nightstand'], 'End Table'), 0);
   assert.ok(nameSimilarity(['Nightstand', 'end table'], 'End Table') > 0);
