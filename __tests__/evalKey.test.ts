@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cleanKey, describeKey, keyProblem } from '../scripts/eval/key';
+import { cleanKey, describeKey, keyProblem, safeErrorMessage } from '../scripts/eval/key';
 
 /*
  * The eval asks for the vision key itself because setting it through the shell failed
@@ -48,4 +48,12 @@ test('nothing that describes a key quotes it', () => {
       assert.doesNotMatch(text, /Ab1_-Ab1|secretpart/, text);
     }
   }
+});
+
+test('an API error message is printed for its diagnosis, with photo data and the key blanked', () => {
+  assert.equal(safeErrorMessage('Your credit balance is too low to access the Anthropic API.', KEY), 'Your credit balance is too low to access the Anthropic API.');
+  const echoed = safeErrorMessage(`messages.0.content.1.image.source.base64: invalid data /9j/4AAQSkZJRgABAQAAAQABAAD${'x'.repeat(500)} for key ${KEY}`, KEY);
+  assert.doesNotMatch(echoed, /4AAQSkZJRg|xxxxxxxxxx|Ab1_-Ab1/);
+  assert.match(echoed, /^messages\.0\.content\.1\.image\.source\.base64: invalid data/);
+  assert.ok(safeErrorMessage('word '.repeat(200), KEY).length <= 240);
 });

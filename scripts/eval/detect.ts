@@ -62,7 +62,7 @@ import {
   UPSTREAM_TIMEOUT_MS,
   type VisionRequestBody,
 } from '../../src/vision/detectRequest';
-import { askForKey, cleanKey, describeKey, keyProblem } from './key';
+import { askForKey, cleanKey, describeKey, keyProblem, safeErrorMessage } from './key';
 import { estimateImageTokens, groupPhotosByRoom, roomKeyOf } from './photos';
 import { preparePhoto, type PreparedPhoto } from './prepare';
 import { compareLines, costEstimate, inventoryLines, roomLines, summaryLines } from './report';
@@ -234,12 +234,13 @@ async function ask(body: VisionRequestBody, apiKey: string): Promise<Attempt> {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      // The status and the error's type – `authentication_error`, `overloaded_error` – and
-      // never its message: an error message can echo the request, and the request is photos.
+      // The status, the error's type and its message – the message is the diagnosis –
+      // with anything that could be photo data or the key blanked by safeErrorMessage.
       let type = '';
       try {
-        const detail = ((await response.json()) as { error?: { type?: unknown } }).error?.type;
-        if (typeof detail === 'string' && /^[a-z_]{1,40}$/.test(detail)) type = ` ${detail}`;
+        const detail = ((await response.json()) as { error?: { type?: unknown; message?: unknown } }).error;
+        if (typeof detail?.type === 'string' && /^[a-z_]{1,40}$/.test(detail.type)) type = ` ${detail.type}`;
+        if (typeof detail?.message === 'string' && detail.message.trim() !== '') type += `: ${safeErrorMessage(detail.message, apiKey)}`;
       } catch {
         // Not JSON; the status says enough.
       }
@@ -470,7 +471,7 @@ async function checkKey() {
     let detail = '';
     try {
       const error = ((await response.json()) as { error?: { type?: string; message?: string } }).error;
-      detail = [error?.type, error?.message].filter(Boolean).join(': ');
+      detail = [error?.type, error?.message && safeErrorMessage(error.message, key)].filter(Boolean).join(': ');
     } catch {
       // not JSON
     }

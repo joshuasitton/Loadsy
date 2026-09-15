@@ -113,3 +113,20 @@ export function askForKey(prompt: string): Promise<string | null> {
     input.on('data', onData);
   });
 }
+
+/**
+ * An API error message made safe to print and to save.
+ *
+ * The message is the diagnosis – "credit balance is too low", "image exceeds 5 MB" –
+ * and hiding it turned one 400 into an afternoon of guessing. But an error can quote
+ * the request, and the request carries photos and the key, so any long unbroken run of
+ * base64 or key characters is blanked, the key itself is removed if it appears, and the
+ * message is capped.
+ */
+export function safeErrorMessage(message: string, key: string): string {
+  return (key ? message.split(key).join('[key]') : message)
+    .replace(/[A-Za-z0-9+/=_-]{40,}/g, '[…]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240);
+}
