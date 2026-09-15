@@ -3,7 +3,7 @@ import { assessDimensions } from '../domain/plausibility';
 import { ceilingForDetection } from '../domain/ceiling';
 import { cubicFeetFor } from '../domain/volume';
 import { finiteNumber, isRecord, nonEmptyString, oneOf } from '../lib/guards';
-import { ApiError, apiFetch, mockDelay, USE_MOCKS } from './client';
+import { ApiError, apiFetch, DETECT_TIMEOUT_MS, mockDelay, USE_MOCKS } from './client';
 import { mockDetect } from './mocks/detect';
 
 /** Spec §4.1 — Vision/Detection Agent. */
@@ -74,7 +74,7 @@ export async function detectItems(request: DetectRequest): Promise<InventoryItem
       // `undefined` is dropped by JSON.stringify, so a standard ceiling adds nothing.
       ceilingHeightIn: ceilingForDetection(request.ceilingHeightIn) ?? undefined,
     }),
-  });
+  }, DETECT_TIMEOUT_MS);
 
   if (!Array.isArray(response.items)) {
     throw new ApiError('/v1/detect returned no item list', 502);

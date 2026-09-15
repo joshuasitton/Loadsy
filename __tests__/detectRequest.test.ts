@@ -5,9 +5,11 @@ import { join } from 'node:path';
 
 import { MAX_PHOTOS } from '../src/domain/capture';
 import { UPLOAD_LONG_EDGE, UPLOAD_QUALITY } from '../src/media/uploadSpec';
+import { DETECT_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from '../src/api/client';
 import {
   buildDetectBody,
   DETECT_MAX_TOKENS,
+  UPSTREAM_TIMEOUT_MS,
   SYSTEM_PROMPT,
   userTurn,
 } from '../src/vision/detectRequest';
@@ -182,4 +184,14 @@ test('thinking, effort and budget reach the request only when asked for', () => 
   assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { effort: 'xhigh' }));
   assert.doesNotThrow(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'adaptive', effort: 'max' }));
   assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { maxTokens: 0 }));
+});
+
+/* --------------------------------------------------------------- deadlines */
+
+test('detection waits long enough for a real room, and the route gives up before the app does', () => {
+  // 50 answers for one four-photo room took 25–38 seconds (15 September); at the old
+  // 11 and 15 seconds every real request failed.
+  assert.ok(UPSTREAM_TIMEOUT_MS >= 45_000, 'the slowest measured answer, with room to spare');
+  assert.ok(DETECT_TIMEOUT_MS >= UPSTREAM_TIMEOUT_MS + 10_000, 'the route, which knows why, fails first');
+  assert.equal(REQUEST_TIMEOUT_MS, 15_000, 'every other endpoint keeps the short deadline');
 });

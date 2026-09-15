@@ -19,3 +19,6 @@ expo-env.d.ts
 
 # Saved eval runs: no photos, but an item-by-item inventory of the rooms in them.
 /eval-results/
+
+# Local secrets – the vision key for a live dev server. Never committed; see README.
+.env*.local

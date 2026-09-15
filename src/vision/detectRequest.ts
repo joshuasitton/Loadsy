@@ -26,13 +26,17 @@ export const DEFAULT_VISION_MODEL = 'claude-opus-5';
 /**
  * How long the route waits for the model before giving up.
  *
- * Under the client's 15s abort, with room for a slow mobile network on either
- * side of it. A request that will miss the client's deadline is better failed
- * server-side, where the reason is known, than aborted on the phone, where it is
- * not. The eval applies the same limit and counts what it cuts off, so a latency
- * problem shows up in the measurement rather than only in the field.
+ * Was 11 seconds, set before detection had ever run on a real room. Measured on 15
+ * September: 50 answers for one four-photo room took 25–38 seconds each, with thinking
+ * off – so at 11 seconds every real request failed. Decided the same day, under the
+ * low-overhead rule: wait longer and say so on screen, rather than add streaming or a
+ * second model. Sixty seconds covers the slowest answer measured with room to spare.
+ *
+ * Under the client's `DETECT_TIMEOUT_MS`, so a request that will miss the client's
+ * deadline fails here, where the reason is known. Before production: confirm EAS
+ * Hosting holds a request open this long.
  */
-export const UPSTREAM_TIMEOUT_MS = 11_000;
+export const UPSTREAM_TIMEOUT_MS = 60_000;
 
 /**
  * The response budget.
