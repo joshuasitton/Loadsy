@@ -130,3 +130,21 @@ test('a non-standard ceiling is told to the model before the instruction to list
     buildDetectBody('m', 'Den', ['A']).system,
   );
 });
+
+/* ------------------------------------------------------------ thinking (E2) */
+
+test('the default request carries no thinking, effort or budget change – exactly what the route sent', () => {
+  const body = buildDetectBody('claude-opus-5', 'Den', ['AAA']);
+  assert.equal(body.max_tokens, 4000);
+  assert.deepEqual(Object.keys(body), ['model', 'max_tokens', 'system', 'messages']);
+});
+
+test('thinking, effort and budget reach the request only when asked for', () => {
+  const body = buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'disabled', effort: 'medium', maxTokens: 8000 });
+  assert.equal(body.max_tokens, 8000);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.deepEqual(body.output_config, { effort: 'medium' });
+  // Opus 5 returns a 400 for this pairing, so it is refused before any request.
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'disabled', effort: 'max' }));
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { maxTokens: 0 }));
+});

@@ -37,6 +37,9 @@
  *
  * Options:
  *   --runs <n>        Ask the model n times per room (default 3, or 1 with --inventory).
+ *   --thinking <t>    adaptive | off – E2. Unset sends what the app sends (adaptive, by default).
+ *   --effort <e>      low | medium | high | xhigh | max – E2. Unset sends no effort.
+ *   --max-tokens <n>  The response budget, thinking included. Unset: the app's 4,000.
  *   --ceiling-ft <h>  The home's ceiling height, as the app asks it: 8 for standard, 9, 9'6".
  *                     Required with --inventory.
  *   --max-photos <n>  Send only each room's first n photos – compare one angle against several.
@@ -59,6 +62,8 @@ import {
   DEFAULT_VISION_MODEL,
   DETECT_MAX_TOKENS,
   SYSTEM_PROMPT,
+  type DetectOptions,
+  type Effort,
   UPSTREAM_TIMEOUT_MS,
   type VisionRequestBody,
 } from '../../src/vision/detectRequest';
@@ -126,8 +131,30 @@ if (inventory && ceilingFlagIn === null) fail('--inventory needs the ceiling hei
 const photoDir = option('--dir') ?? './eval-photos';
 const runs = wholeNumber('--runs', inventory ? 1 : 3, 10);
 const maxPhotos = wholeNumber('--max-photos', MAX_PHOTOS, MAX_PHOTOS);
-const label = option('--label') ?? (inventory ? 'inventory' : maxPhotos < MAX_PHOTOS ? `max-${maxPhotos}-photos` : 'live');
 const compareFile = option('--compare');
+
+/*
+ * E2 experiments: how much the model deliberates. Unset, every request is the one the
+ * app sends; set, the run is labelled and fingerprinted as different, so --compare
+ * never mistakes it for the shipped request.
+ */
+const thinkingArg = option('--thinking');
+if (thinkingArg !== null && thinkingArg !== 'off' && thinkingArg !== 'adaptive') fail('--thinking must be off or adaptive.');
+const effortArg = option('--effort');
+const EFFORTS: readonly Effort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+if (effortArg !== null && !EFFORTS.includes(effortArg as Effort)) fail(`--effort must be one of ${EFFORTS.join(', ')}.`);
+if (thinkingArg === 'off' && (effortArg === 'xhigh' || effortArg === 'max')) fail('Opus 5 cannot turn thinking off at effort xhigh or max.');
+const maxTokensArg = option('--max-tokens') === null ? null : wholeNumber('--max-tokens', DETECT_MAX_TOKENS, 128_000);
+const tuning: Pick<DetectOptions, 'thinking' | 'effort' | 'maxTokens'> = {
+  ...(thinkingArg ? { thinking: thinkingArg === 'off' ? ('disabled' as const) : ('adaptive' as const) } : {}),
+  ...(effortArg ? { effort: effortArg as Effort } : {}),
+  ...(maxTokensArg !== null ? { maxTokens: maxTokensArg } : {}),
+};
+const tuningLabel = [thinkingArg && `thinking-${thinkingArg}`, effortArg && `effort-${effortArg}`, maxTokensArg !== null && `max-${maxTokensArg}`].filter(Boolean).join('-');
+const budget = maxTokensArg ?? DETECT_MAX_TOKENS;
+const label =
+  option('--label') ??
+  [inventory ? 'inventory' : maxPhotos < MAX_PHOTOS ? `max-${maxPhotos}-photos` : 'live', tuningLabel].filter(Boolean).join('-');
 const everyAnswer = args.includes('--every-answer');
 const model = process.env.VISION_MODEL ?? DEFAULT_VISION_MODEL;
 
@@ -281,7 +308,7 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
     label,
     startedAt,
     model,
-    maxTokens: DETECT_MAX_TOKENS,
+    maxTokens: budget,
     deadlineMs: UPSTREAM_TIMEOUT_MS,
     rooms: {},
   };
@@ -312,7 +339,7 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
     }
     const photoHashes = chosen.map((name) => sha256(readFileSync(join(photoDir, name))));
     const ceilingIn = ceilingInches(room);
-    const body = buildDetectBody(model, roomName, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceilingIn });
+    const body = buildDetectBody(model, roomName, prepared.map((photo) => photo.base64), { ceilingHeightIn: ceilingIn, ...tuning });
     run.rooms[key] = { roomName, photoCount: chosen.length, ceilingIn, photoHashes, requestHash: requestHash(body, photoHashes), attempts: [] };
     requests.push({ key, body });
   }
@@ -320,7 +347,8 @@ async function live(truth: Map<string, TruthRoom>): Promise<SavedRun> {
 
   const total = requests.length * runs;
   const ceilingNote = ceilingFlagIn === null ? '' : ` · ceiling ${formatCeiling(ceilingFlagIn)}${ceilingForDetection(ceilingFlagIn) === null ? ' (standard, nothing added to the prompt)' : ' told to the model'}`;
-  console.log(`${inventory ? 'INVENTORY' : 'LIVE'} · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model}${ceilingNote}\nsaving to ${file}\n`);
+  const tuningNote = tuningLabel ? ` · ${tuningLabel.replace(/-/g, ' ')} (not what the app sends yet)` : '';
+  console.log(`${inventory ? 'INVENTORY' : 'LIVE'} · ${requests.length} room(s) × ${runs} run(s) = ${total} requests · ${model}${ceilingNote}${tuningNote}\nsaving to ${file}\n`);
 
   let done = 0;
   for (let r = 0; r < runs; r++) {
@@ -399,7 +427,7 @@ function dryRun(truth: Map<string, TruthRoom>) {
     });
     const ceiling = ceilingInches(room);
     if (ceilingForDetection(ceiling) !== null) console.log(`  ceiling ${formatCeiling(ceiling!)} – told to the model`);
-    const body = buildDetectBody(model, roomNameFor(key, room), prepared.map((photo) => photo.base64), { ceilingHeightIn: ceiling });
+    const body = buildDetectBody(model, roomNameFor(key, room), prepared.map((photo) => photo.base64), { ceilingHeightIn: ceiling, ...tuning });
     const text = body.messages[0]!.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('');
 
     // Only rooms a live run would send are priced: those with ground truth, or all of them blind.
@@ -410,11 +438,11 @@ function dryRun(truth: Map<string, TruthRoom>) {
     console.log('');
   }
 
-  const cost = costEstimate(inputTokens * runs, ready * runs, DETECT_MAX_TOKENS);
+  const cost = costEstimate(inputTokens * runs, ready * runs, budget);
   console.log('— dry run: nothing was sent —');
   console.log(`${inventory ? 'rooms ready to send   ' : 'rooms ready to score  '}       ${ready} of ${rooms.size}`);
   console.log(`requests a live run sends    ${ready * runs}   (${ready} room${ready === 1 ? '' : 's'} × ${runs} run${runs === 1 ? '' : 's'})`);
-  console.log(`estimated live cost          ≈ $${cost.likely.toFixed(2)}, at most $${cost.worst.toFixed(2)}   (~1,500 output tokens an answer; at most the whole ${DETECT_MAX_TOKENS.toLocaleString()}-token budget)\n`);
+  console.log(`estimated live cost          ≈ $${cost.likely.toFixed(2)}, at most $${cost.worst.toFixed(2)}   (~1,500 output tokens an answer; at most the whole ${budget.toLocaleString()}-token budget)\n`);
 }
 
 /* ------------------------------------------------------------------- main */

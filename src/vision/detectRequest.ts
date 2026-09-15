@@ -48,6 +48,8 @@ export const DETECT_MAX_TOKENS = 4000;
 export interface VisionRequestBody {
   model: string;
   max_tokens: number;
+  thinking?: { type: 'adaptive' | 'disabled' };
+  output_config?: { effort: Effort };
   system: string;
   messages: {
     role: 'user';
@@ -65,6 +67,8 @@ export interface VisionRequestBody {
  *   call, because telling one sofa seen twice from two matching sofas needs both
  *   images in view at once.
  */
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export interface DetectOptions {
   /**
    * The home's ceiling height in inches, as the person answered it. Only a
@@ -72,6 +76,21 @@ export interface DetectOptions {
    * with an ordinary ceiling, or no answer, sends exactly what it sent before.
    */
   ceilingHeightIn?: number | null;
+  /**
+   * How much the model deliberates – sprint item E2, and for now set only by the eval.
+   *
+   * Unset, the request is exactly what the route has always sent: no `thinking`
+   * field, which on Claude Opus 5 means adaptive thinking ON, out of the same
+   * `DETECT_MAX_TOKENS` budget. The first live run on real photos (15 September, four
+   * photos of one room) spent all 4,000 tokens and 60 seconds thinking and returned
+   * no inventory at all. These exist so the eval can measure the alternatives before
+   * one becomes the default here, for the route and the eval at once.
+   *
+   * Opus 5 accepts `thinking: disabled` only at effort `high` or lower.
+   */
+  thinking?: 'adaptive' | 'disabled';
+  effort?: Effort;
+  maxTokens?: number;
 }
 
 export function buildDetectBody(
@@ -84,9 +103,18 @@ export function buildDetectBody(
   if (photos.length > MAX_PHOTOS) {
     throw new Error(`buildDetectBody: ${photos.length} photos, at most ${MAX_PHOTOS} per room`);
   }
+  if (options.thinking === 'disabled' && (options.effort === 'xhigh' || options.effort === 'max')) {
+    throw new Error(`buildDetectBody: thinking cannot be disabled at effort ${options.effort}`);
+  }
+  if (options.maxTokens !== undefined && !(Number.isInteger(options.maxTokens) && options.maxTokens > 0)) {
+    throw new Error(`buildDetectBody: maxTokens must be a positive whole number`);
+  }
   return {
     model,
-    max_tokens: DETECT_MAX_TOKENS,
+    max_tokens: options.maxTokens ?? DETECT_MAX_TOKENS,
+    // Added only when asked for, so the default request stays byte for byte what it was.
+    ...(options.thinking ? { thinking: { type: options.thinking } } : {}),
+    ...(options.effort ? { output_config: { effort: options.effort } } : {}),
     system: SYSTEM_PROMPT,
     messages: [
       {
