@@ -138,7 +138,7 @@ export function StepNav({
 
       {locked ? (
         <Text style={styles.lockedNote}>
-          Your truck size and prices are done — that is the whole free app. The load order and
+          Your truck size and where to rent it are done — that is the whole free app. The load order and
           the layout are Premium.
         </Text>
       ) : null}

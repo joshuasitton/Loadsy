@@ -3,7 +3,16 @@ import { formatCuFt } from '../src/ui/format';
 import { useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { canLeaveInventory, confidenceBannerCopy, isUnresolved, markConfirmed, unresolvedCount } from '../src/domain/confidence';
+import {
+  canLeaveInventory,
+  confidenceBannerCopy,
+  inventoryBlockedReason,
+  isUnresolved,
+  markConfirmed,
+  unresolvedCount,
+  unresolvedDuplicates,
+} from '../src/domain/confidence';
+import type { SuspectedDuplicate } from '../src/domain/duplicates';
 import type { InventoryItem, ItemCategory, WeightClass } from '../src/domain/types';
 import { cubicFeetFor, roomCubicFeet } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
@@ -27,6 +36,7 @@ export default function InventoryScreen() {
   const [newRoomName, setNewRoomName] = useState('');
 
   const unresolved = unresolvedCount(move);
+  const duplicates = useMemo(() => unresolvedDuplicates(move), [move]);
   // The single source of truth for the CTA — programmatic, per spec §3 Screen 2.
   const canAdvance = canLeaveInventory(move);
 
@@ -49,6 +59,12 @@ export default function InventoryScreen() {
             title={confidenceBannerCopy(unresolved)}
             message="We weren't sure about these. Confirm or correct them and your truck estimate gets a lot sharper."
           />
+        ) : duplicates.length > 0 ? (
+          <Banner
+            tone="amber"
+            title={`${duplicates.length} ${duplicates.length === 1 ? 'item looks' : 'items look'} listed in two rooms`}
+            message="A photo of one room often catches the next room through a doorway. Tell us where each one really is, so it's only counted once."
+          />
         ) : totals.items > 0 ? (
           <Banner tone="green" title="Inventory looks good" message={`${totals.items} items · ${formatCuFt(totals.cuFt)} ft³ before packing buffer`} />
         ) : null}
@@ -62,6 +78,17 @@ export default function InventoryScreen() {
             <PrimaryButton title="Capture a room" onPress={() => router.push('/capture')} />
           </Card>
         ) : null}
+
+        {duplicates.map((pair) => (
+          <DuplicateCard
+            key={pair.key}
+            pair={pair}
+            onChooseRoom={(keep) =>
+              dispatch({ type: 'removeItem', itemId: keep === 'first' ? pair.second.item.id : pair.first.item.id })
+            }
+            onKeepBoth={() => dispatch({ type: 'keepDuplicate', key: pair.key })}
+          />
+        ))}
 
         {move.rooms.map((room) => (
           <View key={room.id} style={styles.room}>
@@ -152,13 +179,7 @@ export default function InventoryScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
         <StepNav
           current="/inventory"
-          blockedReason={
-            canAdvance
-              ? null
-              : totals.items === 0
-                ? 'Add at least one item before sizing a truck'
-                : `${unresolved} ${unresolved === 1 ? 'item still needs' : 'items still need'} a quick check`
-          }
+          blockedReason={canAdvance ? null : inventoryBlockedReason(move)}
           onAdvance={advance}
         />
       </View>
@@ -480,6 +501,51 @@ function num(value: string): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+/**
+ * One object that looks listed in two rooms, and the question only the person can
+ * answer: which room is it in? Choosing a room removes the other listing; "I have two"
+ * keeps both and stops asking. See src/domain/duplicates.ts for when this is asked.
+ */
+function DuplicateCard({
+  pair,
+  onChooseRoom,
+  onKeepBoth,
+}: {
+  pair: SuspectedDuplicate;
+  onChooseRoom: (keep: 'first' | 'second') => void;
+  onKeepBoth: () => void;
+}) {
+  const { first, second } = pair;
+  const name = first.item.name === second.item.name ? first.item.name : `${first.item.name} / ${second.item.name}`;
+  const size = Math.max(first.item.cubicFeet, second.item.cubicFeet);
+  return (
+    <Card style={styles.duplicate}>
+      <Text style={styles.itemName}>{name}</Text>
+      <Text style={styles.itemMeta}>
+        Listed in {first.roomName} and in {second.roomName} · {formatCuFt(size)} ft³ each
+      </Text>
+      <Text style={styles.duplicateQuestion}>Which room is it in?</Text>
+      <View style={styles.duplicateActions}>
+        <SecondaryButton
+          title={first.roomName}
+          onPress={() => onChooseRoom('first')}
+          accessibilityLabel={`${name} is in ${first.roomName} – remove it from ${second.roomName}`}
+        />
+        <SecondaryButton
+          title={second.roomName}
+          onPress={() => onChooseRoom('second')}
+          accessibilityLabel={`${name} is in ${second.roomName} – remove it from ${first.roomName}`}
+        />
+        <SecondaryButton
+          title="I have two"
+          onPress={onKeepBoth}
+          accessibilityLabel={`I have two – keep ${name} in both rooms`}
+        />
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xl, gap: space.lg },
   empty: { gap: space.md },
@@ -499,6 +565,9 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   itemCardFlagged: { borderColor: colors.amber, backgroundColor: colors.surfaceRaised },
+  duplicate: { gap: space.sm, borderColor: colors.amber, borderWidth: 1 },
+  duplicateQuestion: { ...type.bodyStrong, color: colors.text, marginTop: space.xs },
+  duplicateActions: { gap: space.sm },
   itemTop: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
   itemNameBlock: { flex: 1, gap: 2 },
   itemName: { ...type.bodyStrong, color: colors.text },

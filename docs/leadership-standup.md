@@ -10,6 +10,43 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-15 — Detection measured on real rooms; positioning decided
+
+### What the eval found
+
+A tape-measured family room, asked 50 times:
+
+- **Sizing is close, the truck is not.** Median room error 9.6%, never under-sized – but the
+  model runs about 13% large and the room sits 4% below a truck line, so 44 of 50 answers
+  chose the bigger truck.
+- **The next room gets counted.** Through an opening, the breakfast room's chalkboard was
+  listed in 49 answers, its console table in 35 and its hutch in 11.
+- **Every answer took 25–38 seconds** against the route's 11-second limit. Thinking is now off,
+  which fixed empty answers but not the wait.
+
+### Chairman decisions
+
+1. **Double counts are caught across the move.** When two rooms list the same kind of object
+   at about the same size, the app asks which room it is in. Only kinds a home usually has
+   one of are checked. Built, in PR #7.
+2. **v1 is aimed at apartment moves, with the same code.** Smaller moves mean fewer rooms to
+   wait on, fewer openings to count through, and a cheaper mistake. Draft listing copy is in
+   `APP_STORE.md`.
+3. **Pile mode is tested in the eval before anything is built,** after launch.
+4. **No prices in v1.** Live testing showed the prices screen had no service behind it; the
+   demo's figures were unsourced. Prices, the trip step and the location permission are
+   removed; a Where to Rent screen links to five rental companies. Built, in PR #7.
+5. **Keep it simple, and low-overhead.** "We do not want to be a high-overhead company."
+   Acting as the customer's agent with rental companies, and valet service, were raised and
+   set aside: both need people, vehicles and insurance. Features, revenue and infrastructure
+   should run without staff – self-serve, serverless, referrals rather than services.
+
+**Decided later the same day:** wait up to 60 seconds for detection and show progress.
+**Still needed:** the vision key as an EAS secret; the revenue posture; Anthropic's
+data-retention terms; whether the tagline's "Right price" still fits.
+
+---
+
 ## 2026-09-14 — Sprint start, and Chairman decisions on sweep capture and the mark
 
 ### Sprint started: ready to submit by Friday 25 September

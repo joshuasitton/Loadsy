@@ -64,9 +64,18 @@ export class ApiError extends Error {
  */
 export const REQUEST_TIMEOUT_MS = 15_000;
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Detection's own, longer deadline. A room takes 25–38 seconds to detect (measured 15
+ * September), so the general 15 seconds failed every real request. Kept above the
+ * route's 60-second upstream limit, so the route – which knows why – is the one that
+ * gives up. Not imported from src/vision/detectRequest: that module holds the prompt,
+ * which has no business in the app bundle; a test pins the two together instead.
+ */
+export const DETECT_TIMEOUT_MS = 75_000;
+
+export async function apiFetch<T>(path: string, init?: RequestInit, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(resolveUrl(path), {
       ...init,

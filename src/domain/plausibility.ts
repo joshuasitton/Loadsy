@@ -106,6 +106,8 @@ const VOLUME_PRIORS: readonly VolumePrior[] = [
   { label: 'a coffee table', match: /\bcoffee table\b/i, minCuFt: 4, maxCuFt: 27 },
   { label: 'a console table', match: /\b(console table|sofa table)\b/i, minCuFt: 6, maxCuFt: 32 },
   { label: 'a patio table', match: /\bpatio table\b/i, minCuFt: 14, maxCuFt: 88 },
+  // Ahead of the desk: a lap desk is a tray, and was flagged as an impossibly small desk.
+  { label: 'a lap desk', match: /\blap desk\b/i, minCuFt: 0.2, maxCuFt: 8 },
   { label: 'a desk', match: /\bdesk\b/i, minCuFt: 10, maxCuFt: 44 },
   { label: 'a side table', match: /\b(nightstand|side table|end table|bedside)\b/i, minCuFt: 2, maxCuFt: 18 },
 
@@ -156,9 +158,52 @@ const VOLUME_PRIORS: readonly VolumePrior[] = [
   { label: 'a box', match: /\b(box(es)?|carton|tote|crate|suitcase)\b/i, minCuFt: 0.4, maxCuFt: 40 },
 ];
 
-/** The first prior whose name matches, or null when the item is unrecognised. */
+/**
+ * What the object IS, from a detector's name for it: the name with the words that say
+ * where it is, what is on it, or what it holds taken off.
+ *
+ * Needed because a detector describes as well as names. On the first real room it
+ * returned "Small Round Accent Table (left of recliner)", "Throw Pillow (corner of
+ * sectional)" and "Ceramic Vase (on sideboard)", and matching anywhere in the name
+ * judged a 14 in table against recliner sizes: six of twenty review flags in that
+ * room were false alarms, and a gate that cries wolf gets clicked through.
+ *
+ * Takes the first of "A / B" alternatives, drops parentheses, a trailing " - …"
+ * description, and a trailing clause opened by a position or contents word ("on",
+ * "by", "with", …). Not "of": "Chest of Drawers" is a name.
+ */
+export function objectName(name: string): string {
+  return (name.split(/\s+\/\s+/)[0] ?? name)
+    .replace(/\([^)]*\)/g, ' ')
+    .split(/\s[-–—:]\s/)[0]!
+    .replace(/\s(?:on|by|beside|near|next to|left of|right of|in front of|behind|under|above|below|against|atop|with|from|for|in)\s.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Words a name often ends on after the word that says what the thing is: "Recliner
+ * Chair", "Sectional Sofa", "TV Stand". Allowed after a prior's match, so the specific
+ * word still decides – without this, "Power Recliner Chair" is judged as a dining chair.
+ */
+const TRAILING_GENERIC = '(?:\\s+(?:chair|sofa|couch|table|unit|set|stand|cabinet))?';
+
+/** Each prior, matching only at the END of an object name – where English puts the noun. */
+const ANCHORED = VOLUME_PRIORS.map((prior) => ({
+  prior,
+  match: new RegExp(`(?:${prior.match.source})${TRAILING_GENERIC}\\s*$`, 'i'),
+}));
+
+/**
+ * The prior for what the object is, or null when it is unrecognised.
+ *
+ * Matched against `objectName`, and only at its end, so the noun decides: "Sideboard
+ * Top Items" is items, not a sideboard, and "Table Lamp" is a lamp. The first such
+ * prior in list order wins, so a specific rule still beats a general one.
+ */
 export function volumePriorFor(name: string): VolumePrior | null {
-  return VOLUME_PRIORS.find((prior) => prior.match.test(name)) ?? null;
+  const object = objectName(name);
+  return ANCHORED.find(({ match }) => match.test(object))?.prior ?? null;
 }
 
 /**

@@ -3,7 +3,7 @@ import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { TRUCK_LABEL } from '../src/domain/truck';
-import { canLeaveInventory, confidenceBannerCopy, unresolvedCount } from '../src/domain/confidence';
+import { inventoryBlockedReason, unresolvedCount, unresolvedDuplicates } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
 import { useEntitlement } from '../src/billing/entitlementStore';
 import { DemoBar } from '../src/demo/DemoBar';
@@ -18,7 +18,7 @@ import { colors, radius, space, type } from '../src/ui/theme';
 interface StepRow {
   status: MoveStatus;
   title: string;
-  href: '/inventory' | '/trip' | '/packing' | null;
+  href: '/inventory' | '/truck' | '/packing' | null;
   detail: (ctx: ReturnType<typeof useMove>) => string;
   /**
    * Why this row cannot be opened yet, or null when it can.
@@ -43,9 +43,7 @@ interface StepRow {
 
 /** The single reason string, so Screen 7 and Screen 2 can never disagree. */
 function inventoryGate(ctx: ReturnType<typeof useMove>): string | null {
-  if (allItems(ctx.move).length === 0) return 'Add your inventory first';
-  if (!canLeaveInventory(ctx.move)) return confidenceBannerCopy(unresolvedCount(ctx.move));
-  return null;
+  return inventoryBlockedReason(ctx.move);
 }
 
 /**
@@ -73,7 +71,7 @@ const ROWS: StepRow[] = [
     detail: (ctx) => {
       const count = allItems(ctx.move).length;
       if (count === 0) return 'No items yet — start by photographing a room';
-      const unresolved = unresolvedCount(ctx.move);
+      const unresolved = unresolvedCount(ctx.move) + unresolvedDuplicates(ctx.move).length;
       return unresolved > 0
         ? `${count} items · ${unresolved} need a quick check`
         : `${count} items · ${formatCuFt(ctx.recommendation.rawCuFt)} ft³`;
@@ -83,11 +81,9 @@ const ROWS: StepRow[] = [
   },
   {
     status: 'truckAndPrice',
-    title: 'Trip, Truck & Price',
-    // The trip is the front of this stage: where the move goes decides the
-    // mileage and the drop fee, and both are priced two screens later.
-    href: '/trip',
-    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · estimated prices from 5 vendors`,
+    title: 'Truck & Where to Rent',
+    href: '/truck',
+    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · where to rent one`,
     lockedReason: inventoryGate,
     premium: false,
   },

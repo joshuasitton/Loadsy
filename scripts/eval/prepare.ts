@@ -76,7 +76,7 @@ export function preparePhoto(source: string, workDir: string, index: number): Pr
     sips(['-s', 'format', 'jpeg', source, '--out', probe]);
   } catch {
     throw new UnreadablePhotoError(
-      `${basename(source)} is not a photo sips can read. (The two placeholder files that came with the repo are not real images.)`,
+      `${basename(source)} is not a photo sips can read.`,
     );
   }
   const orientation = readJpegOrientation(readFileSync(probe));

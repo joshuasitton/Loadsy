@@ -30,6 +30,9 @@ export default function CaptureScreen() {
   const { move, dispatch } = useMove();
   const [roomName, setRoomName] = useState('');
   const [busy, setBusy] = useState(false);
+  // Seconds since "Measure this room" – a real room takes about half a minute, and a
+  // spinner with no sense of time reads as broken long before that.
+  const [measuringFor, setMeasuringFor] = useState<number | null>(null);
   const [rejection, setRejection] = useState<ReturnType<typeof assessPhoto> | null>(null);
   /**
    * Every angle of this room, held until the user is done shooting.
@@ -203,12 +206,19 @@ export default function CaptureScreen() {
     }
   }
 
+  useEffect(() => {
+    if (measuringFor === null) return;
+    const tick = setInterval(() => setMeasuringFor((s) => (s === null ? null : s + 1)), 1000);
+    return () => clearInterval(tick);
+  }, [measuringFor === null]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Sends every angle of this room in one request. */
   async function measureRoom() {
     if (inFlight.current || angles.length === 0) return;
     inFlight.current = true;
     setRejection(null);
     setBusy(true);
+    setMeasuringFor(0);
 
     try {
       // Reuses the room the user already named rather than minting a second one.
@@ -242,18 +252,26 @@ export default function CaptureScreen() {
       // Rendered inline, not as an Alert: this one has a path forward, and the
       // banner is where every other capture failure already speaks.
       const isNetwork = !(err instanceof ApiError);
+      // 504 from the route, 408 from the app's own deadline: the room was sent and took
+      // too long, which is not a connection problem and not an unreadable photo.
+      const tookTooLong = err instanceof ApiError && (err.status === 504 || err.status === 408);
       setRejection({
         ok: false,
         code: isNetwork ? 'network' : 'noFurniture',
-        title: isNetwork ? 'Connection problem' : "Couldn't measure that room",
+        title: isNetwork ? 'Connection problem' : tookTooLong ? 'That took too long' : "Couldn't measure that room",
         message: isNetwork
           ? "Couldn't reach our servers. Check your connection and try again, or add the items by hand."
-          : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
+          : tookTooLong
+            ? 'Measuring this room took more than a minute. Try again, or add the items by hand.'
+            : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
         recoverable: true,
       });
     } finally {
       inFlight.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setBusy(false);
+        setMeasuringFor(null);
+      }
     }
   }
 
@@ -320,9 +338,21 @@ export default function CaptureScreen() {
         {busy ? (
           <View style={styles.busy}>
             <ActivityIndicator color={colors.accent} />
-            <Text style={styles.busyText}>
-              {angles.length > 0 ? 'Measuring the room…' : 'Reading that photo…'}
-            </Text>
+            {measuringFor === null ? (
+              <Text style={styles.busyText}>Reading that photo…</Text>
+            ) : (
+              <View style={styles.busyCopy}>
+                {/* Announced when the phase changes, not every second. */}
+                <Text style={styles.busyText} aria-live="polite">
+                  {measuringFor < 40
+                    ? 'Measuring the room – this usually takes about 30 seconds.'
+                    : 'Still measuring – rooms with a lot in them take a little longer.'}
+                </Text>
+                <Text style={styles.busyElapsed} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  {measuringFor}s
+                </Text>
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.actions}>
@@ -456,5 +486,7 @@ const styles = StyleSheet.create({
   },
   angleChipText: { ...type.caption, color: colors.textMuted, fontSize: 12 },
   busy: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
-  busyText: { ...type.body, color: colors.textMuted },
+  busyText: { ...type.body, color: colors.textMuted, textAlign: 'center' },
+  busyCopy: { alignItems: 'center', gap: space.xs },
+  busyElapsed: { ...type.caption, color: colors.textDim, fontVariant: ['tabular-nums'] },
 });

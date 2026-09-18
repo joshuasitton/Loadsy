@@ -1,0 +1,22 @@
+{
+  "living-room": {
+    "roomName": "Living Room",
+    "items": [
+      { "name": "Sofa", "lengthIn": 90, "widthIn": 38, "heightIn": 34, "aka": ["couch"] },
+      { "name": "Coffee Table", "lengthIn": 48, "widthIn": 24, "heightIn": 18 },
+      { "name": "TV", "lengthIn": 57, "widthIn": 3, "heightIn": 33 },
+      { "name": "Bookcase", "lengthIn": 32, "widthIn": 12, "heightIn": 72 },
+      { "name": "Armchair", "lengthIn": 36, "widthIn": 34, "heightIn": 34 }
+    ]
+  },
+  "bedroom": {
+    "roomName": "Bedroom",
+    "ceilingFt": 9,
+    "items": [
+      { "name": "Queen Mattress", "lengthIn": 80, "widthIn": 60, "heightIn": 12 },
+      { "name": "Bed Frame", "lengthIn": 84, "widthIn": 64, "heightIn": 14 },
+      { "name": "Chest of Drawers", "lengthIn": 60, "widthIn": 20, "heightIn": 34 },
+      { "name": "Nightstand", "lengthIn": 22, "widthIn": 18, "heightIn": 26, "count": 2 }
+    ]
+  }
+}

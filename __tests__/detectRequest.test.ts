@@ -5,9 +5,11 @@ import { join } from 'node:path';
 
 import { MAX_PHOTOS } from '../src/domain/capture';
 import { UPLOAD_LONG_EDGE, UPLOAD_QUALITY } from '../src/media/uploadSpec';
+import { DETECT_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from '../src/api/client';
 import {
   buildDetectBody,
   DETECT_MAX_TOKENS,
+  UPSTREAM_TIMEOUT_MS,
   SYSTEM_PROMPT,
   userTurn,
 } from '../src/vision/detectRequest';
@@ -79,10 +81,15 @@ test('SINGLE SOURCE: the route and the eval both build the request through the s
 });
 
 test('SINGLE SOURCE: the eval reads the app answer with the app parser and sizes with the app buffer', () => {
-  const source = readFileSync(join(ROOT, 'scripts/eval/detect.ts'), 'utf8');
-  assert.match(source, /\bparseDetectedItem\b/);
-  assert.match(source, /\bDEFAULT_PACKING_BUFFER_PCT\b/);
-  assert.doesNotMatch(source, /\*\s*1\.2\b/, 'a hard-coded 1.2 buffer is the drift this replaced');
+  // Answers are read at scoring time, in score.ts, so a saved run scored again later
+  // is read by the parser as it is then.
+  const score = readFileSync(join(ROOT, 'scripts/eval/score.ts'), 'utf8');
+  assert.match(score, /import \{[^}]*\bparseDetectedItem\b[^}]*\} from '[./]+\/src\/api\/detect'/);
+  assert.match(score, /import \{[^}]*\bDEFAULT_PACKING_BUFFER_PCT\b[^}]*\} from '[./]+\/src\/domain\/volume'/);
+  for (const file of ['scripts/eval/detect.ts', 'scripts/eval/score.ts', 'scripts/eval/report.ts']) {
+    const source = readFileSync(join(ROOT, file), 'utf8');
+    assert.doesNotMatch(source, /\*\s*1\.2\b/, `${file}: a hard-coded 1.2 buffer is the drift this replaced`);
+  }
 });
 
 test('the upload size the eval prepares to is the one the app uploads at', () => {
@@ -124,4 +131,67 @@ test('a non-standard ceiling is told to the model before the instruction to list
     buildDetectBody('m', 'Den', ['A'], { ceilingHeightIn: 108 }).system,
     buildDetectBody('m', 'Den', ['A']).system,
   );
+});
+
+/* ------------------------------------------------------------ thinking (E2) */
+
+test('thinking is off by default, and always stated – omitted, Opus 5 thinks', () => {
+  // Omitted, Claude Opus 5 runs adaptive thinking out of the answer's budget. On the
+  // first real room that spent all 4,000 tokens and 60 seconds and returned nothing.
+  const body = buildDetectBody('claude-opus-5', 'Den', ['AAA']);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.equal(body.max_tokens, DETECT_MAX_TOKENS);
+  assert.ok(DETECT_MAX_TOKENS >= 8000, 'a full room took 6,695 tokens before the shorter format');
+  assert.equal(body.output_config, undefined);
+});
+
+test('the prompt counts sections, stays in its room, and boxes the small things', () => {
+  // Each rule answers a measured error on the first real room (15 September).
+  // An L-shaped sectional reported as one 108x84 rectangle: 178.5 ft³ against 88.1 measured.
+  assert.match(SYSTEM_PROMPT, /sectional or modular sofa is one entry per section/);
+  assert.match(SYSTEM_PROMPT, /Never report an L- or U-shaped arrangement as one rectangle/);
+  // A console table, its lamp and vase counted from the next room, through an opening.
+  assert.match(SYSTEM_PROMPT, /Objects in another room are not in this one/);
+  // 26 small items listed one by one – most of the review flags and half the tokens.
+  assert.match(SYSTEM_PROMPT, /count boxes instead of listing it/);
+  for (const box of ['Small Box', 'Medium Box', 'Large Box']) assert.match(SYSTEM_PROMPT, new RegExp(`"${box}"`));
+  // Decided 15 September: boxed or loose is decided by whether it fits a Large Box, not
+  // by what it is – a tall lamp, a tower fan or a dog bed stays on the list.
+  assert.match(SYSTEM_PROMPT, /anything else too big for a Large Box \(18 x 18 x 24 in\)/);
+  assert.match(SYSTEM_PROMPT, /The test is size, not type/);
+});
+
+test('the answer format asks only for what the app reads', () => {
+  // Every output token is latency. These three were written for every item and read by
+  // nothing: the app recomputes cubic feet from the dimensions.
+  const schema = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('## Output'));
+  for (const unread of ['cubicFeet', 'dimensionSource', 'scaleAnchorNote']) {
+    assert.doesNotMatch(SYSTEM_PROMPT, new RegExp(unread), unread);
+  }
+  for (const read of ['name', 'category', 'lengthIn', 'confidence', 'confidenceReason', 'isFragile', 'estimatedWeightClass']) {
+    assert.match(schema, new RegExp(`"${read}"`), read);
+  }
+});
+
+test('thinking, effort and budget reach the request only when asked for', () => {
+  const body = buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'disabled', effort: 'medium', maxTokens: 8000 });
+  assert.equal(body.max_tokens, 8000);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.deepEqual(body.output_config, { effort: 'medium' });
+  // Opus 5 returns a 400 for this pairing, so it is refused before any request –
+  // including when thinking is off only by default.
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'disabled', effort: 'max' }));
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { effort: 'xhigh' }));
+  assert.doesNotThrow(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { thinking: 'adaptive', effort: 'max' }));
+  assert.throws(() => buildDetectBody('claude-opus-5', 'Den', ['AAA'], { maxTokens: 0 }));
+});
+
+/* --------------------------------------------------------------- deadlines */
+
+test('detection waits long enough for a real room, and the route gives up before the app does', () => {
+  // 50 answers for one four-photo room took 25–38 seconds (15 September); at the old
+  // 11 and 15 seconds every real request failed.
+  assert.ok(UPSTREAM_TIMEOUT_MS >= 45_000, 'the slowest measured answer, with room to spare');
+  assert.ok(DETECT_TIMEOUT_MS >= UPSTREAM_TIMEOUT_MS + 10_000, 'the route, which knows why, fails first');
+  assert.equal(REQUEST_TIMEOUT_MS, 15_000, 'every other endpoint keeps the short deadline');
 });

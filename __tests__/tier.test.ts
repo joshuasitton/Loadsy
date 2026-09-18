@@ -54,7 +54,7 @@ test('the setup flow is free until the Packing Plan', () => {
   const gated = FLOW.filter((step) => isPremiumRoute(step.route)).map((step) => step.route);
   assert.deepEqual(gated, ['/packing']);
 
-  for (const route of ['/inventory', '/trip', '/truck', '/prices'] as const) {
+  for (const route of ['/inventory', '/truck', '/rent'] as const) {
     assert.equal(isPremiumRoute(route), false, `${route} should be free`);
   }
 });
@@ -67,10 +67,10 @@ test('Truck Layout is behind the same wall as the plan that leads to it', () => 
 });
 
 test('a free tier opens the free routes and no others', () => {
-  const routes: GatedRoute[] = ['/inventory', '/trip', '/truck', '/prices', '/packing', '/layout-view'];
+  const routes: GatedRoute[] = ['/inventory', '/truck', '/rent', '/packing', '/layout-view'];
   assert.deepEqual(
     routes.filter((route) => unlocks('free', route)),
-    ['/inventory', '/trip', '/truck', '/prices'],
+    ['/inventory', '/truck', '/rent'],
   );
   // Premium opens everything, including the free routes — it is a superset, not
   // a different product.

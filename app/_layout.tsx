@@ -101,17 +101,12 @@ function RootNavigator() {
       <Stack.Screen name="index" options={{ title: 'My Move' }} />
       <Stack.Screen name="capture" options={{ title: 'Capture Room' }} />
       <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
-      <Stack.Screen name="trip" options={{ title: 'Your Trip' }} />
       <Stack.Screen name="truck" options={{ title: 'Truck Size' }} />
-      <Stack.Screen name="prices" options={{ title: 'Local Prices' }} />
+      <Stack.Screen name="rent" options={{ title: 'Where to Rent' }} />
       <Stack.Screen name="packing" options={{ title: 'Packing Plan' }} />
       <Stack.Screen name="premium" options={{ title: 'Loadsy Premium' }} />
       <Stack.Screen name="layout-view" options={{ title: 'Truck Layout' }} />
       <Stack.Screen name="history" options={{ title: 'Past Moves' }} />
-      <Stack.Screen
-        name="quote/[id]"
-        options={{ title: 'Price Breakdown', presentation: 'modal' }}
-      />
     </Stack>
   );
 }
