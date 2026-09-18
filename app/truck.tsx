@@ -160,7 +160,7 @@ export default function TruckScreen() {
         <StepNav
           current="/truck"
           blockedReason={
-            move.rooms.length === 0 ? 'Add a room before choosing a truck' : inventoryBlockedReason(move)
+            move.rooms.length === 0 ? 'Take photos before choosing a truck' : inventoryBlockedReason(move)
           }
           onAdvance={() => dispatch({ type: 'setStatus', status: 'truckAndPrice' })}
         />

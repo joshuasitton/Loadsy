@@ -343,6 +343,28 @@ The company's site is the main action on Where to Rent and opens inside the app 
 an affiliate link will need. "Near me" is a maps search, so the nearest branch is found
 without Loadsy asking where anyone is.
 
+### Nobody names a room
+
+Decided 18 September: "stuff is stuff" – take pictures, get a truck size, find a truck.
+Naming rooms was a question the answer never needed, asked before the one thing the person
+came to do, and an apartment move or a pile in a garage does not divide into rooms anyway.
+So Capture is "Add photos", the inventory is one list, and Past Moves shows one list.
+
+Rooms were hidden, not removed. A set of photos is still one request, labelled "Photos 1",
+"Photos 2" (`nextPhotoSetName`), with hand-added items under "Added by hand" – because the
+set is the unit the model de-duplicates within: two photos of one sofa in one request are
+one sofa. Taking the grouping out of the data would have meant either one request for
+every photo in the home, past the route's limit and its minute, or no de-duplication at
+all. Between sets, the double-count check (`src/domain/duplicates.ts`) still asks – now
+"Is it one piece, or two?", since there is no room to ask about. "It's one" deletes the
+second listing rather than marking it, so the inventory and the truck agree without a
+reconciling step.
+
+What went with the names: the coverage card, which listed the storage spaces with no room
+of that name yet, became a fixed checklist – closets, kitchen
+cabinets, storage, balcony or garage – and the Packing Plan lost its By Room tab, which
+would have grouped things under "Photos 2".
+
 ### Where the move starts and ends
 
 Its own step, `app/trip.tsx`, between Inventory and Truck Size — full street
@@ -478,10 +500,10 @@ The screens from spec §3, less prices – see "No prices in v1" above:
 |---|---|---|
 | `app/index.tsx` | Screen 7 | My Move dashboard, 5-step tracker bound to `MoveStatus` |
 | `app/capture.tsx` | Screen 1 | Camera + gallery capture, tips card, photo quality gate |
-| `app/inventory.tsx` | Screen 2 | Grouped inventory, confidence gate, manual add item/room |
+| `app/inventory.tsx` | Screen 2 | One inventory list, confidence and double-count gate, add by hand |
 | `app/truck.tsx` | Screen 3 | Recommendation with the raw → buffered → capacity breakdown |
 | `app/rent.tsx` | Screen 4 | Where to rent the truck or a pickup or trailer that fits – each company's site, and "near me" |
-| `app/packing.tsx` | Screen 5 | Load Plan / By Room tabs, weight-class aware |
+| `app/packing.tsx` | Screen 5 | Load plan in numbered groups, weight-class aware |
 | `app/layout-view.tsx` | Screen 6 | Top / 3D truck diagram, save and share |
 
 ### Architecture

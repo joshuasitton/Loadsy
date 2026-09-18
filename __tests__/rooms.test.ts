@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findRoomByName, normaliseRoomName, resolveRoomId } from '../src/domain/rooms';
+import { findRoomByName, nextPhotoSetName, normaliseRoomName, resolveRoomId } from '../src/domain/rooms';
 import { rawVolumeCuFt } from '../src/domain/volume';
 import { recommendTruckSize } from '../src/domain/truck';
 import { makeItem, makeMove, makeRoom, resetIds } from './helpers';
@@ -61,4 +61,11 @@ test('the duplicate room this prevents would have doubled the truck size', () =>
   // furniture the user owns exactly one of.
   assert.equal(recommendTruckSize(honest * 1.2), '10ft');
   assert.equal(recommendTruckSize(inflated * 1.2), '15ft');
+});
+
+test('each batch of photos gets the next unused label, and nobody has to name it', () => {
+  assert.equal(nextPhotoSetName(makeMove([])), 'Photos 1');
+  assert.equal(nextPhotoSetName(makeMove([makeRoom([], { name: 'Photos 1' }), makeRoom([], { name: 'Living Room' })])), 'Photos 2');
+  // A gap is filled rather than skipped past, and names compare as a person reads them.
+  assert.equal(nextPhotoSetName(makeMove([makeRoom([], { name: 'photos 2' })])), 'Photos 1');
 });

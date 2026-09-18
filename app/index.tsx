@@ -70,7 +70,7 @@ const ROWS: StepRow[] = [
     href: '/inventory',
     detail: (ctx) => {
       const count = allItems(ctx.move).length;
-      if (count === 0) return 'No items yet — start by photographing a room';
+      if (count === 0) return 'No items yet — start by taking photos';
       const unresolved = unresolvedCount(ctx.move) + unresolvedDuplicates(ctx.move).length;
       return unresolved > 0
         ? `${count} items · ${unresolved} need a quick check`
@@ -154,7 +154,7 @@ export default function MyMoveScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>Right size truck.{'\n'}Right price. Right plan.</Text>
           <Text style={styles.heroSubtitle}>
-            Photograph your rooms and Loadsy works out how much truck you actually need.
+            Photograph what you&apos;re moving and Loadsy works out how much truck you actually need.
           </Text>
         </View>
 
@@ -258,13 +258,13 @@ export default function MyMoveScreen() {
 
         <Card style={styles.cta}>
           <Text style={styles.ctaTitle}>
-            {itemCount === 0 ? 'Start with one room' : 'Add another room'}
+            {itemCount === 0 ? 'Start with photos' : 'Add more photos'}
           </Text>
           <Text style={styles.ctaBody}>
-            Stand in the doorway and frame the whole room, corners included. Loadsy does the rest.
+            Frame everything you&apos;re moving – stand back, corners included. Loadsy does the rest.
           </Text>
           <PrimaryButton
-            title={itemCount === 0 ? 'Capture a room' : 'Capture another room'}
+            title={itemCount === 0 ? 'Take photos' : 'Add more photos'}
             onPress={() => router.push('/capture')}
           />
         </Card>
