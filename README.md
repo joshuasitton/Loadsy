@@ -313,6 +313,36 @@ section describes a screen now removed – `app/trip.tsx` is in the git history 
 domain code, which stays. The quote code in `src/api/rentals.ts`, `src/api/mocks/quotes.ts`
 and `src/domain/quotes.ts` is kept, tested and unused until prices return.
 
+### Pickups and trailers
+
+Decided 18 September: offered at launch beside the truck. The truck stays the
+recommendation – enclosed, no tow vehicle, and what the load plan is solved for – and the
+truck screen says, for an 8 ft pickup, a 5×8 open trailer and 5×8 and 6×12 cargo trailers,
+whether this load fits and why not.
+
+A truck is sized by volume because everything in a home goes through its door. These are
+not, so `src/domain/vehicleFit.ts` checks three things: every piece must fit the space in
+some square-on orientation – and through an enclosed trailer's door, which is smaller than
+its inside – and the buffered load must fit the space less the same 15% reserve a truck
+keeps. A pickup's width is the gap between its wheel wells, 50 in, because that is the
+width a sofa gets. An open bed's height is Loadsy's own rule, 42 in above its floor – about
+the top of a pickup's cab – not a specification. Payload is shown, not checked: the
+inventory knows a weight class, not pounds.
+
+Every dimension is from a published specification, cited in `src/domain/smallVehicles.ts`;
+where sources disagreed the smaller figure is used, and volume is computed from the
+dimensions because published cubic feet run 8–10% high. `src/domain/rentalOffers.ts` lists
+only companies that rent each vehicle – Penske and Budget Truck rent neither pickups nor
+trailers, and only U-Haul rents enclosed trailers – because a company listed for a vehicle
+it does not have is a wasted trip. Two known limits, both erring towards "doesn't fit":
+detection sees furniture assembled, so a bed frame that would come apart is judged whole
+(the screen says so), and a wide flat piece such as a mattress is held to the wheel-well
+width although it could ride above the wells.
+
+The company's site is the main action on Where to Rent and opens inside the app – the route
+an affiliate link will need. "Near me" is a maps search, so the nearest branch is found
+without Loadsy asking where anyone is.
+
 ### Where the move starts and ends
 
 Its own step, `app/trip.tsx`, between Inventory and Truck Size — full street
@@ -450,7 +480,7 @@ The screens from spec §3, less prices – see "No prices in v1" above:
 | `app/capture.tsx` | Screen 1 | Camera + gallery capture, tips card, photo quality gate |
 | `app/inventory.tsx` | Screen 2 | Grouped inventory, confidence gate, manual add item/room |
 | `app/truck.tsx` | Screen 3 | Recommendation with the raw → buffered → capacity breakdown |
-| `app/rent.tsx` | Screen 4 | Where to rent the recommended size – a link to each rental company |
+| `app/rent.tsx` | Screen 4 | Where to rent the truck or a pickup or trailer that fits – each company's site, and "near me" |
 | `app/packing.tsx` | Screen 5 | Load Plan / By Room tabs, weight-class aware |
 | `app/layout-view.tsx` | Screen 6 | Top / 3D truck diagram, save and share |
 

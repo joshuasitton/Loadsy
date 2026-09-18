@@ -36,7 +36,12 @@ A tape-measured family room, asked 50 times:
 4. **No prices in v1.** Live testing showed the prices screen had no service behind it; the
    demo's figures were unsourced. Prices, the trip step and the location permission are
    removed; a Where to Rent screen links to five rental companies. Built, in PR #7.
-5. **Keep it simple, and low-overhead.** "We do not want to be a high-overhead company."
+5. **Pickups and trailers at launch** (18 September). The Chairman chose them over the
+   recommendation to defer to v1.1. Offered beside the truck when the load fits, with where
+   to rent each and a "near me" maps link; the company's site stays the main action for
+   future affiliate links. Building quotes from rental sites with a browser agent was
+   considered and declined: U-Haul's and Penske's terms forbid automated collection.
+6. **Keep it simple, and low-overhead.** "We do not want to be a high-overhead company."
    Acting as the customer's agent with rental companies, and valet service, were raised and
    set aside: both need people, vehicles and insurance. Features, revenue and infrastructure
    should run without staff – self-serve, serverless, referrals rather than services.
