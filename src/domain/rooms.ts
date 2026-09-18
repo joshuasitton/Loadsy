@@ -37,3 +37,23 @@ export function findRoomByName(move: Move, name: string): Room | null {
 export function resolveRoomId(move: Move, name: string, newId: string): string {
   return findRoomByName(move, name)?.id ?? newId;
 }
+
+/*
+ * Rooms made invisible, decided 18 September: "stuff is stuff – take pictures, get truck
+ * size, find truck." Nobody names a room any more. Each batch of photos still becomes a
+ * room behind the scenes, because detection, the eval and the packing plan are built on
+ * one request per batch – a batch of photos of one space is exactly what a room was.
+ * Only the name is now Loadsy's, not the person's.
+ */
+
+/** The group items added by hand go into. Never shown. */
+export const ADDED_BY_HAND = 'Added by hand';
+
+/** "Photos 1", "Photos 2" … – the next label not already in use. */
+export function nextPhotoSetName(move: Move): string {
+  const used = new Set(move.rooms.map((room) => normaliseRoomName(room.name)));
+  for (let n = 1; ; n++) {
+    const name = `Photos ${n}`;
+    if (!used.has(normaliseRoomName(name))) return name;
+  }
+}

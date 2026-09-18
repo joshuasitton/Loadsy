@@ -1,14 +1,14 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { detectItems } from '../src/api/detect';
 import { ApiError } from '../src/api/client';
 import { MAX_PHOTOS } from '../src/domain/capture';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
 import { measureFrame } from '../src/media/frameSignals';
 import { prepareUpload } from '../src/media/prepareUpload';
-import { resolveRoomId } from '../src/domain/rooms';
+import { ADDED_BY_HAND, nextPhotoSetName, resolveRoomId } from '../src/domain/rooms';
 import { useMove } from '../src/state/moveStore';
 import { CeilingQuestion } from '../src/ui/CeilingQuestion';
 import { Banner, Card, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
@@ -16,7 +16,6 @@ import { colors, radius, space, type } from '../src/ui/theme';
 
 /** Screen 1 — Capture Room. */
 
-const ROOM_SUGGESTIONS = ['Living Room', 'Bedroom', 'Kitchen', 'Dining Room', 'Office', 'Garage'];
 
 const TIPS = [
   { title: 'Shoot from the doorway', body: 'A wide frame beats a close-up — Loadsy needs the whole room to judge scale.' },
@@ -28,7 +27,6 @@ const TIPS = [
 export default function CaptureScreen() {
   const router = useRouter();
   const { move, dispatch } = useMove();
-  const [roomName, setRoomName] = useState('');
   const [busy, setBusy] = useState(false);
   // Seconds since "Measure this room" – a real room takes about half a minute, and a
   // spinner with no sense of time reads as broken long before that.
@@ -67,15 +65,11 @@ export default function CaptureScreen() {
     };
   }, []);
 
-  const trimmedName = roomName.trim();
-  // Asked once per move. Until it is answered the camera stays off, for the same
-  // reason an unnamed room keeps it off: the answer changes what every photo measures.
+  // Asked once per move. Until it is answered the camera stays off: the answer changes
+  // what every photo measures. Rooms are no longer named (18 September) – each batch of
+  // photos is labelled by Loadsy when it is measured; see nextPhotoSetName.
   const ceilingAnswered = move.ceilingHeightIn !== null;
-  const blockedReason = !trimmedName
-    ? 'Name the room first, above.'
-    : !ceilingAnswered
-      ? 'Answer the ceiling question first, above.'
-      : null;
+  const blockedReason = !ceilingAnswered ? 'Answer the ceiling question first, above.' : null;
 
   /**
    * Creates the room only when the user has chosen to keep going by hand. The
@@ -88,21 +82,13 @@ export default function CaptureScreen() {
     // create two identically-named empty rooms.
     if (inFlight.current) return;
     inFlight.current = true;
-    const name = trimmedName || 'Room';
-    dispatch({ type: 'addRoom', id: resolveRoomId(move, name, `room-${Date.now()}`), name });
+    dispatch({ type: 'addRoom', id: resolveRoomId(move, ADDED_BY_HAND, `room-${Date.now()}`), name: ADDED_BY_HAND });
     router.replace('/inventory');
   }
 
   async function capture(source: 'camera' | 'library') {
-    if (!trimmedName) {
-      Alert.alert(
-        'Name the room first',
-        'Tell Loadsy which room this is so it can group the items it finds.',
-      );
-      return;
-    }
-    // Behind the disabled buttons as well, like the name check above: a capture
-    // measured against the wrong ceiling is a wrong inventory, not a slow one.
+    // Behind the disabled buttons as well: a capture measured against the wrong ceiling
+    // is a wrong inventory, not a slow one.
     if (!ceilingAnswered) return;
     if (inFlight.current) return;
     inFlight.current = true;
@@ -212,7 +198,7 @@ export default function CaptureScreen() {
     return () => clearInterval(tick);
   }, [measuringFor === null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Sends every angle of this room in one request. */
+  /** Sends every photo in this set in one request, so what two of them show is counted once. */
   async function measureRoom() {
     if (inFlight.current || angles.length === 0) return;
     inFlight.current = true;
@@ -224,10 +210,13 @@ export default function CaptureScreen() {
       // Reuses the room the user already named rather than minting a second one.
       // The same id must carry through to addItems below: addRoom is a no-op on a
       // colliding id, so items aimed at a fresh id would land in no room at all.
-      const roomId = resolveRoomId(move, trimmedName, `room-${Date.now()}`);
+      // A new batch every time: the label is Loadsy's, so it never collides with one the
+      // person meant as "the same room again".
+      const label = nextPhotoSetName(move);
+      const roomId = `room-${Date.now()}`;
       const items = await detectItems({
         roomId,
-        roomName: trimmedName,
+        roomName: label,
         photos: angles,
         ceilingHeightIn: move.ceilingHeightIn,
       });
@@ -240,7 +229,7 @@ export default function CaptureScreen() {
       }
 
       if (!mounted.current) return;
-      dispatch({ type: 'addRoom', id: roomId, name: trimmedName });
+      dispatch({ type: 'addRoom', id: roomId, name: label });
       for (const angle of angles) dispatch({ type: 'addPhoto', roomId, photoId: angle.photoId });
       dispatch({ type: 'addItems', roomId, items });
       router.replace('/inventory');
@@ -258,11 +247,11 @@ export default function CaptureScreen() {
       setRejection({
         ok: false,
         code: isNetwork ? 'network' : 'noFurniture',
-        title: isNetwork ? 'Connection problem' : tookTooLong ? 'That took too long' : "Couldn't measure that room",
+        title: isNetwork ? 'Connection problem' : tookTooLong ? 'That took too long' : "Couldn't measure those photos",
         message: isNetwork
           ? "Couldn't reach our servers. Check your connection and try again, or add the items by hand."
           : tookTooLong
-            ? 'Measuring this room took more than a minute. Try again, or add the items by hand.'
+            ? 'Measuring took more than a minute. Try again, or add the items by hand.'
             : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
         recoverable: true,
       });
@@ -278,30 +267,6 @@ export default function CaptureScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <SectionLabel>WHICH ROOM IS THIS?</SectionLabel>
-        <TextInput
-          value={roomName}
-          onChangeText={setRoomName}
-          placeholder="Living Room"
-          placeholderTextColor={colors.textDim}
-          style={styles.input}
-          accessibilityLabel="Room name"
-          returnKeyType="done"
-        />
-        <View style={styles.suggestions}>
-          {ROOM_SUGGESTIONS.map((name) => (
-            <Pressable
-              key={name}
-              onPress={() => setRoomName(name)}
-              accessibilityRole="button"
-              accessibilityLabel={`Use room name ${name}`}
-              style={styles.suggestion}
-            >
-              <Text style={styles.suggestionText}>{name}</Text>
-            </Pressable>
-          ))}
-        </View>
-
         <CeilingQuestion
           value={move.ceilingHeightIn}
           onAnswer={(inches) => dispatch({ type: 'setCeilingHeight', inches })}
@@ -322,8 +287,8 @@ export default function CaptureScreen() {
             <SectionLabel>{angles.length === 1 ? '1 ANGLE' : `${angles.length} ANGLES`}</SectionLabel>
             <Text style={styles.anglesBody}>
               {angles.length === 1
-                ? 'One more from a different corner will measure this room noticeably better — a second view shows what the first one hid, and gives Loadsy something to check its own sizes against.'
-                : `Good — ${angles.length} views of this room. Add another if anything is still out of shot.`}
+                ? 'One more from a different corner will measure noticeably better — a second view shows what the first one hid, and gives Loadsy something to check its own sizes against.'
+                : `Good — ${angles.length} views. Add another if anything is still out of shot.`}
             </Text>
             <View style={styles.angleChips}>
               {angles.map((angle, index) => (
@@ -345,8 +310,8 @@ export default function CaptureScreen() {
                 {/* Announced when the phase changes, not every second. */}
                 <Text style={styles.busyText} aria-live="polite">
                   {measuringFor < 40
-                    ? 'Measuring the room – this usually takes about 30 seconds.'
-                    : 'Still measuring – rooms with a lot in them take a little longer.'}
+                    ? 'Measuring – this usually takes about 30 seconds.'
+                    : 'Still measuring – photos with a lot in them take a little longer.'}
                 </Text>
                 <Text style={styles.busyElapsed} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                   {measuringFor}s
@@ -358,7 +323,7 @@ export default function CaptureScreen() {
           <View style={styles.actions}>
             {angles.length > 0 ? (
               <PrimaryButton
-                title={`Measure this room (${angles.length})`}
+                title={`Measure ${angles.length === 1 ? 'this photo' : `these ${angles.length} photos`}`}
                 onPress={() => { void measureRoom(); }}
                 accessibilityHint="Sends every angle together so the same furniture is not counted twice"
               />
@@ -386,7 +351,7 @@ export default function CaptureScreen() {
             {blockedReason ? <Text style={styles.actionsHint}>{blockedReason}</Text> : null}
             {angles.length >= MAX_PHOTOS ? (
               <Text style={styles.anglesBody}>
-                That is plenty for one room — {MAX_PHOTOS} angles is the most Loadsy measures at once.
+                {MAX_PHOTOS} photos is the most Loadsy measures at once. Measure these, then add more.
               </Text>
             ) : null}
           </View>
@@ -436,24 +401,6 @@ export default function CaptureScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.lg },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: space.lg,
-    color: colors.text,
-    ...type.body,
-    minHeight: 52,
-  },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: -space.sm },
-  suggestion: {
-    paddingVertical: space.xs + 2,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceRaised,
-  },
-  suggestionText: { ...type.caption, color: colors.textMuted },
   rejectionActions: { marginTop: space.md },
   tips: { gap: space.md },
   tipsToggle: {

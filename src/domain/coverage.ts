@@ -14,17 +14,18 @@
  *
  * These are deliberately storage and edge spaces, not living rooms. Nobody forgets
  * the room with the sofa in it; they forget the one with the bikes.
+ *
+ * Until 18 September the list was filtered against the rooms a person had named, so
+ * a captured garage was not asked about again. Rooms are no longer named (README,
+ * "Nobody names a room"), so there is nothing to match against and the whole list is
+ * shown as a checklist. It is the one list: the inventory screen renders it, and does
+ * not keep its own.
  */
-
-import type { Move } from './types';
-import { normaliseRoomName } from './rooms';
 
 export interface CoverageArea {
   readonly id: string;
-  /** The room name added on tap, and the label shown. */
+  /** The label shown. */
   readonly label: string;
-  /** Names that count as already covering this area. */
-  readonly match: RegExp;
   /** Why it is worth checking, in the user's terms. */
   readonly hint: string;
 }
@@ -34,72 +35,18 @@ export interface CoverageArea {
  * truck size on its own; a missed coat closet rarely is.
  */
 export const COMMONLY_MISSED: readonly CoverageArea[] = [
+  { id: 'garage', label: 'Garage', hint: 'Bikes, tools and shelving add up fast' },
+  { id: 'storage', label: 'Storage or shed', hint: 'Easy to forget when it is not in the house' },
+  { id: 'basement', label: 'Basement', hint: 'Often where the bulky things live' },
+  { id: 'attic', label: 'Attic or loft', hint: 'Boxes up here are easy to overlook' },
+  { id: 'closets', label: 'Closets', hint: 'Everything hanging still has to travel' },
   {
-    id: 'garage',
-    label: 'Garage',
-    match: /\b(garage|carport)\b/i,
-    hint: 'Bikes, tools and shelving add up fast',
+    id: 'cabinets',
+    label: 'Kitchen cabinets',
+    // Detection sees closed doors, not what is behind them, and built-in cabinets are
+    // not furniture it lists – so an apartment's kitchen can photograph as nearly empty.
+    hint: 'Dishes, pans and the pantry are behind closed doors – usually several boxes',
   },
-  {
-    id: 'storage',
-    label: 'Storage or shed',
-    match: /\b(storage|shed|locker|unit)\b/i,
-    hint: 'Easy to forget when it is not in the house',
-  },
-  {
-    id: 'basement',
-    label: 'Basement',
-    match: /\b(basement|cellar)\b/i,
-    hint: 'Often where the bulky things live',
-  },
-  {
-    id: 'attic',
-    label: 'Attic or loft',
-    match: /\b(attic|loft)\b/i,
-    hint: 'Boxes up here are easy to overlook',
-  },
-  {
-    id: 'closets',
-    label: 'Closets',
-    // `closets?` matters: the chip adds the room as "Closets", and \bcloset\b does
-    // not match that — so the area would be offered again the moment it was taken.
-    match: /\b(closets?|wardrobe room|walk-?in)\b/i,
-    hint: 'Everything hanging still has to travel',
-  },
-  {
-    id: 'laundry',
-    label: 'Laundry',
-    match: /\b(laundry|utility|mud ?room)\b/i,
-    hint: 'A washer and dryer are 40 ft³ between them',
-  },
-  {
-    id: 'outdoor',
-    label: 'Patio or balcony',
-    match: /\b(patio|balcony|deck|yard|garden|terrace)\b/i,
-    hint: 'Outdoor furniture and the grill count too',
-  },
+  { id: 'laundry', label: 'Laundry', hint: 'A washer and dryer are 40 ft³ between them' },
+  { id: 'outdoor', label: 'Patio or balcony', hint: 'Outdoor furniture and the grill count too' },
 ];
-
-/**
- * The areas no captured room appears to cover.
- *
- * Matching is on the names the user typed, so someone who called it "Front Garage"
- * or "garage / workshop" is not prompted again. A false prompt is cheap — one
- * dismissal — but a repeated one for a room they already did erodes trust in the
- * whole list, and then the prompts that matter get ignored too.
- */
-export function uncoveredAreas(move: Move): CoverageArea[] {
-  const captured = move.rooms.map((room) => normaliseRoomName(room.name));
-  return COMMONLY_MISSED.filter((area) => !captured.some((name) => area.match.test(name)));
-}
-
-/**
- * Whether it is worth asking at all.
- *
- * Silent until there is an inventory to be incomplete: prompting someone with no
- * rooms yet to check their attic is noise, and the empty state already tells them
- * what to do.
- */
-export function shouldPromptCoverage(move: Move): boolean {
-  return move.rooms.length > 0 && uncoveredAreas(move).length > 0;
-}

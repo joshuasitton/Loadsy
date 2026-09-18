@@ -64,7 +64,7 @@ test('the gate holds until each pair is answered – by choosing a room or keepi
   const move = makeMove([family, breakfast]);
 
   assert.equal(canLeaveInventory(move), false);
-  assert.equal(inventoryBlockedReason(move), '1 item looks listed in two rooms');
+  assert.equal(inventoryBlockedReason(move), '1 item may be listed twice');
 
   // "It's in the breakfast room": the family room's listing is removed.
   const chosen = { ...move, rooms: [{ ...family, items: [] }, breakfast] };
@@ -82,7 +82,7 @@ test('the blocked reason names every kind of check still open, in one place', ()
   resetIds();
   const unsure = item('Unlabelled Thing', 40, 20, 20, { confidence: 'low', confidenceReason: 'Partly hidden' });
   const move = makeMove([makeRoom([item('Hutch', 60, 20, 72), unsure]), makeRoom([item('Hutch', 64, 20, 74)])]);
-  assert.equal(inventoryBlockedReason(move), '1 item needs a quick check · 1 item looks listed in two rooms');
+  assert.equal(inventoryBlockedReason(move), '1 item needs a quick check · 1 item may be listed twice');
   assert.equal(inventoryBlockedReason(makeMove([])), 'Add at least one item before sizing a truck');
 });
 

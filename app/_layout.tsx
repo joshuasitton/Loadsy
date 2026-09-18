@@ -99,7 +99,7 @@ function RootNavigator() {
     >
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'My Move' }} />
-      <Stack.Screen name="capture" options={{ title: 'Capture Room' }} />
+      <Stack.Screen name="capture" options={{ title: 'Add Photos' }} />
       <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
       <Stack.Screen name="truck" options={{ title: 'Truck Size' }} />
       <Stack.Screen name="rent" options={{ title: 'Where to Rent' }} />

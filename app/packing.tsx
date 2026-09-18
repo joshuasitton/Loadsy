@@ -1,25 +1,29 @@
 import { useRouter } from 'expo-router';
 import { formatCuFt } from '../src/ui/format';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { guidanceFor } from '../src/domain/itemGuidance';
 import { renderZoneSVG, zoneAriaLabel } from '../src/truckmap/renderSvg';
-import { stepForItem, type LoadStepOrder } from '../src/domain/packing';
+import type { LoadStepOrder } from '../src/domain/packing';
 import type { InventoryItem, LoadStep, TruckSize } from '../src/domain/types';
-import { allItems, roomCubicFeet } from '../src/domain/volume';
+import { allItems } from '../src/domain/volume';
 import { loadOrderIndex, planLoad } from '../src/truckmap/layout';
 import { useEntitlement } from '../src/billing/entitlementStore';
 import { PremiumWall } from '../src/ui/PremiumWall';
 import { useMove } from '../src/state/moveStore';
-import { Banner, Card, Chip, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
+import { Banner, Card, PrimaryButton, Screen, SecondaryButton } from '../src/ui/components';
 import { colors, space, type } from '../src/ui/theme';
 import { StepNav } from '../src/ui/StepNav';
 
-/** Screen 5 — Packing Plan. Two tabs: Load Plan and By Room. */
-
-type Tab = 'load' | 'room';
+/**
+ * Screen 5 — Packing Plan: the load order.
+ *
+ * There was a By Room tab. Rooms stopped being something a person names on 18 September
+ * – photos are grouped as "Photos 1", "Photos 2" – so grouping by them told nobody where
+ * anything was.
+ */
 
 export default function PackingRoute() {
   const { allows } = useEntitlement();
@@ -40,7 +44,6 @@ function PackingPlanScreen() {
   const router = useRouter();
   const { move, packingPlan, recommendation } = useMove();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('load');
 
   // Memoised because allItems() builds a fresh array every call, and the diagrams
   // below are keyed on it.
@@ -52,7 +55,7 @@ function PackingPlanScreen() {
    *
    * Memoised on the inventory and the truck because the solve is the most
    * expensive thing either screen does — a few hundred milliseconds for a house
-   * move — and this screen re-renders on every tab press.
+   * move — and this screen re-renders whenever the move store does.
    */
   const loadOrder = useMemo(
     () => loadOrderIndex(planLoad(items, recommendation.size)),
@@ -74,9 +77,9 @@ function PackingPlanScreen() {
           <Banner
             tone="neutral"
             title="No inventory yet"
-            message="Your load order comes from what you are actually moving. Add a room and we'll build it."
+            message="Your load order comes from what you are actually moving. Take photos and we'll build it."
           />
-          <PrimaryButton title="Capture a room" onPress={() => router.push('/capture')} />
+          <PrimaryButton title="Take photos" onPress={() => router.push('/capture')} />
         </View>
       </Screen>
     );
@@ -85,21 +88,12 @@ function PackingPlanScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.tabs}>
-          <Chip label="Load Plan" active={tab === 'load'} onPress={() => setTab('load')} />
-          <Chip label="By Room" active={tab === 'room'} onPress={() => setTab('room')} />
-        </View>
-
-        {tab === 'room' ? (
-          <ByRoomTab move={move} />
-        ) : (
-          <LoadPlanTab
-            steps={packingPlan?.loadSteps ?? []}
-            items={items}
-            truckSize={recommendation.size}
-            loadOrder={loadOrder}
-          />
-        )}
+        <LoadPlanTab
+          steps={packingPlan?.loadSteps ?? []}
+          items={items}
+          truckSize={recommendation.size}
+          loadOrder={loadOrder}
+        />
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
@@ -282,36 +276,8 @@ function LoadPlanTab({
   );
 }
 
-function ByRoomTab({ move }: { move: ReturnType<typeof useMove>['move'] }) {
-  return (
-    <View style={styles.rooms}>
-      <Text style={styles.intro}>
-        The same items, grouped by where they are now — useful while you are boxing up rather than
-        loading.
-      </Text>
-
-      {move.rooms.map((room) => (
-        <Card key={room.id} style={styles.room}>
-          <View style={styles.roomHeader}>
-            <Text style={styles.roomName}>{room.name}</Text>
-            <Text style={styles.roomTotal}>{formatCuFt(roomCubicFeet(room))} ft³</Text>
-          </View>
-          <SectionLabel>{room.items.length} ITEMS</SectionLabel>
-          {room.items.map((item) => (
-            <View key={item.id} style={styles.roomItem}>
-              <Text style={styles.roomItemName}>{item.name}</Text>
-              <Text style={styles.roomItemStep}>Load step {stepForItem(item)}</Text>
-            </View>
-          ))}
-        </Card>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xl, gap: space.lg },
-  tabs: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   intro: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   busy: { alignItems: 'center', gap: space.md, paddingVertical: space.xxl },
   busyText: { ...type.body, color: colors.textMuted },
@@ -346,19 +312,6 @@ const styles = StyleSheet.create({
   stepItemNumber: { color: colors.textDim, fontWeight: '400' },
   stepItemName: { ...type.caption, color: colors.text, flex: 1 },
   stepItemMeta: { ...type.caption, color: colors.textDim, fontSize: 12 },
-  rooms: { gap: space.md },
-  room: { gap: space.sm },
-  roomHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  roomName: { ...type.heading, color: colors.text },
-  roomTotal: { ...type.caption, color: colors.textMuted },
-  roomItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: space.md,
-    paddingVertical: space.xs,
-  },
-  roomItemName: { ...type.caption, color: colors.text, flex: 1 },
-  roomItemStep: { ...type.caption, color: colors.textDim, fontSize: 12 },
   footer: {
     padding: space.lg,
     paddingBottom: space.xl,

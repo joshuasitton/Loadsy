@@ -71,7 +71,6 @@ export default function HistoryScreen() {
                   <Text style={styles.date}>{formatDate(record.completedAt)}</Text>
                   <Text style={styles.truck}>{TRUCK_LABEL[record.truckSize]}</Text>
                   <Text style={styles.meta}>
-                    {record.roomCount} {record.roomCount === 1 ? 'room' : 'rooms'} ·{' '}
                     {record.itemCount} items · {formatCuFt(record.rawCuFt)} ft³
                     {record.originZip ? ` · from ${record.originZip}` : ''}
                   </Text>
@@ -92,16 +91,12 @@ export default function HistoryScreen() {
                   ) : null}
                   <Text style={styles.meta}>Completed {formatDateTime(record.completedAt)}</Text>
 
-                  {record.rooms.map((room, index) => (
-                    <View key={`${record.id}-room-${index}`} style={styles.room}>
-                      <Text style={styles.roomName}>{room.name}</Text>
-                      <Text style={styles.roomItems}>
-                        {room.items.length === 0
-                          ? 'No items recorded'
-                          : room.items.map((i) => i.name).join(' · ')}
-                      </Text>
-                    </View>
-                  ))}
+                  {/* One list: rooms are no longer named (18 September). */}
+                  <Text style={styles.roomItems}>
+                    {record.itemCount === 0
+                      ? 'No items recorded'
+                      : record.rooms.flatMap((room) => room.items.map((i) => i.name)).join(' · ')}
+                  </Text>
 
                   {/*
                     Two taps, in place, rather than a system alert. Alert.alert is
@@ -200,8 +195,6 @@ const styles = StyleSheet.create({
   },
   figureLabel: { ...type.label, fontSize: 9, color: colors.textDim },
   figureValue: { ...type.bodyStrong, color: colors.text },
-  room: { gap: 2 },
-  roomName: { ...type.bodyStrong, color: colors.text },
   roomItems: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   confirmRow: { flexDirection: 'row', gap: space.sm },
   danger: {

@@ -45,6 +45,12 @@ A tape-measured family room, asked 50 times:
    Acting as the customer's agent with rental companies, and valet service, were raised and
    set aside: both need people, vehicles and insurance. Features, revenue and infrastructure
    should run without staff – self-serve, serverless, referrals rather than services.
+7. **Rooms are invisible** (18 September). "Stuff is stuff. Take pictures, get truck size,
+   find truck." Nobody names a room any more: Capture is "Add photos", the inventory is one
+   list, and the coverage prompt is a checklist of what gets missed. Each set of photos is
+   still measured as one request – which is what stops two photos of one sofa counting as
+   two – so decision 1's double-count check now runs across sets of photos and asks
+   whether it is one piece or two.
 
 **Decided later the same day:** wait up to 60 seconds for detection and show progress.
 **Still needed:** the vision key as an EAS secret; the revenue posture; Anthropic's

@@ -24,7 +24,7 @@ export default function Root({ children }: PropsWithChildren) {
         <title>Loadsy — Right size truck. Right price. Right plan.</title>
         <meta
           name="description"
-          content="Photograph your rooms and Loadsy works out how much truck you actually need, where to rent it, and the order to load it in."
+          content="Photograph what you're moving and Loadsy works out how much truck you actually need, where to rent it, and the order to load it in."
         />
         <meta name="theme-color" content="#FFFFFF" />
 
@@ -32,7 +32,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:title" content="Loadsy" />
         <meta
           property="og:description"
-          content="Photograph your rooms and Loadsy works out how much truck you actually need."
+          content="Photograph what you're moving and Loadsy works out how much truck you actually need."
         />
         <meta name="twitter:card" content="summary" />
 

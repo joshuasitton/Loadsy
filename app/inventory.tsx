@@ -12,12 +12,12 @@ import {
   unresolvedCount,
   unresolvedDuplicates,
 } from '../src/domain/confidence';
+import { COMMONLY_MISSED } from '../src/domain/coverage';
 import type { SuspectedDuplicate } from '../src/domain/duplicates';
 import type { InventoryItem, ItemCategory, WeightClass } from '../src/domain/types';
-import { cubicFeetFor, roomCubicFeet } from '../src/domain/volume';
+import { cubicFeetFor } from '../src/domain/volume';
 import { useMove } from '../src/state/moveStore';
-import { shouldPromptCoverage, uncoveredAreas } from '../src/domain/coverage';
-import { resolveRoomId } from '../src/domain/rooms';
+import { ADDED_BY_HAND, resolveRoomId } from '../src/domain/rooms';
 import { Banner, Card, Chip, Divider, PrimaryButton, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
 import { StepNav } from '../src/ui/StepNav';
@@ -33,9 +33,16 @@ export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [addingToRoom, setAddingToRoom] = useState<string | null>(null);
-  const [newRoomName, setNewRoomName] = useState('');
 
   const unresolved = unresolvedCount(move);
+  const items = useMemo(() => move.rooms.flatMap((room) => room.items), [move.rooms]);
+
+  /** Items added by hand go into one group of their own, created the first time. */
+  function addByHand() {
+    const id = resolveRoomId(move, ADDED_BY_HAND, `room-${Date.now()}`);
+    dispatch({ type: 'addRoom', id, name: ADDED_BY_HAND });
+    setAddingToRoom(id);
+  }
   const duplicates = useMemo(() => unresolvedDuplicates(move), [move]);
   // The single source of truth for the CTA — programmatic, per spec §3 Screen 2.
   const canAdvance = canLeaveInventory(move);
@@ -62,20 +69,20 @@ export default function InventoryScreen() {
         ) : duplicates.length > 0 ? (
           <Banner
             tone="amber"
-            title={`${duplicates.length} ${duplicates.length === 1 ? 'item looks' : 'items look'} listed in two rooms`}
-            message="A photo of one room often catches the next room through a doorway. Tell us where each one really is, so it's only counted once."
+            title={`${duplicates.length} ${duplicates.length === 1 ? 'item may be' : 'items may be'} listed twice`}
+            message="Photos taken at different times often catch the same piece – through a doorway, or from another angle. Tell us which, so it's only counted once."
           />
         ) : totals.items > 0 ? (
           <Banner tone="green" title="Inventory looks good" message={`${totals.items} items · ${formatCuFt(totals.cuFt)} ft³ before packing buffer`} />
         ) : null}
 
-        {move.rooms.length === 0 ? (
+        {totals.items === 0 ? (
           <Card style={styles.empty}>
             <Text style={styles.emptyTitle}>Nothing here yet</Text>
             <Text style={styles.emptyBody}>
-              Photograph a room, or add rooms and items by hand — both work.
+              Take photos of what you&apos;re moving, or add items by hand — both work.
             </Text>
-            <PrimaryButton title="Capture a room" onPress={() => router.push('/capture')} />
+            <PrimaryButton title="Take photos" onPress={() => router.push('/capture')} />
           </Card>
         ) : null}
 
@@ -83,97 +90,52 @@ export default function InventoryScreen() {
           <DuplicateCard
             key={pair.key}
             pair={pair}
-            onChooseRoom={(keep) =>
-              dispatch({ type: 'removeItem', itemId: keep === 'first' ? pair.second.item.id : pair.first.item.id })
-            }
+            onKeepOne={() => dispatch({ type: 'removeItem', itemId: pair.second.item.id })}
             onKeepBoth={() => dispatch({ type: 'keepDuplicate', key: pair.key })}
           />
         ))}
 
-        {move.rooms.map((room) => (
-          <View key={room.id} style={styles.room}>
-            <View style={styles.roomHeader}>
-              <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomTotal}>{formatCuFt(roomCubicFeet(room))} ft³</Text>
-            </View>
-
-            {room.items.length === 0 ? (
-              <Text style={styles.roomEmpty}>No items in this room yet.</Text>
-            ) : (
-              room.items.map((item) => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  onEdit={() => setEditing(item)}
-                  onConfirm={() => dispatch({ type: 'updateItem', item: markConfirmed(item) })}
-                  onRemove={() => dispatch({ type: 'removeItem', itemId: item.id })}
-                />
-              ))
-            )}
-
-            <SecondaryButton
-              title="+ Add item"
-              onPress={() => setAddingToRoom(room.id)}
-              accessibilityLabel={`Add an item to ${room.name}`}
-            />
+        {/*
+          One list, decided 18 September: "stuff is stuff". Rooms still exist underneath – one
+          per batch of photos, see src/domain/rooms.ts – but nobody names or reads one.
+        */}
+        {items.length > 0 ? (
+          <View style={styles.room}>
+            {items.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                onEdit={() => setEditing(item)}
+                onConfirm={() => dispatch({ type: 'updateItem', item: markConfirmed(item) })}
+                onRemove={() => dispatch({ type: 'removeItem', itemId: item.id })}
+              />
+            ))}
           </View>
-        ))}
+        ) : null}
 
-        {shouldPromptCoverage(move) ? (
+        <View style={styles.addRow}>
+          <SecondaryButton title="+ Add item by hand" onPress={addByHand} />
+          {totals.items > 0 ? (
+            <SecondaryButton title="+ Add more photos" onPress={() => router.push('/capture')} />
+          ) : null}
+        </View>
+
+        {totals.items > 0 ? (
           <Card style={styles.coverage}>
             <SectionLabel>EASY TO MISS</SectionLabel>
             <Text style={styles.coverageBody}>
-              A room left out is the one thing a truck estimate can&apos;t recover from — we can
-              size for a sofa measured wrong, not for a garage we never saw. Tap anything you
-              still need to add.
+              Anything left out makes the truck too small – the one mistake moving day can&apos;t fix.
+              If you have these, did you get them?
             </Text>
-            <View style={styles.coverageChips}>
-              {uncoveredAreas(move).map((area) => (
-                <Chip
-                  key={area.id}
-                  label={area.label}
-                  active={false}
-                  onPress={() =>
-                    dispatch({
-                      type: 'addRoom',
-                      id: resolveRoomId(move, area.label, `room-${Date.now()}`),
-                      name: area.label,
-                    })
-                  }
-                  accessibilityLabel={`Add ${area.label}. ${area.hint}`}
-                />
+            <View style={styles.coverageList}>
+              {COMMONLY_MISSED.map((area) => (
+                <Text key={area.id} style={styles.coverageBody}>
+                  <Text style={styles.coverageLabel}>{area.label}</Text> – {area.hint}
+                </Text>
               ))}
             </View>
           </Card>
         ) : null}
-
-        <Card style={styles.addRoom}>
-          <SectionLabel>ADD A ROOM BY HAND</SectionLabel>
-          <View style={styles.addRoomRow}>
-            <TextInput
-              value={newRoomName}
-              onChangeText={setNewRoomName}
-              placeholder="Garage"
-              placeholderTextColor={colors.textDim}
-              style={styles.input}
-              accessibilityLabel="New room name"
-            />
-            <SecondaryButton
-              title="Add"
-              accessibilityLabel="Add room"
-              onPress={() => {
-                const name = newRoomName.trim();
-                if (!name) return;
-                dispatch({
-                  type: 'addRoom',
-                  id: resolveRoomId(move, name, `room-${Date.now()}`),
-                  name,
-                });
-                setNewRoomName('');
-              }}
-            />
-          </View>
-        </Card>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
@@ -502,17 +464,17 @@ function num(value: string): number {
 }
 
 /**
- * One object that looks listed in two rooms, and the question only the person can
- * answer: which room is it in? Choosing a room removes the other listing; "I have two"
- * keeps both and stops asking. See src/domain/duplicates.ts for when this is asked.
+ * One piece that looks listed twice – usually the same furniture caught by two batches of
+ * photos – and the question only the person can answer. "It's one" removes the second
+ * listing; "I have two" keeps both and stops asking. See src/domain/duplicates.ts.
  */
 function DuplicateCard({
   pair,
-  onChooseRoom,
+  onKeepOne,
   onKeepBoth,
 }: {
   pair: SuspectedDuplicate;
-  onChooseRoom: (keep: 'first' | 'second') => void;
+  onKeepOne: () => void;
   onKeepBoth: () => void;
 }) {
   const { first, second } = pair;
@@ -521,26 +483,15 @@ function DuplicateCard({
   return (
     <Card style={styles.duplicate}>
       <Text style={styles.itemName}>{name}</Text>
-      <Text style={styles.itemMeta}>
-        Listed in {first.roomName} and in {second.roomName} · {formatCuFt(size)} ft³ each
-      </Text>
-      <Text style={styles.duplicateQuestion}>Which room is it in?</Text>
+      <Text style={styles.itemMeta}>Listed twice · {formatCuFt(size)} ft³ each</Text>
+      <Text style={styles.duplicateQuestion}>Is it one piece, or two?</Text>
       <View style={styles.duplicateActions}>
         <SecondaryButton
-          title={first.roomName}
-          onPress={() => onChooseRoom('first')}
-          accessibilityLabel={`${name} is in ${first.roomName} – remove it from ${second.roomName}`}
+          title="It's one – count it once"
+          onPress={onKeepOne}
+          accessibilityLabel={`${name} is one piece – remove the second listing`}
         />
-        <SecondaryButton
-          title={second.roomName}
-          onPress={() => onChooseRoom('second')}
-          accessibilityLabel={`${name} is in ${second.roomName} – remove it from ${first.roomName}`}
-        />
-        <SecondaryButton
-          title="I have two"
-          onPress={onKeepBoth}
-          accessibilityLabel={`I have two – keep ${name} in both rooms`}
-        />
+        <SecondaryButton title="I have two" onPress={onKeepBoth} accessibilityLabel={`I have two – keep both listings of ${name}`} />
       </View>
     </Card>
   );
@@ -552,10 +503,6 @@ const styles = StyleSheet.create({
   emptyTitle: { ...type.heading, color: colors.text },
   emptyBody: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   room: { gap: space.sm },
-  roomHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  roomName: { ...type.title, fontSize: 19, color: colors.text },
-  roomTotal: { ...type.caption, color: colors.textMuted },
-  roomEmpty: { ...type.caption, color: colors.textDim, paddingVertical: space.sm },
   itemCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -602,9 +549,9 @@ const styles = StyleSheet.create({
   removeText: { color: colors.danger },
   coverage: { gap: space.sm },
   coverageBody: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
-  coverageChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },
-  addRoom: { gap: space.sm },
-  addRoomRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
+  coverageList: { gap: space.xs },
+  coverageLabel: { color: colors.text, fontWeight: '600' },
+  addRow: { gap: space.sm },
   input: {
     flex: 1,
     backgroundColor: colors.surfaceRaised,

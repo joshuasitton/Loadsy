@@ -48,7 +48,7 @@ export function inventoryBlockedReason(move: Move): string | null {
   const twoRooms = unresolvedDuplicates(move).length;
   const parts = [
     unsure > 0 ? confidenceBannerCopy(unsure) : null,
-    twoRooms > 0 ? `${twoRooms} ${twoRooms === 1 ? 'item looks' : 'items look'} listed in two rooms` : null,
+    twoRooms > 0 ? `${twoRooms} ${twoRooms === 1 ? 'item may be' : 'items may be'} listed twice` : null,
   ].filter((part): part is string => part !== null);
   return parts.length === 0 ? null : parts.join(' · ');
 }
