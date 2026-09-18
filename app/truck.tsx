@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { formatCuFt } from '../src/ui/format';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import {
 } from '../src/domain/truck';
 import { TRUCK_SIZES, type TruckSize } from '../src/domain/types';
 import { inventoryBlockedReason } from '../src/domain/confidence';
+import { SMALL_VEHICLES } from '../src/domain/smallVehicles';
+import { assessSmallVehicles, type VehicleFit } from '../src/domain/vehicleFit';
 import { useMove } from '../src/state/moveStore';
 import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
@@ -51,6 +53,7 @@ export default function TruckScreen() {
   const [guideOpen, setGuideOpen] = useState(false);
 
   const previewCapacity = TRUCK_CAPACITY[previewing];
+  const smaller = useMemo(() => assessSmallVehicles(move, SMALL_VEHICLES), [move]);
   const isPreviewingRecommendation = previewing === recommendation.size;
 
   return (
@@ -94,6 +97,8 @@ export default function TruckScreen() {
             </Text>
           ) : null}
         </Card>
+
+        <SmallerOptions fits={smaller} />
 
         <View>
           <SectionLabel>COMPARE SIZES</SectionLabel>
@@ -203,6 +208,62 @@ export default function TruckScreen() {
   );
 }
 
+/**
+ * Pickups and trailers beside the truck, each with a plain yes or no and the reason – see
+ * src/domain/vehicleFit.ts for what is checked. The truck stays the recommendation: it is
+ * enclosed, needs no tow vehicle, and is what the load plan is solved for. These are the
+ * cheaper ways to do the same move when the load allows it.
+ */
+function SmallerOptions({ fits }: { fits: VehicleFit[] }) {
+  const anyFit = fits.some((fit) => fit.fits);
+  return (
+    <Card style={styles.smaller}>
+      <SectionLabel>SMALLER OPTIONS</SectionLabel>
+      <Text style={styles.smallerIntro}>
+        {anyFit
+          ? 'Your load also fits these – usually cheaper than a truck.'
+          : 'A pickup or trailer won’t take this load.'}
+      </Text>
+      {fits.map((fit) => (
+        <View
+          key={fit.vehicle.id}
+          style={styles.smallerRow}
+          accessible
+          accessibilityLabel={`${fit.vehicle.label}: ${fit.fits ? 'fits your load' : `doesn't fit. ${fit.reason ?? ''}`}`}
+        >
+          <View style={styles.smallerHead}>
+            <Text style={styles.smallerName}>{fit.vehicle.label}</Text>
+            <Text style={[styles.smallerVerdict, fit.fits ? styles.smallerYes : styles.smallerNo]}>
+              {fit.fits ? 'Fits' : 'Doesn’t fit'}
+            </Text>
+          </View>
+          {fit.fits ? (
+            <Text style={styles.smallerNote}>
+              {[
+                `Takes about ${Math.round(fit.usableCuFt)} ft³`,
+                `carries up to ${fit.vehicle.maxLoadLb.toLocaleString()} lb`,
+                fit.vehicle.needsTow ? 'needs a vehicle with a hitch that can tow it' : null,
+                fit.vehicle.enclosed ? null : 'open to the weather – strap everything down',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          ) : (
+            <Text style={styles.smallerNote}>{fit.reason}</Text>
+          )}
+        </View>
+      ))}
+      {fits.some((fit) => fit.tooBig.length > 0) ? (
+        // Detection sees furniture assembled. Which pieces come apart is the owner's
+        // knowledge, so it is said rather than guessed at.
+        <Text style={styles.smallerNote}>
+          Pieces that come apart – bed frames, table legs – may fit once taken apart.
+        </Text>
+      ) : null}
+    </Card>
+  );
+}
+
 function WhyRow({
   label,
   value,
@@ -250,6 +311,15 @@ const styles = StyleSheet.create({
   whyHint: { ...type.caption, color: colors.textDim, lineHeight: 18 },
   whyDivider: { height: 1, backgroundColor: colors.border },
   headroom: { ...type.caption, color: colors.textDim, marginTop: space.xs },
+  smaller: { gap: space.md },
+  smallerIntro: { ...type.body, color: colors.textMuted },
+  smallerRow: { gap: 2, paddingTop: space.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  smallerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space.md },
+  smallerName: { ...type.bodyStrong, color: colors.text, flexShrink: 1 },
+  smallerVerdict: { ...type.caption, fontWeight: '600' },
+  smallerYes: { color: colors.green },
+  smallerNo: { color: colors.textMuted },
+  smallerNote: { ...type.caption, color: colors.textDim, lineHeight: 18 },
   chipRow: { gap: space.sm, paddingRight: space.lg },
   sizeChip: {
     width: 150,
