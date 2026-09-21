@@ -1,7 +1,8 @@
 import { Link, useRouter } from 'expo-router';
 import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
+import type { MoveStatus } from '../src/domain/types';
+import { dashboardStatuses } from '../src/domain/tier';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { inventoryBlockedReason, unresolvedCount, unresolvedDuplicates } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
@@ -120,10 +121,18 @@ const ROWS: StepRow[] = [
 
 export default function MyMoveScreen() {
   const ctx = useMove();
-  const { tier } = useEntitlement();
+  const { tier, premiumPresent } = useEntitlement();
   const { history, complete } = useHistory();
   const router = useRouter();
-  const currentIndex = MOVE_STATUS_ORDER.indexOf(ctx.move.status);
+  /*
+   * Which stages this build draws. With Premium present, all five – the two stubs
+   * are what the wall promises. Without it, the three that open: a release with
+   * nothing to sell must not show "SOON" rows it cannot deliver (guideline 2.1),
+   * and the built Premium screens are simply the end of the flow.
+   */
+  const statuses = dashboardStatuses(premiumPresent);
+  const rows = ROWS.filter((row) => statuses.includes(row.status));
+  const currentIndex = statuses.indexOf(ctx.move.status);
   const itemCount = allItems(ctx.move).length;
 
   // Two taps rather than a system alert: finishing a move clears the inventory,
@@ -161,9 +170,9 @@ export default function MyMoveScreen() {
         <DemoBar />
 
         <View style={styles.progressTrack} accessibilityRole="progressbar"
-          accessibilityValue={{ min: 1, max: 5, now: currentIndex + 1 }}
-          accessibilityLabel={`Step ${currentIndex + 1} of 5`}>
-          {MOVE_STATUS_ORDER.map((status, index) => (
+          accessibilityValue={{ min: 1, max: statuses.length, now: currentIndex + 1 }}
+          accessibilityLabel={`Step ${currentIndex + 1} of ${statuses.length}`}>
+          {statuses.map((status, index) => (
             <View
               key={status}
               style={[
@@ -173,21 +182,24 @@ export default function MyMoveScreen() {
             />
           ))}
         </View>
-        <Text style={styles.progressCaption}>Step {currentIndex + 1} of 5</Text>
+        <Text style={styles.progressCaption}>Step {currentIndex + 1} of {statuses.length}</Text>
 
         <SectionLabel>YOUR MOVE</SectionLabel>
         <View style={styles.rows}>
-          {ROWS.map((row, index) => {
+          {rows.map((row, index) => {
             const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo';
             const isStub = row.href === null;
             const locked = row.lockedReason(ctx);
+            // Only a Premium row in a build where Premium exists; otherwise the row
+            // is an ordinary step and draws no tier line.
+            const premium = row.premium && premiumPresent;
             /*
              * Behind the paywall for this account — which makes the row MORE
              * interactive, not less. It is the one place the wall is worth
              * opening from, so it stays a live button and leads there instead of
              * to the screen it names.
              */
-            const gated = row.premium && tier === 'free';
+            const gated = premium && tier === 'free';
             // Programmatically inert, not merely dimmed — the same standard the
             // spec sets for Screen 2's CTA.
             const blocked = !gated && (isStub || locked !== null);
@@ -208,7 +220,7 @@ export default function MyMoveScreen() {
                   see. It also stops "PREMIUM" reading as a boast about the row
                   rather than a boundary.
                 */}
-                {row.premium && !ROWS[index - 1]?.premium ? (
+                {premium && !rows[index - 1]?.premium ? (
                   <View style={styles.tierBreak}>
                     <Text style={styles.tierBreakLabel}>PREMIUM</Text>
                     <View style={styles.tierBreakRule} />
@@ -221,7 +233,7 @@ export default function MyMoveScreen() {
                   if (row.href && !locked) router.push(row.href);
                 }}
                 accessibilityRole={blocked ? 'text' : 'button'}
-                accessibilityLabel={`${row.title}.${row.premium ? ' Premium.' : ''} ${detail}`}
+                accessibilityLabel={`${row.title}.${premium ? ' Premium.' : ''} ${detail}`}
                 accessibilityState={{ disabled: blocked }}
                 accessibilityHint={gated ? 'Opens what Premium adds' : (locked ?? undefined)}
                 style={({ pressed }) => [styles.row, pressed && !blocked && styles.rowPressed]}

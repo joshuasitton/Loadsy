@@ -195,6 +195,19 @@ the single function that decides what tier a build will accept from storage.
 nothing to sell and no demo has to answer "free" to it. Everything resolving a tier goes
 through that function, and `__tests__/tier.test.ts` pins it.
 
+**A store build of the MVP has no Premium in it at all.** `PREMIUM_REACHABLE` is false
+there – nothing to sell, no demo – and since 21 September that also means nothing is
+drawn: no tier line on the dashboard, no wall, no Premium screen (the URL answers with
+the dashboard), and no "SOON" rows for Reservations and Moving Day. The Packing Plan
+and the Truck Layout are simply the end of the flow. Apple rejects apps that show
+features which are not available (guideline 2.1), and a wall that says "not for sale
+yet" in front of finished software is exactly that. `dashboardStatuses()` in
+`src/domain/tier.ts` is the one place that decides which stages a build draws, and
+`__tests__/tier.test.ts` pins that the shipped stages are a prefix of the model's order
+– so the current step has the same index in both builds and the progress bar cannot
+disagree with itself. The domain rule about where Free ends is unchanged; the build
+declines to apply it when there is nothing on the other side.
+
 Demo builds can flip between the tiers — the toggle is in the demo bar, and the wall
 carries one too. That exists because the solver is the most convincing thing Loadsy
 does and it now sits behind a lock; a walkthrough has to be able to show both sides,

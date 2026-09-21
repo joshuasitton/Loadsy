@@ -2,7 +2,7 @@
   "expo": {
     "name": "Loadsy",
     "slug": "loadsy",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "loadsy",
     "userInterfaceStyle": "light",
@@ -34,7 +34,8 @@
           "microphonePermission": false
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
