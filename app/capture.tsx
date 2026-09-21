@@ -244,15 +244,26 @@ export default function CaptureScreen() {
       // 504 from the route, 408 from the app's own deadline: the room was sent and took
       // too long, which is not a connection problem and not an unreadable photo.
       const tookTooLong = err instanceof ApiError && (err.status === 504 || err.status === 408);
+      // 429 from the route's rate limit. Not a fault in the photo and not the network,
+      // so neither of those messages is true; say what it is and how long to wait.
+      const throttled = err instanceof ApiError && err.status === 429;
       setRejection({
         ok: false,
         code: isNetwork ? 'network' : 'noFurniture',
-        title: isNetwork ? 'Connection problem' : tookTooLong ? 'That took too long' : "Couldn't measure those photos",
+        title: isNetwork
+          ? 'Connection problem'
+          : throttled
+            ? 'Give it a few minutes'
+            : tookTooLong
+              ? 'That took too long'
+              : "Couldn't measure those photos",
         message: isNetwork
           ? "Couldn't reach our servers. Check your connection and try again, or add the items by hand."
-          : tookTooLong
-            ? 'Measuring took more than a minute. Try again, or add the items by hand.'
-            : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
+          : throttled
+            ? 'Loadsy measures a limited number of photo sets at a time. Wait a few minutes and try again, or add the items by hand.'
+            : tookTooLong
+              ? 'Measuring took more than a minute. Try again, or add the items by hand.'
+              : 'The photo reached us but we could not read it just now. Try again in a moment, or add the items by hand.',
         recoverable: true,
       });
     } finally {

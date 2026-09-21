@@ -27,6 +27,7 @@
 import { MAX_PHOTOS } from '../../src/domain/capture';
 /** The prompt and request shape, shared with the detection eval so the two cannot drift. */
 import { buildDetectBody, DEFAULT_VISION_MODEL, UPSTREAM_TIMEOUT_MS } from '../../src/vision/detectRequest';
+import { clientKey, PER_CLIENT, PER_INSTANCE, SlidingWindow } from '../../src/vision/rateLimit';
 
 /** Set in EAS Hosting environment secrets. Never an EXPO_PUBLIC_ var — those ship. */
 const API_KEY = process.env.VISION_API_KEY;
@@ -35,6 +36,14 @@ const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 
 /** Roughly a 1568x1176 JPEG at quality 0.8, plus base64 overhead and headroom. */
 const MAX_IMAGE_BYTES = 3_000_000;
+
+/**
+ * What one client, and this process, may forward to the model – see
+ * src/vision/rateLimit.ts for the numbers and the known weakness. Module-level so
+ * the counters outlive a request; per-process, so they do not outlive the instance.
+ */
+const perClient = new SlidingWindow(PER_CLIENT);
+const perInstance = new SlidingWindow(PER_INSTANCE);
 
 interface DetectBody {
   roomId?: unknown;
@@ -54,6 +63,19 @@ export async function POST(request: Request): Promise<Response> {
     // logs and return a generic message — never echo configuration to a client.
     console.error('[detect] VISION_API_KEY is not configured');
     return json({ error: 'Detection is unavailable' }, 503);
+  }
+
+  // Before the body is read: a refused request should cost nothing, and parsing three
+  // megabytes of JSON to then say no is not nothing.
+  const now = Date.now();
+  const verdict = [perClient.take(clientKey(request.headers), now), perInstance.take('*', now)].find(
+    (result) => !result.ok,
+  );
+  if (verdict && !verdict.ok) {
+    return Response.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'retry-after': String(Math.ceil(verdict.retryAfterMs / 1000)) } },
+    );
   }
 
   let body: DetectBody;

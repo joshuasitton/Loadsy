@@ -48,15 +48,21 @@ answer is "mocks in development, live everywhere else".
 
 ### The hosted demo
 
-Live at **<https://loadsy.expo.app>**, deployed with:
+Live at **<https://loadsy--demo.expo.app>**, deployed with:
 
 ```bash
 npm run demo:deploy
 ```
 
-That exports with `EXPO_PUBLIC_DEMO_MODE=true` and promotes it to the production
-alias, so the URL is stable and can be handed to someone in a meeting. To run the
-same build locally instead:
+That exports with `EXPO_PUBLIC_DEMO_MODE=true` and deploys it under the `demo`
+alias, so the URL is stable and can be handed to someone in a meeting. It is
+deliberately not the production deployment. Until 21 September it was: the script
+ran `eas deploy --prod`, and <https://loadsy.expo.app> is also the host every
+installed iOS build calls for `/v1/detect` – so each demo deploy replaced the
+endpoint real users depend on with whatever the demo branch had, under the
+`preview` environment's variables rather than production's. Production is now
+deployed only by `npm run deploy:prod`, from a plain export with demo mode and
+mocks off – see "The backend". To run the demo build locally instead:
 
 ```bash
 npm run demo
@@ -409,15 +415,31 @@ volumes, truck sizing, prices and the packing plan are all pure functions of the
 inventory. A key is the only thing that cannot ship, so it is the whole backend.
 
 ```bash
-npx eas-cli@latest deploy
+npm run deploy:prod
 ```
+
+That is a plain `expo export -p web` – so demo mode and mocks are off – followed by
+`eas deploy --prod --environment production`: the production URL and the production
+secrets, named together on purpose. A bare `eas deploy` takes a preview URL and the
+`preview` environment, where the key is not set, and the route answers 503. That is
+correct, and baffling if you expected production. The demo has its own script and
+its own alias for the same reason; see "The hosted demo".
 
 Set the key as an EAS environment secret — **never** as an `EXPO_PUBLIC_` variable,
 which is bundled into the app in plaintext:
 
 ```bash
-npx eas-cli@latest env:create --name VISION_API_KEY --scope project --visibility secret
+npx eas-cli@latest env:create production --name VISION_API_KEY --scope project --visibility secret
 ```
+
+**Cost.** The route's URL ships in every bundle, and until App Attest nothing proves
+a request came from Loadsy, so `src/vision/rateLimit.ts` bounds what one address can
+ask for – twenty photo sets in fifteen minutes, and three hundred per process from
+everyone – and answers 429 with a `Retry-After` beyond that, before the body is read.
+The capture screen says what a 429 means rather than blaming the photo. The counters
+live in process memory and serverless hosting runs many processes, so this is sized
+for a person, not proof against a script: the spend limit on the API key is the hard
+cap, and App Attest is the v1.1 fix.
 
 Then point the app at the deployment and turn the mocks off:
 
