@@ -20,6 +20,19 @@ no data — photos are processed and discarded — so the answers are
 "Data Not Collected" throughout. Confirm that is still true if the Vision agent starts
 retaining images server-side.
 
+**Privacy policy URL and support URL – built 21 September**
+
+Both are routes in the app, so the web page and the in-app screen are one file and
+cannot disagree: <https://loadsy.expo.app/privacy> (`app/privacy.tsx`) and
+<https://loadsy.expo.app/support> (`app/support.tsx`), linked from the foot of the
+dashboard as Apple asks. `src/domain/site.ts` holds the URLs; a test pins the host to the
+production API host in `eas.json`. The privacy page is written as claims about the code
+– the pass-through, the address counting in the rate limit, what stays on the phone – so
+when the code changes the page changes and its date moves. Two things still wait on the
+Chairman: the support address (`EXPO_PUBLIC_SUPPORT_EMAIL`; until it is set both pages say
+one is coming), and decision 6, confirming Anthropic's retention terms, which the page
+currently describes as a limited safety-monitoring hold with no training use.
+
 **No location permission, no addresses, no prices – removed 15 September**
 
 v1 has no price service, so prices came out, and with them the trip step and the

@@ -3,6 +3,7 @@ import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { MoveStatus } from '../src/domain/types';
 import { dashboardStatuses } from '../src/domain/tier';
+import { PRIVACY_PATH, SUPPORT_PATH } from '../src/domain/site';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { inventoryBlockedReason, unresolvedCount, unresolvedDuplicates } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
@@ -358,6 +359,21 @@ export default function MyMoveScreen() {
             {history.length === 0 ? 'Past moves →' : `Past moves (${history.length}) →`}
           </Text>
         </Pressable>
+
+        {/*
+          The two pages App Store Connect links to, reachable from inside the app as
+          Apple asks. At the bottom, small: they are for the person who wants them,
+          not in the way of the person who wants a truck.
+        */}
+        <View style={styles.foot}>
+          <Link href={PRIVACY_PATH} style={styles.footLink}>
+            <Text style={styles.footText}>Privacy</Text>
+          </Link>
+          <Text style={styles.footDot}>·</Text>
+          <Link href={SUPPORT_PATH} style={styles.footLink}>
+            <Text style={styles.footText}>Help</Text>
+          </Link>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -410,6 +426,10 @@ const styles = StyleSheet.create({
   ctaBody: { ...type.caption, color: colors.textMuted, lineHeight: 19 },
   link: { alignSelf: 'center', paddingVertical: space.sm },
   linkText: { ...type.body, color: colors.accent },
+  foot: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space.sm, marginTop: space.md },
+  footLink: { paddingVertical: space.xs, paddingHorizontal: space.xs },
+  footText: { ...type.caption, color: colors.textDim },
+  footDot: { ...type.caption, color: colors.textDim },
   keeping: { gap: space.md },
   keepingHead: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   keepingTitle: { ...type.heading, color: colors.text, flex: 1 },

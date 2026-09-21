@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { detectItems } from '../src/api/detect';
 import { ApiError } from '../src/api/client';
 import { MAX_PHOTOS } from '../src/domain/capture';
+import { PHOTO_TIPS } from '../src/domain/photoTips';
 import { assessPhoto, type PhotoQualitySignals } from '../src/domain/photoQuality';
 import { measureFrame } from '../src/media/frameSignals';
 import { prepareUpload } from '../src/media/prepareUpload';
@@ -17,12 +18,6 @@ import { colors, radius, space, type } from '../src/ui/theme';
 /** Screen 1 — Capture Room. */
 
 
-const TIPS = [
-  { title: 'Shoot from the doorway', body: 'A wide frame beats a close-up — Loadsy needs the whole room to judge scale.' },
-  { title: 'Then one from another corner', body: 'A second angle shows what the first hid, and lets Loadsy check its own sizes. It is the single biggest thing you can do for accuracy.' },
-  { title: 'Get the corners in', body: 'Corners give the walls a reference, which is how furniture depth gets estimated.' },
-  { title: 'Turn the lights on', body: 'Bright and still. A dark or blurry photo means guessy measurements.' },
-];
 
 export default function CaptureScreen() {
   const router = useRouter();
@@ -397,7 +392,7 @@ export default function CaptureScreen() {
 
         {tipsOpen ? (
           <Card style={styles.tips}>
-            {TIPS.map((tip) => (
+            {PHOTO_TIPS.map((tip) => (
               <View key={tip.title} style={styles.tip}>
                 <Text style={styles.tipTitle}>{tip.title}</Text>
                 <Text style={styles.tipBody}>{tip.body}</Text>
