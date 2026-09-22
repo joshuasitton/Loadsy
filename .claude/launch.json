@@ -39,6 +39,24 @@
         "npx expo export -p web && npx expo serve --port 8084"
       ],
       "port": 8084
+    },
+    {
+      "name": "loadsy-sim",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "EXPO_PUBLIC_DEMO_MODE=true EXPO_PUBLIC_USE_MOCKS=true npx expo start --ios --port 8086"
+      ],
+      "port": 8086
+    },
+    {
+      "name": "loadsy-sim-release",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "EXPO_PUBLIC_DEMO_MODE=false EXPO_PUBLIC_USE_MOCKS=true npx expo start --port 8086"
+      ],
+      "port": 8086
     }
   ]
 }

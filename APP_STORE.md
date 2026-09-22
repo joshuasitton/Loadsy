@@ -71,7 +71,10 @@ same code. A house still works; the listing just leads with apartments. Every we
 detection eval found – the wait per room, furniture counted in two rooms, the cost of a
 wrong truck – grows with the size of the move.
 
-Draft copy for E11. v1 shows no prices (decided 15 September), so no copy may promise them.
+The complete listing – every App Store Connect field, in the order the pages ask, with
+the decisions still open marked – is `docs/app-store-listing.md` (22 September). The
+draft below is what it grew from. v1 shows no prices (decided 15 September), so no copy
+may promise them.
 
 - **Subtitle:** *Apartment moves, sized right*
 - **Promotional text:** Photograph each room. Loadsy lists what's there, sizes the truck

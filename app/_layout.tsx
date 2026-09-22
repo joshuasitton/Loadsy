@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth/authStore';
 import { EntitlementProvider } from '../src/billing/entitlementStore';
 import { DEMO_MODE } from '../src/demo/mode';
+import { useWelcomeSeen } from '../src/onboarding/welcome';
 import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
 import { SignOutButton } from '../src/ui/SignOutButton';
@@ -35,6 +36,16 @@ function useDocumentTitle() {
 }
 
 /**
+ * Routes the demo's sign-in never stands in front of.
+ *
+ * The privacy policy and the help page are the two URLs App Store Connect carries, and
+ * Apple's reviewer – and anyone else – opens them without a password. The demo gate
+ * exists to give a shared link a front door; putting it in front of the policy would
+ * make the policy unreadable from the one place it is required to be readable.
+ */
+const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support', 'welcome']);
+
+/**
  * Sends signed-out visitors to the sign-in screen, and signed-in ones away from it.
  *
  * Only under DEMO_MODE. There is no real authentication in this app — see
@@ -44,16 +55,6 @@ function useDocumentTitle() {
  * and so a URL passed around a room does not drop the next person into the last
  * person's half-finished move.
  */
-/**
- * Routes the demo's sign-in never stands in front of.
- *
- * The privacy policy and the help page are the two URLs App Store Connect carries, and
- * Apple's reviewer – and anyone else – opens them without a password. The demo gate
- * exists to give a shared link a front door; putting it in front of the policy would
- * make the policy unreadable from the one place it is required to be readable.
- */
-const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support']);
-
 function useAuthGate() {
   const { status } = useAuth();
   const segments = useSegments();
@@ -70,6 +71,29 @@ function useAuthGate() {
     if (status === 'signedOut' && !onPublic) router.replace('/login');
     else if (status === 'signedIn' && onLogin) router.replace('/');
   }, [status, segments, router]);
+}
+
+/**
+ * Sends a phone that has never seen the welcome screen there, once.
+ *
+ * Not under DEMO_MODE: the demo already has a front door, the sign-in screen, and a
+ * walkthrough that lands on a prepared move does not need a second one. The welcome is
+ * still reachable at /welcome in the demo, for looking at it. Decides nothing until the
+ * flag has been read – otherwise the dashboard would flash before the redirect on every
+ * cold start, which is the wrong first impression twice over.
+ */
+function useWelcomeGate() {
+  const segments = useSegments();
+  const router = useRouter();
+  // Shared with the welcome screen's Get Started button, so the gate learns the flag
+  // changed in the same tick and does not send the person straight back.
+  const seen = useWelcomeSeen();
+
+  useEffect(() => {
+    if (DEMO_MODE || seen !== false) return;
+    if (PUBLIC_SEGMENTS.has(segments[0] ?? '')) return;
+    router.replace('/welcome');
+  }, [seen, segments, router]);
 }
 
 export default function RootLayout() {
@@ -93,6 +117,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   useAuthGate();
+  useWelcomeGate();
 
   return (
     <Stack
@@ -103,12 +128,15 @@ function RootNavigator() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },
         // Set once, for every screen with a header, so it cannot go missing from
-        // the one screen somebody happens to be stuck on. It renders nothing when
-        // signed out, so unauthenticated routes are unaffected.
-        headerRight: () => <SignOutButton />,
+        // the one screen somebody happens to be stuck on. Only under demo mode:
+        // nothing else can sign in, and iOS 26 draws the header's trailing slot as
+        // an empty glass circle when the component in it renders nothing – which is
+        // what build 4 shipped on every screen.
+        ...(DEMO_MODE ? { headerRight: () => <SignOutButton /> } : {}),
       }}
     >
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="welcome" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'My Move' }} />
       <Stack.Screen name="capture" options={{ title: 'Add Photos' }} />
       <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
