@@ -19,7 +19,8 @@ npm run typecheck     # tsc --noEmit
 npm run lint          # expo lint
 npx expo start --web  # fastest way to see the whole flow
 npm run demo          # demo mode + mocks, on web
-npm run demo:deploy   # export and promote https://loadsy.expo.app
+npm run demo:deploy   # export the demo and deploy it to https://loadsy--demo.expo.app
+npm run deploy:prod   # export the real app and deploy it to https://loadsy.expo.app
 npm run brand:icons   # regenerate the four PNG marks and verify them
 npm run eval:detect   # run the detection eval over eval-photos/
 ```

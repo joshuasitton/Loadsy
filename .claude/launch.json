@@ -30,6 +30,15 @@
         "EXPO_PUBLIC_USE_MOCKS=false npx expo start --web --port 8083"
       ],
       "port": 8083
+    },
+    {
+      "name": "loadsy-release",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "npx expo export -p web && npx expo serve --port 8084"
+      ],
+      "port": 8084
     }
   ]
 }

@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 
 import { FLOW } from '../src/domain/flow';
 import {
+  dashboardStatuses,
   FREE_FEATURES,
   FREE_STATUSES,
   isFreeStatus,
   isPremiumRoute,
   PREMIUM_FEATURES,
+  SHIPPED_STATUSES,
   unlocks,
   type GatedRoute,
 } from '../src/domain/tier';
@@ -131,4 +133,21 @@ test('a demo build can preview Premium without anything being for sale', async (
   assert.equal(billing.honour('premium'), 'premium');
   // And back down, which matters more — the free experience is the one shipping.
   assert.equal(billing.honour('free'), 'free');
+});
+
+test('a build without Premium shows only the stages that open, and nothing marked SOON', () => {
+  // Guideline 2.1: an app must not show features which are not available. With no
+  // wall to promise Reservations and Moving Day from, their rows have to go.
+  assert.deepEqual([...dashboardStatuses(false)], ['inventory', 'truckAndPrice', 'packingPlan']);
+  assert.deepEqual([...dashboardStatuses(true)], [...MOVE_STATUS_ORDER]);
+  // Free stays free, and every built stage ships – the Packing Plan is the last step.
+  for (const status of FREE_STATUSES) assert.equal(SHIPPED_STATUSES.includes(status), true);
+});
+
+test('the shipped stages are a prefix of the model order, so the current step has one index', () => {
+  // The progress bar indexes the current status into whichever list the build draws.
+  // If the shipped list were reordered or skipped a stage, a move on the Packing Plan
+  // would show "Step 3 of 3" in one build and "Step 4 of 5" – a different step – in
+  // the other.
+  assert.deepEqual([...SHIPPED_STATUSES], MOVE_STATUS_ORDER.slice(0, SHIPPED_STATUSES.length));
 });

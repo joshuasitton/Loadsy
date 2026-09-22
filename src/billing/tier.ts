@@ -22,6 +22,14 @@ export const PREMIUM_FOR_SALE = process.env.EXPO_PUBLIC_PREMIUM_FOR_SALE === 'tr
  *
  * Two, and only two: something to sell, or a demo showing what there will be to
  * sell. A store build of the MVP has neither.
+ *
+ * This is also whether Premium is PRESENT – the wall, the tier line on the dashboard,
+ * the Premium screen and the "SOON" rows. A build where Premium cannot be reached has
+ * no business showing a door to it: Apple rejects apps that present features which
+ * are not available (guideline 2.1), and a wall that says "not for sale yet" is
+ * exactly that. In such a build the finished software behind the wall – the Packing
+ * Plan and the Truck Layout – is simply part of the app, which is what "ship with no
+ * monetisation" means (sprint decision 5, 14 September).
  */
 export const PREMIUM_REACHABLE = PREMIUM_FOR_SALE || DEMO_MODE;
 

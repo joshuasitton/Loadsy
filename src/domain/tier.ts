@@ -20,7 +20,7 @@
  */
 
 import { FLOW, type FlowRoute } from './flow';
-import type { MoveStatus } from './types';
+import { MOVE_STATUS_ORDER, type MoveStatus } from './types';
 
 export type Tier = 'free' | 'premium';
 
@@ -35,6 +35,29 @@ export const FREE_STATUSES = ['inventory', 'truckAndPrice'] as const satisfies r
 
 export function isFreeStatus(status: MoveStatus): boolean {
   return (FREE_STATUSES as readonly MoveStatus[]).includes(status);
+}
+
+/**
+ * The stages that have a screen behind them.
+ *
+ * Reservations and Moving Day are rows on the dashboard with nothing to open – the
+ * spec's stubs, tagged "SOON". A build where Premium exists shows them, because the
+ * wall lists them as what Premium will add and a row is the honest place to say so. A
+ * build where Premium does not exist has no wall to promise them from, and Apple
+ * rejects apps that show features which are not available (guideline 2.1). So the
+ * list of stages a dashboard draws depends on whether Premium is present at all.
+ */
+export const SHIPPED_STATUSES = ['inventory', 'truckAndPrice', 'packingPlan'] as const satisfies readonly MoveStatus[];
+
+/**
+ * The stages a dashboard shows, in order, given whether Premium is present in the build.
+ *
+ * `MOVE_STATUS_ORDER` stays the model's order and `SHIPPED_STATUSES` a prefix of it –
+ * pinned by a test – so the current stage's index is the same in both lists and the
+ * progress bar cannot point at a different step depending on the build.
+ */
+export function dashboardStatuses(premiumPresent: boolean): readonly MoveStatus[] {
+  return premiumPresent ? MOVE_STATUS_ORDER : SHIPPED_STATUSES;
 }
 
 /**

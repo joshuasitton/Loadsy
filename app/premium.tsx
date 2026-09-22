@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEntitlement } from '../src/billing/entitlementStore';
 import { PREMIUM_FEATURES } from '../src/domain/tier';
@@ -15,8 +15,12 @@ import { colors, radius, space, type } from '../src/ui/theme';
  */
 export default function PremiumScreen() {
   const router = useRouter();
-  const { tier, canPreview, setTier } = useEntitlement();
+  const { tier, canPreview, setTier, premiumPresent } = useEntitlement();
 
+  // A store build of the MVP has no Premium to describe. The URL still exists – it is
+  // in the bundle – so it answers with the dashboard rather than a wall in front of
+  // nothing, which is the screen Apple rejects apps for (guideline 2.1).
+  if (!premiumPresent) return <Redirect href="/" />;
   if (tier === 'free') return <PremiumWall />;
 
   const built = PREMIUM_FEATURES.filter((feature) => feature.built);

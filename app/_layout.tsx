@@ -44,6 +44,16 @@ function useDocumentTitle() {
  * and so a URL passed around a room does not drop the next person into the last
  * person's half-finished move.
  */
+/**
+ * Routes the demo's sign-in never stands in front of.
+ *
+ * The privacy policy and the help page are the two URLs App Store Connect carries, and
+ * Apple's reviewer – and anyone else – opens them without a password. The demo gate
+ * exists to give a shared link a front door; putting it in front of the policy would
+ * make the policy unreadable from the one place it is required to be readable.
+ */
+const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support']);
+
 function useAuthGate() {
   const { status } = useAuth();
   const segments = useSegments();
@@ -56,7 +66,8 @@ function useAuthGate() {
     if (status === 'loading') return;
 
     const onLogin = segments[0] === 'login';
-    if (status === 'signedOut' && !onLogin) router.replace('/login');
+    const onPublic = PUBLIC_SEGMENTS.has(segments[0] ?? '');
+    if (status === 'signedOut' && !onPublic) router.replace('/login');
     else if (status === 'signedIn' && onLogin) router.replace('/');
   }, [status, segments, router]);
 }
@@ -107,6 +118,8 @@ function RootNavigator() {
       <Stack.Screen name="premium" options={{ title: 'Loadsy Premium' }} />
       <Stack.Screen name="layout-view" options={{ title: 'Truck Layout' }} />
       <Stack.Screen name="history" options={{ title: 'Past Moves' }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
+      <Stack.Screen name="support" options={{ title: 'Help' }} />
     </Stack>
   );
 }

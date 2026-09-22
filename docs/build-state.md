@@ -123,7 +123,7 @@ quality thresholds are implemented and tested but currently fed a hard-coded
 
 ## Submission blockers
 
-- **Privacy policy URL** — mandatory for App Store submission. None exists.
+- ~~**Privacy policy URL** — mandatory for App Store submission. None exists.~~ Built 21 September: `/privacy` and `/support` are routes on the production site; see `APP_STORE.md`. The support address is still the Chairman's to choose.
 - **App Privacy nutrition label** — drafted in `APP_STORE.md`; depends on the
   pass-through staying a pass-through.
 - **Apple Developer Program enrollment** — status unknown. Individual is

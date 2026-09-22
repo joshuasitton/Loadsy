@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { DEMO_MODE } from '../demo/mode';
 import { unlocks, type GatedRoute, type Tier } from '../domain/tier';
-import { honour, PREMIUM_FOR_SALE } from './tier';
+import { honour, PREMIUM_FOR_SALE, PREMIUM_REACHABLE } from './tier';
 
 /**
  * Which tier the person using the app is on.
@@ -39,6 +39,12 @@ interface EntitlementValue {
   canPreview: boolean;
   /** True when Premium is something a person could actually buy. False for MVP. */
   forSale: boolean;
+  /**
+   * True when Premium exists in this build at all – the wall, the tier line, the
+   * "SOON" rows. False in a store build of the MVP, where the built Premium screens
+   * are simply part of the app. See PREMIUM_REACHABLE in ./tier.ts.
+   */
+  premiumPresent: boolean;
   setTier: (tier: Tier) => void;
   /** Whether this person has asked to be told when Premium ships. */
   interested: boolean;
@@ -88,13 +94,20 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     void persist({ interested: true });
   }, []);
 
-  const allows = useCallback((route: GatedRoute) => unlocks(tier, route), [tier]);
+  // Where Premium is not present there is nothing to be locked out of: a build that
+  // can never grant Premium and still walled off the Packing Plan would ship a door
+  // with no key. The domain rule is unchanged; this is the build declining to apply it.
+  const allows = useCallback(
+    (route: GatedRoute) => !PREMIUM_REACHABLE || unlocks(tier, route),
+    [tier],
+  );
 
   const value = useMemo(
     () => ({
       tier,
       canPreview: DEMO_MODE,
       forSale: PREMIUM_FOR_SALE,
+      premiumPresent: PREMIUM_REACHABLE,
       setTier,
       interested,
       registerInterest,
