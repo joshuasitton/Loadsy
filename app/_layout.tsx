@@ -1,12 +1,12 @@
 import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth/authStore';
 import { EntitlementProvider } from '../src/billing/entitlementStore';
 import { DEMO_MODE } from '../src/demo/mode';
-import { readWelcomeSeen } from '../src/onboarding/welcome';
+import { useWelcomeSeen } from '../src/onboarding/welcome';
 import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
 import { SignOutButton } from '../src/ui/SignOutButton';
@@ -78,25 +78,16 @@ function useAuthGate() {
  *
  * Not under DEMO_MODE: the demo already has a front door, the sign-in screen, and a
  * walkthrough that lands on a prepared move does not need a second one. The welcome is
- * still reachable at /welcome in the demo, for looking at it. Reads the flag once and
- * decides nothing until it has – otherwise the dashboard would flash before the
- * redirect on every cold start, which is the wrong first impression twice over.
+ * still reachable at /welcome in the demo, for looking at it. Decides nothing until the
+ * flag has been read – otherwise the dashboard would flash before the redirect on every
+ * cold start, which is the wrong first impression twice over.
  */
 function useWelcomeGate() {
   const segments = useSegments();
   const router = useRouter();
-  const [seen, setSeen] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (DEMO_MODE) return;
-    let cancelled = false;
-    void readWelcomeSeen().then((value) => {
-      if (!cancelled) setSeen(value);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Shared with the welcome screen's Get Started button, so the gate learns the flag
+  // changed in the same tick and does not send the person straight back.
+  const seen = useWelcomeSeen();
 
   useEffect(() => {
     if (DEMO_MODE || seen !== false) return;
