@@ -20,7 +20,7 @@
  */
 
 import { FLOW, type FlowRoute } from './flow';
-import { MOVE_STATUS_ORDER, type MoveStatus } from './types';
+import type { MoveStatus } from './types';
 
 export type Tier = 'free' | 'premium';
 
@@ -38,26 +38,40 @@ export function isFreeStatus(status: MoveStatus): boolean {
 }
 
 /**
- * The stages that have a screen behind them.
+ * What the dashboard lists, in order: one row per screen, derived from `FLOW` so a step
+ * cannot exist in the flow and be missing from the dashboard – which is how Where to
+ * Rent and Truck Layout went unreachable from My Move in the first store build. Truck
+ * Layout is the detour off the Packing Plan, listed after it; it is not in `FLOW`
+ * because Back and Forward do not pass through it, and that is still true.
  *
- * Reservations and Moving Day are rows on the dashboard with nothing to open – the
- * spec's stubs, tagged "SOON". A build where Premium exists shows them, because the
- * wall lists them as what Premium will add and a row is the honest place to say so. A
- * build where Premium does not exist has no wall to promise them from, and Apple
- * rejects apps that show features which are not available (guideline 2.1). So the
- * list of stages a dashboard draws depends on whether Premium is present at all.
+ * Reservations and Moving Day have no screen – the spec's stubs, tagged "SOON". A build
+ * where Premium exists shows them, because the wall promises them and a row is the
+ * honest place to say so. A build where Premium does not exist has no wall to promise
+ * them from, and Apple rejects apps that show features which are not available
+ * (guideline 2.1), so they are left out. Which stage a row belongs to is carried on it,
+ * so the progress bar can be drawn from the same list.
  */
-export const SHIPPED_STATUSES = ['inventory', 'truckAndPrice', 'packingPlan'] as const satisfies readonly MoveStatus[];
+export interface DashboardRow {
+  /** The screen, or null for a stub with nothing to open. */
+  route: GatedRoute | null;
+  status: MoveStatus;
+  title: string;
+}
 
-/**
- * The stages a dashboard shows, in order, given whether Premium is present in the build.
- *
- * `MOVE_STATUS_ORDER` stays the model's order and `SHIPPED_STATUSES` a prefix of it –
- * pinned by a test – so the current stage's index is the same in both lists and the
- * progress bar cannot point at a different step depending on the build.
- */
-export function dashboardStatuses(premiumPresent: boolean): readonly MoveStatus[] {
-  return premiumPresent ? MOVE_STATUS_ORDER : SHIPPED_STATUSES;
+export function dashboardRows(premiumPresent: boolean): readonly DashboardRow[] {
+  const rows: DashboardRow[] = FLOW.map((step) => ({
+    route: step.route,
+    status: step.status,
+    title: step.title,
+  }));
+  rows.push({ route: '/layout-view', status: 'packingPlan', title: 'Truck Layout' });
+  if (premiumPresent) {
+    rows.push(
+      { route: null, status: 'reservations', title: 'Reservations' },
+      { route: null, status: 'movingDay', title: 'Moving Day' },
+    );
+  }
+  return rows;
 }
 
 /**

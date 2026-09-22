@@ -216,6 +216,32 @@ including development, unlike `USE_MOCKS` and `DEMO_MODE`: those default on in d
 because a developer wants the convenient thing, and this one defaults off because a
 developer wants to be looking at the screen users will actually get.
 
+### Every screen is a row on My Move
+
+The dashboard's rows come from `dashboardRows()` in `src/domain/tier.ts`, which derives
+them from `FLOW` and appends Truck Layout – the detour off the Packing Plan – and, only
+where Premium is present, the two "SOON" stubs. They used to be a hand-written list of
+three, and the first store build (22 September) could not reach Where to Rent or Truck
+Layout from My Move at all: both existed, both were in the flow, and neither had a row.
+Deriving the list is what makes that impossible to repeat, and `__tests__/tier.test.ts`
+pins that every `FLOW` route is a row.
+
+Two rows share a stage – Truck Size and Where to Rent are both `truckAndPrice` – so a
+row's state is decided by its stage against the move's, not by its position: both read as
+current when the move is there. The progress bar counts rows, and "Step n" is the first
+current one.
+
+### The welcome screen
+
+`app/welcome.tsx` is shown once per phone, on the first launch of a release build, and
+never again – the flag is `src/onboarding/welcome.ts`, read once in the root layout before
+anything is drawn so the dashboard cannot flash first. It is three lines on what the app
+does and a Get Started button; no pages, no account, nothing to skip on later opens. Asked
+for after the first TestFlight install, where an empty dashboard was the right screen for
+the fiftieth launch and a cold one for the first. It does not appear under `DEMO_MODE`,
+where the sign-in screen is already the front door, but `/welcome` still opens for looking
+at it. The tagline is deliberately absent from it while "Right price." is under review.
+
 ### Moving through the flow
 
 The four working screens — Inventory, Truck Size, Where to Rent, Packing Plan —

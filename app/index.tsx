@@ -1,8 +1,8 @@
 import { Link, useRouter } from 'expo-router';
 import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { MoveStatus } from '../src/domain/types';
-import { dashboardStatuses } from '../src/domain/tier';
+import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
+import { dashboardRows, isPremiumRoute, type GatedRoute } from '../src/domain/tier';
 import { PRIVACY_PATH, SUPPORT_PATH } from '../src/domain/site';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { inventoryBlockedReason, unresolvedCount, unresolvedDuplicates } from '../src/domain/confidence';
@@ -15,12 +15,9 @@ import { Card, PrimaryButton, Screen, SectionLabel } from '../src/ui/components'
 import { formatCuFt, formatDateTime } from '../src/ui/format';
 import { colors, radius, space, type } from '../src/ui/theme';
 
-/** Screen 7 — My Move dashboard. 5-step progress tracker bound to MoveStatus. */
+/** Screen 7 — My Move dashboard. One row per screen, bound to MoveStatus. */
 
-interface StepRow {
-  status: MoveStatus;
-  title: string;
-  href: '/inventory' | '/truck' | '/packing' | null;
+interface RowCopy {
   detail: (ctx: ReturnType<typeof useMove>) => string;
   /**
    * Why this row cannot be opened yet, or null when it can.
@@ -31,19 +28,8 @@ interface StepRow {
    * dimensions — or on an empty inventory. A gate with a second door is not a gate.
    */
   lockedReason: (ctx: ReturnType<typeof useMove>) => string | null;
-  /**
-   * Whether this row is behind the paywall.
-   *
-   * Not derived from `isPremiumStatus(row.status)` even though it could be —
-   * `status` is what the row REPRESENTS, and Reservations and Moving Day are
-   * premium for a product reason rather than because of where they sit in the
-   * status order. Writing it out keeps the two facts separable if the order ever
-   * changes.
-   */
-  premium: boolean;
 }
 
-/** The single reason string, so Screen 7 and Screen 2 can never disagree. */
 function inventoryGate(ctx: ReturnType<typeof useMove>): string | null {
   return inventoryBlockedReason(ctx.move);
 }
@@ -52,12 +38,13 @@ function inventoryGate(ctx: ReturnType<typeof useMove>): string | null {
  * What a locked row says instead of its own summary.
  *
  * The unlocked copy describes a result — "12 load steps ready" — and printing
- * that next to a lock would be describing something the user cannot look at.
+ * that under a lock would be advertising a thing the tap will not deliver.
  */
-function premiumDetail(status: MoveStatus): string {
-  switch (status) {
+function premiumDetail(row: { route: GatedRoute | null; status: MoveStatus }): string {
+  if (row.route === '/layout-view') return 'The load, drawn from the side and from above';
+  switch (row.status) {
     case 'packingPlan':
-      return 'The load order and the truck layout, solved from your inventory';
+      return 'The order to load it in, and where each piece goes';
     case 'reservations':
       return 'Hold the truck you picked and keep the confirmation here';
     default:
@@ -65,11 +52,13 @@ function premiumDetail(status: MoveStatus): string {
   }
 }
 
-const ROWS: StepRow[] = [
-  {
-    status: 'inventory',
-    title: 'Inventory',
-    href: '/inventory',
+/**
+ * The words for each row. The rows themselves – which screens, in what order – come
+ * from the domain (`dashboardRows`), so a screen cannot be in the flow and missing
+ * here. Keyed by route for screens and by status for the two stubs.
+ */
+const COPY: Record<GatedRoute | 'reservations' | 'movingDay', RowCopy> = {
+  '/inventory': {
     detail: (ctx) => {
       const count = allItems(ctx.move).length;
       if (count === 0) return 'No items yet — start by taking photos';
@@ -79,46 +68,39 @@ const ROWS: StepRow[] = [
         : `${count} items · ${formatCuFt(ctx.recommendation.rawCuFt)} ft³`;
     },
     lockedReason: () => null,
-    premium: false,
   },
-  {
-    status: 'truckAndPrice',
-    title: 'Truck & Where to Rent',
-    href: '/truck',
-    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · where to rent one`,
+  '/truck': {
+    detail: (ctx) => inventoryGate(ctx) ?? `${TRUCK_LABEL[ctx.recommendation.size]} · with the 15% reserve`,
     lockedReason: inventoryGate,
-    premium: false,
   },
-  {
-    status: 'packingPlan',
-    title: 'Packing Plan',
-    href: '/packing',
+  '/rent': {
+    detail: (ctx) => inventoryGate(ctx) ?? `Who rents a ${TRUCK_LABEL[ctx.recommendation.size]}, and near you`,
+    lockedReason: inventoryGate,
+  },
+  '/packing': {
     detail: (ctx) =>
       inventoryGate(ctx) ??
       (ctx.packingPlan
         ? `${ctx.packingPlan.loadSteps.length} load steps ready`
         : 'Build a load order once your inventory is set'),
     lockedReason: inventoryGate,
-    premium: true,
   },
-  {
-    // Spec §3 Screen 7: MVP-scope stub. No booking logic behind this.
-    status: 'reservations',
-    title: 'Reservations',
-    href: null,
+  '/layout-view': {
+    detail: (ctx) =>
+      inventoryGate(ctx) ??
+      (ctx.packingPlan ? 'The load, drawn from the side and from above' : 'Drawn once the load order exists'),
+    lockedReason: inventoryGate,
+  },
+  // Spec §3 Screen 7: MVP-scope stubs. No booking logic behind these.
+  reservations: {
     detail: () => 'Book directly with the vendor, then check it off here',
     lockedReason: () => null,
-    premium: true,
   },
-  {
-    status: 'movingDay',
-    title: 'Moving Day',
-    href: null,
+  movingDay: {
     detail: () => 'Your day-of checklist — coming together as you go',
     lockedReason: () => null,
-    premium: true,
   },
-];
+};
 
 export default function MyMoveScreen() {
   const ctx = useMove();
@@ -126,14 +108,22 @@ export default function MyMoveScreen() {
   const { history, complete } = useHistory();
   const router = useRouter();
   /*
-   * Which stages this build draws. With Premium present, all five – the two stubs
-   * are what the wall promises. Without it, the three that open: a release with
-   * nothing to sell must not show "SOON" rows it cannot deliver (guideline 2.1),
-   * and the built Premium screens are simply the end of the flow.
+   * One row per screen, from the domain. With Premium present the two stubs follow –
+   * they are what the wall promises. Without it, a release with nothing to sell must
+   * not show "SOON" rows it cannot deliver (guideline 2.1).
+   *
+   * A row is done when its stage is behind the move's, current when it is the move's
+   * stage – two rows can share a stage (Truck Size and Where to Rent), and both read as
+   * current – and to-do otherwise. The bar counts rows, and "Step n" is the first
+   * current row.
    */
-  const statuses = dashboardStatuses(premiumPresent);
-  const rows = ROWS.filter((row) => statuses.includes(row.status));
-  const currentIndex = statuses.indexOf(ctx.move.status);
+  const rows = dashboardRows(premiumPresent);
+  const stage = MOVE_STATUS_ORDER.indexOf(ctx.move.status);
+  const rowState = (status: MoveStatus): 'done' | 'current' | 'todo' => {
+    const at = MOVE_STATUS_ORDER.indexOf(status);
+    return at < stage ? 'done' : at === stage ? 'current' : 'todo';
+  };
+  const currentIndex = Math.max(0, rows.findIndex((row) => rowState(row.status) === 'current'));
   const itemCount = allItems(ctx.move).length;
 
   // Two taps rather than a system alert: finishing a move clears the inventory,
@@ -171,29 +161,32 @@ export default function MyMoveScreen() {
         <DemoBar />
 
         <View style={styles.progressTrack} accessibilityRole="progressbar"
-          accessibilityValue={{ min: 1, max: statuses.length, now: currentIndex + 1 }}
-          accessibilityLabel={`Step ${currentIndex + 1} of ${statuses.length}`}>
-          {statuses.map((status, index) => (
+          accessibilityValue={{ min: 1, max: rows.length, now: currentIndex + 1 }}
+          accessibilityLabel={`Step ${currentIndex + 1} of ${rows.length}`}>
+          {rows.map((row) => (
             <View
-              key={status}
+              key={row.title}
               style={[
                 styles.progressSegment,
-                index <= currentIndex && styles.progressSegmentDone,
+                rowState(row.status) !== 'todo' && styles.progressSegmentDone,
               ]}
             />
           ))}
         </View>
-        <Text style={styles.progressCaption}>Step {currentIndex + 1} of {statuses.length}</Text>
+        <Text style={styles.progressCaption}>Step {currentIndex + 1} of {rows.length}</Text>
 
         <SectionLabel>YOUR MOVE</SectionLabel>
         <View style={styles.rows}>
           {rows.map((row, index) => {
-            const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo';
-            const isStub = row.href === null;
-            const locked = row.lockedReason(ctx);
+            const state = rowState(row.status);
+            const isStub = row.route === null;
+            const copy = COPY[row.route ?? (row.status as 'reservations' | 'movingDay')];
+            const locked = copy.lockedReason(ctx);
             // Only a Premium row in a build where Premium exists; otherwise the row
             // is an ordinary step and draws no tier line.
-            const premium = row.premium && premiumPresent;
+            const premium = premiumPresent && (row.route === null || isPremiumRoute(row.route));
+            const previousPremium =
+              index > 0 && (rows[index - 1]!.route === null || isPremiumRoute(rows[index - 1]!.route!));
             /*
              * Behind the paywall for this account — which makes the row MORE
              * interactive, not less. It is the one place the wall is worth
@@ -211,9 +204,9 @@ export default function MyMoveScreen() {
              * written yet, and a Premium account would not find them either.
              */
             const tag = isStub ? 'SOON' : null;
-            const detail = gated && locked === null ? premiumDetail(row.status) : row.detail(ctx);
+            const detail = gated && locked === null ? premiumDetail(row) : copy.detail(ctx);
             return (
-              <Fragment key={row.status}>
+              <Fragment key={row.title}>
                 {/*
                   Drawn once, where the free app ends. Two tiers scattered through
                   one list as five identical rows with small labels is a thing you
@@ -221,7 +214,7 @@ export default function MyMoveScreen() {
                   see. It also stops "PREMIUM" reading as a boast about the row
                   rather than a boundary.
                 */}
-                {premium && !rows[index - 1]?.premium ? (
+                {premium && !previousPremium ? (
                   <View style={styles.tierBreak}>
                     <Text style={styles.tierBreakLabel}>PREMIUM</Text>
                     <View style={styles.tierBreakRule} />
@@ -231,7 +224,7 @@ export default function MyMoveScreen() {
                 disabled={blocked}
                 onPress={() => {
                   if (gated) return router.push('/premium');
-                  if (row.href && !locked) router.push(row.href);
+                  if (row.route && !locked) router.push(row.route);
                 }}
                 accessibilityRole={blocked ? 'text' : 'button'}
                 accessibilityLabel={`${row.title}.${premium ? ' Premium.' : ''} ${detail}`}

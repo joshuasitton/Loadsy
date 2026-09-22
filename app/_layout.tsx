@@ -1,11 +1,12 @@
 import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth/authStore';
 import { EntitlementProvider } from '../src/billing/entitlementStore';
 import { DEMO_MODE } from '../src/demo/mode';
+import { readWelcomeSeen } from '../src/onboarding/welcome';
 import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
 import { SignOutButton } from '../src/ui/SignOutButton';
@@ -52,7 +53,7 @@ function useDocumentTitle() {
  * exists to give a shared link a front door; putting it in front of the policy would
  * make the policy unreadable from the one place it is required to be readable.
  */
-const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support']);
+const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support', 'welcome']);
 
 function useAuthGate() {
   const { status } = useAuth();
@@ -70,6 +71,38 @@ function useAuthGate() {
     if (status === 'signedOut' && !onPublic) router.replace('/login');
     else if (status === 'signedIn' && onLogin) router.replace('/');
   }, [status, segments, router]);
+}
+
+/**
+ * Sends a phone that has never seen the welcome screen there, once.
+ *
+ * Not under DEMO_MODE: the demo already has a front door, the sign-in screen, and a
+ * walkthrough that lands on a prepared move does not need a second one. The welcome is
+ * still reachable at /welcome in the demo, for looking at it. Reads the flag once and
+ * decides nothing until it has – otherwise the dashboard would flash before the
+ * redirect on every cold start, which is the wrong first impression twice over.
+ */
+function useWelcomeGate() {
+  const segments = useSegments();
+  const router = useRouter();
+  const [seen, setSeen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    void readWelcomeSeen().then((value) => {
+      if (!cancelled) setSeen(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (DEMO_MODE || seen !== false) return;
+    if (PUBLIC_SEGMENTS.has(segments[0] ?? '')) return;
+    router.replace('/welcome');
+  }, [seen, segments, router]);
 }
 
 export default function RootLayout() {
@@ -93,6 +126,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   useAuthGate();
+  useWelcomeGate();
 
   return (
     <Stack
@@ -109,6 +143,7 @@ function RootNavigator() {
       }}
     >
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="welcome" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'My Move' }} />
       <Stack.Screen name="capture" options={{ title: 'Add Photos' }} />
       <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
