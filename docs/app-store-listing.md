@@ -13,16 +13,22 @@ and looks for in copy.
 ## Screenshots
 
 Apple currently requires one iPhone set, at 6.9" (1320 × 2868 px, portrait). Smaller
-sizes are scaled from it unless uploaded separately. The five shots are in
-`store/screenshots-1.0/`, taken from the app on an iPhone 17 Pro Max simulator with the
-2-bedroom inventory loaded and the store build's chrome – no demo bar, no tier line.
-Upload in this order; the first two are what shows in search results:
+sizes are scaled from it unless uploaded separately. Six shots are in
+`store/screenshots-1.0/` (not versioned – regenerated from the simulator), taken on 22
+September from the app on an iPhone 17 Pro Max simulator through Expo Go, with the
+2-bedroom inventory loaded and the store build's chrome: no demo bar, no tier line, no
+sign-out. Upload in this order; the first two are what shows in search results:
 
-1. `01-inventory.png` – the inventory with the confidence check visible
+1. `01-inventory.png` – the inventory, 41 items, "looks good"
 2. `02-truck.png` – the recommendation and its breakdown
 3. `03-rent.png` – where to rent
 4. `04-packing.png` – the load order
-5. `05-layout.png` – the solved truck, drawn
+5. `05-layout.png` – the solved truck, drawn from the side
+6. `00-welcome.png` – the welcome screen; optional, last if used
+
+The inventory shot shows a clean list rather than the confidence check `APP_STORE.md`
+asked for, because the prepared 2-bedroom move has nothing left to check. A shot with
+the check visible needs a real capture, which comes with the phone test (E7).
 
 No app preview video. Not required, and a bad one is worse than none.
 

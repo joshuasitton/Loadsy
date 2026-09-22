@@ -22,3 +22,6 @@ expo-env.d.ts
 
 # Local secrets – the vision key for a live dev server. Never committed; see README.
 .env*.local
+
+# Store screenshots are large generated PNGs; regenerated from the simulator, not versioned.
+/store/

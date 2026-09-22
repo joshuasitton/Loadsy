@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useAuth } from '../auth/authStore';
+import { DEMO_MODE } from '../demo/mode';
 import { colors, radius, space, type } from './theme';
 
 /**
@@ -12,11 +13,16 @@ import { colors, radius, space, type } from './theme';
  *
  * Renders nothing when signed out, so the login screen and any future
  * unauthenticated route are unaffected without needing to know about this.
+ *
+ * And nothing outside demo mode, whatever storage says. Only the demo can sign
+ * anybody in, so a release build has nothing to sign out of – but a phone that ran
+ * the demo build first still holds its session, and showed "Sign out" in every
+ * header of the store-look app while the screenshots were being taken.
  */
 export function SignOutButton() {
   const { status, signOut } = useAuth();
 
-  if (status !== 'signedIn') return null;
+  if (!DEMO_MODE || status !== 'signedIn') return null;
 
   return (
     <Pressable

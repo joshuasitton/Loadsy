@@ -36,16 +36,6 @@ function useDocumentTitle() {
 }
 
 /**
- * Sends signed-out visitors to the sign-in screen, and signed-in ones away from it.
- *
- * Only under DEMO_MODE. There is no real authentication in this app — see
- * src/auth/demoCredentials.ts — and putting a bundled password in front of a
- * shipped build would be security theatre that protects nothing while making the
- * product worse. The gate exists so a demo link opens where a product opens,
- * and so a URL passed around a room does not drop the next person into the last
- * person's half-finished move.
- */
-/**
  * Routes the demo's sign-in never stands in front of.
  *
  * The privacy policy and the help page are the two URLs App Store Connect carries, and
@@ -55,6 +45,16 @@ function useDocumentTitle() {
  */
 const PUBLIC_SEGMENTS = new Set(['login', 'privacy', 'support', 'welcome']);
 
+/**
+ * Sends signed-out visitors to the sign-in screen, and signed-in ones away from it.
+ *
+ * Only under DEMO_MODE. There is no real authentication in this app — see
+ * src/auth/demoCredentials.ts — and putting a bundled password in front of a
+ * shipped build would be security theatre that protects nothing while making the
+ * product worse. The gate exists so a demo link opens where a product opens,
+ * and so a URL passed around a room does not drop the next person into the last
+ * person's half-finished move.
+ */
 function useAuthGate() {
   const { status } = useAuth();
   const segments = useSegments();
@@ -128,9 +128,11 @@ function RootNavigator() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },
         // Set once, for every screen with a header, so it cannot go missing from
-        // the one screen somebody happens to be stuck on. It renders nothing when
-        // signed out, so unauthenticated routes are unaffected.
-        headerRight: () => <SignOutButton />,
+        // the one screen somebody happens to be stuck on. Only under demo mode:
+        // nothing else can sign in, and iOS 26 draws the header's trailing slot as
+        // an empty glass circle when the component in it renders nothing – which is
+        // what build 4 shipped on every screen.
+        ...(DEMO_MODE ? { headerRight: () => <SignOutButton /> } : {}),
       }}
     >
       <Stack.Screen name="login" options={{ headerShown: false }} />
