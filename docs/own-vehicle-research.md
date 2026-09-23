@@ -35,7 +35,8 @@ passes the tailgate.
 
 Once the app is live, the "Mine isn't listed" counts decide the order: filter the
 production deployment's logs in the EAS dashboard on `vehicle_not_listed` and research the
-most-asked body type and make first. Until there are counts, use the order below.
+most-asked body type, make and model years first – the years say which generation's
+figures to find. Until there are counts, use the order below.
 
 ## Where to look, in order
 

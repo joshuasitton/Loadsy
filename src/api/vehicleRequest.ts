@@ -20,7 +20,7 @@ export async function sendVehicleRequest(request: VehicleRequest): Promise<void>
     await fetch(resolveUrl('/v1/vehicle-request'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body: request.body, make: request.make }),
+      body: JSON.stringify({ body: request.body, make: request.make, year: request.year }),
     });
   } catch {
     // Deliberately silent – see above.

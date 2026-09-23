@@ -10,7 +10,7 @@ import {
   type BodyType,
   type OwnVehicle,
 } from '../domain/ownVehicle';
-import { VEHICLE_MAKES, type VehicleMake } from '../domain/vehicleRequest';
+import { modelYears, VEHICLE_MAKES, type VehicleMake } from '../domain/vehicleRequest';
 import { sendVehicleRequest } from '../api/vehicleRequest';
 import { OWN_VEHICLES } from '../domain/ownVehicles';
 import type { Move } from '../domain/types';
@@ -182,12 +182,15 @@ function VehiclePicker({
 /**
  * "Mine isn't listed": the truck, and – if the person chooses to say – which kind of
  * vehicle, so the next ones researched are the ones people drive. Decided 23 September.
- * Two picks from fixed lists and a button that says what it sends; nothing is sent
+ * Three picks from fixed lists and a button that says what it sends; nothing is sent
  * until it is pressed, and nothing typed is ever sent. See src/domain/vehicleRequest.ts.
  */
 function NotListed() {
   const [body, setBody] = useState<BodyType | null>(null);
   const [make, setMake] = useState<VehicleMake | null>(null);
+  const [year, setYear] = useState<string | null>(null);
+  // Once per opening: the list only moves in January, and a re-render must not reorder it.
+  const [years] = useState(() => modelYears(new Date()));
   const [sent, setSent] = useState(false);
 
   return (
@@ -213,16 +216,24 @@ function NotListed() {
               <Choice key={m} label={m} selected={make === m} onPress={() => setMake(m)} />
             ))}
           </View>
+          {/* One scrolling row: twenty-odd years as wrapped chips would push the button
+              off the sheet. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.yearRow}>
+            {years.map((y) => (
+              <Choice key={y} label={y} selected={year === y} onPress={() => setYear(y)} />
+            ))}
+          </ScrollView>
           <Text style={styles.note}>
-            Sends only the type and make you pick – nothing about you, your phone or your move.
+            Sends only the type, make and year you pick – nothing about you, your phone or your
+            move.
           </Text>
           <SecondaryButton
             title="Count my vehicle"
-            disabled={body === null || make === null}
+            disabled={body === null || make === null || year === null}
             onPress={() => {
-              if (body === null || make === null) return;
+              if (body === null || make === null || year === null) return;
               setSent(true);
-              void sendVehicleRequest({ body, make });
+              void sendVehicleRequest({ body, make, year });
             }}
           />
         </>
@@ -306,6 +317,7 @@ const styles = StyleSheet.create({
   vehicleRowSelected: { borderColor: colors.accent, backgroundColor: colors.accentDim },
   pressed: { opacity: 0.85 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  yearRow: { gap: space.sm, paddingRight: space.lg },
   choice: {
     paddingVertical: space.xs + 2,
     paddingHorizontal: space.md,

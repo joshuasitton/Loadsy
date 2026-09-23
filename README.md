@@ -431,16 +431,20 @@ The choice is stored on the move, on the device, like the ceiling height, and is
 sent.
 
 **"Mine isn't listed" is counted** (decided later on 23 September), because it is the
-number that says which vehicle to research next. The person picks a body type and a make
-from fixed lists and presses "Count my vehicle"; nothing is sent before that, and nothing
-typed is ever sent, because a free-text box is where a name or a phone number would
-arrive. `/v1/vehicle-request` writes one log line – `{"event":"vehicle_not_listed",
-"body":"suv","make":"Honda"}` – and keeps nothing else. `src/domain/vehicleRequest.ts` is
+number that says which vehicle to research next. The person picks a body type, a make and
+a model year from fixed lists and presses "Count my vehicle"; nothing is sent before that,
+and nothing typed is ever sent, because a free-text box is where a name or a phone number
+would arrive. The year is there because one make's SUV is several generations with
+different cargo floors – the count has to say which figures to look up, not only which
+badge. The years run from next year back twenty, then "Older" and "Not sure", computed from
+the date so the list does not stop a year short every January. `/v1/vehicle-request`
+writes one log line – `{"event":"vehicle_not_listed","body":"suv","make":"Honda",
+"year":"2019"}` – and keeps nothing else. `src/domain/vehicleRequest.ts` is
 the contract for both ends, and it refuses a request with any extra field rather than
 dropping it, so the payload can only grow by someone changing that function and its test.
 
 The counts live in the deployment's logs rather than a database, because a table would be
-a second thing to secure and pay for, holding two words a row. Read them from the EAS
+a second thing to secure and pay for, holding three words a row. Read them from the EAS
 dashboard, filtering on `vehicle_not_listed`. How long the logs are kept is the hosting
 plan's, not Loadsy's, so read them before each research round rather than expecting a
 year of history. Each address is counted three times an hour at most, in memory – one

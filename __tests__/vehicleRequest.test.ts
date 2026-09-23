@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  modelYears,
   parseVehicleRequest,
   VEHICLE_MAKES,
   VEHICLE_REQUEST_PER_CLIENT,
@@ -10,17 +11,25 @@ import {
 
 /*
  * "Mine isn't listed" is the one thing Loadsy's server keeps, so what it keeps is pinned
- * here: two picks from fixed lists, and nothing a person could type. The route and the
+ * here: three picks from fixed lists, and nothing a person could type. The route and the
  * client are both exercised with the network and the log stubbed.
  */
 
 const ROUTE = new URL('../app/v1/vehicle-request+api.ts', import.meta.url).href;
 const CLIENT = new URL('../src/api/vehicleRequest.ts', import.meta.url).href;
 
-test('only a known body type and a known make are accepted', () => {
-  assert.deepEqual(parseVehicleRequest({ body: 'suv', make: 'Honda' }), { body: 'suv', make: 'Honda' });
-  assert.equal(parseVehicleRequest({ body: 'spaceship', make: 'Honda' }), null);
-  assert.equal(parseVehicleRequest({ body: 'suv', make: 'honda' }), null, 'case matters – the list is the list');
+const SEPT_2026 = new Date('2026-09-23T12:00:00Z');
+
+test('only a known body type, make and model year are accepted', () => {
+  assert.deepEqual(parseVehicleRequest({ body: 'suv', make: 'Honda', year: '2019' }, SEPT_2026), {
+    body: 'suv',
+    make: 'Honda',
+    year: '2019',
+  });
+  assert.equal(parseVehicleRequest({ body: 'spaceship', make: 'Honda', year: '2019' }, SEPT_2026), null);
+  assert.equal(parseVehicleRequest({ body: 'suv', make: 'honda', year: '2019' }, SEPT_2026), null, 'case matters – the list is the list');
+  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda' }, SEPT_2026), null, 'the year is required – "Not sure" is how to skip it');
+  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda', year: 2019 }, SEPT_2026), null, 'a year is one of the listed strings');
   assert.equal(parseVehicleRequest({ body: 'suv' }), null);
   assert.equal(parseVehicleRequest(null), null);
   assert.equal(parseVehicleRequest([]), null);
@@ -28,14 +37,27 @@ test('only a known body type and a known make are accepted', () => {
 });
 
 test('an extra field is refused, not trimmed – nothing more can be sent without this changing', () => {
-  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda', model: 'CR-V' }), null);
-  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda', email: 'a@b.c' }), null);
+  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda', year: '2019', model: 'CR-V' }, SEPT_2026), null);
+  assert.equal(parseVehicleRequest({ body: 'suv', make: 'Honda', year: '2019', email: 'a@b.c' }, SEPT_2026), null);
 });
 
-test('the log line is the event and the two picks, and nothing else', () => {
+test('the years run from next year back twenty, then "Older" and "Not sure", and move each January', () => {
+  const years = modelYears(SEPT_2026);
+  assert.equal(years[0], '2027', 'next model year is on sale in the autumn');
+  assert.equal(years[20], '2007');
+  assert.deepEqual(years.slice(-2), ['Older', 'Not sure']);
+  assert.equal(modelYears(new Date('2027-01-02T00:00:00Z'))[0], '2028');
+  // A year past the newest, or before the oldest, is refused – "Older" covers those.
+  assert.equal(parseVehicleRequest({ body: 'car', make: 'Other', year: '2028' }, SEPT_2026), null);
+  assert.equal(parseVehicleRequest({ body: 'car', make: 'Other', year: '2006' }, SEPT_2026), null);
+  assert.ok(parseVehicleRequest({ body: 'car', make: 'Other', year: 'Older' }, SEPT_2026));
+  assert.ok(parseVehicleRequest({ body: 'car', make: 'Other', year: 'Not sure' }, SEPT_2026));
+});
+
+test('the log line is the event and the three picks, and nothing else', () => {
   assert.equal(
-    vehicleRequestLogLine({ body: 'minivan', make: 'Toyota' }),
-    '{"event":"vehicle_not_listed","body":"minivan","make":"Toyota"}',
+    vehicleRequestLogLine({ body: 'minivan', make: 'Toyota', year: '2021' }),
+    '{"event":"vehicle_not_listed","body":"minivan","make":"Toyota","year":"2021"}',
   );
   assert.equal(VEHICLE_MAKES.at(-1), 'Other', 'every make has somewhere to go');
 });
@@ -61,15 +83,15 @@ function post(body: unknown, address = '203.0.113.7'): Request {
 
 test('the route logs one line for a valid pick, and never the address it came from', async () => {
   const { POST } = await import(`${ROUTE}?case=valid`);
-  const { result, lines } = await withCapturedLog<Response>(() => POST(post({ body: 'pickup', make: 'Ford' })));
+  const { result, lines } = await withCapturedLog<Response>(() => POST(post({ body: 'pickup', make: 'Ford', year: 'Not sure' })));
   assert.equal(result.status, 204);
-  assert.deepEqual(lines, ['{"event":"vehicle_not_listed","body":"pickup","make":"Ford"}']);
+  assert.deepEqual(lines, ['{"event":"vehicle_not_listed","body":"pickup","make":"Ford","year":"Not sure"}']);
   assert.ok(!lines.join('').includes('203.0.113.7'));
 });
 
 test('the route refuses anything else and logs nothing', async () => {
   const { POST } = await import(`${ROUTE}?case=invalid`);
-  for (const bad of [{ body: 'suv', make: 'Honda', model: 'Jazz' }, { body: 'suv' }, 'not json']) {
+  for (const bad of [{ body: 'suv', make: 'Honda', year: 'Older', model: 'Jazz' }, { body: 'suv', make: 'Honda' }, 'not json']) {
     const { result, lines } = await withCapturedLog<Response>(() => POST(post(bad, '198.51.100.1')));
     assert.equal(result.status, 400);
     assert.deepEqual(lines, []);
@@ -80,7 +102,7 @@ test('one address is counted a few times an hour, then quietly not at all', asyn
   const { POST } = await import(`${ROUTE}?case=limit`);
   const { lines } = await withCapturedLog(async () => {
     for (let i = 0; i < VEHICLE_REQUEST_PER_CLIENT.limit + 2; i++) {
-      const response = await POST(post({ body: 'car', make: 'Mazda' }, '192.0.2.44'));
+      const response = await POST(post({ body: 'car', make: 'Mazda', year: 'Older' }, '192.0.2.44'));
       // The same answer either way: there is nothing for the person to retry.
       assert.equal(response.status, 204);
     }
@@ -101,13 +123,13 @@ test('a mock build sends nothing, and a live one sends exactly the two picks', a
 
     process.env.EXPO_PUBLIC_USE_MOCKS = 'true';
     const mock = await import(`${CLIENT}?case=mock`);
-    await mock.sendVehicleRequest({ body: 'suv', make: 'Kia' });
+    await mock.sendVehicleRequest({ body: 'suv', make: 'Kia', year: '2020' });
     assert.deepEqual(bodies, []);
 
     process.env.EXPO_PUBLIC_USE_MOCKS = 'false';
     const live = await import(`${CLIENT}?case=live`);
-    await live.sendVehicleRequest({ body: 'suv', make: 'Kia' });
-    assert.deepEqual(bodies, ['{"body":"suv","make":"Kia"}']);
+    await live.sendVehicleRequest({ body: 'suv', make: 'Kia', year: '2020' });
+    assert.deepEqual(bodies, ['{"body":"suv","make":"Kia","year":"2020"}']);
   } finally {
     globalThis.fetch = original;
     delete process.env.EXPO_PUBLIC_USE_MOCKS;
@@ -125,7 +147,7 @@ test('a failed count never reaches the person', async () => {
     process.env.EXPO_PUBLIC_USE_MOCKS = 'false';
     process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.test';
     const client = await import(`${CLIENT}?case=offline`);
-    await assert.doesNotReject(client.sendVehicleRequest({ body: 'car', make: 'Other' }));
+    await assert.doesNotReject(client.sendVehicleRequest({ body: 'car', make: 'Other', year: 'Not sure' }));
   } finally {
     globalThis.fetch = original;
     delete process.env.EXPO_PUBLIC_USE_MOCKS;
