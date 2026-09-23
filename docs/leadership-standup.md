@@ -10,6 +10,38 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-23 — Your own vehicle
+
+### Chairman decisions
+
+1. **"Will it fit in my own vehicle?" ships in v1.** Pick what you drive; the truck screen
+   says how many trips, which pieces go in each, and which never fit. Built – see the
+   README, "Your own vehicle".
+2. **Fitting in your own car is a good outcome,** although nobody rents anything and no
+   affiliate link is followed. Reach over referral revenue for this feature.
+
+### Where it stands
+
+- **The rule is built and tested;** the vehicle list is not. The cloud session that built it
+  could not reach any manufacturer site, so the list holds one sourced entry, the full-size
+  8 ft pickup. `docs/own-vehicle-research.md` lists the next 30 or so vehicles and where
+  their figures are published; the research runs from Josh's Mac.
+- **Many cars cannot be listed at all.** Most makers publish only cubic feet for sedans and
+  many crossovers, and cubic feet cannot say whether a dresser passes the tailgate. Pickups
+  and minivans are best documented; they go first.
+
+**Decision needed:** whether to count "Mine isn't listed" taps. It is the number that says
+which vehicles to research next, and counting it means analytics – which changes the App
+Store privacy answer from "Data Not Collected".
+
+**Decided later the same day:** count them. Built as an opt-in pick of body type and make,
+sent only on "Count my vehicle", written as one log line by `/v1/vehicle-request`. The App
+Store answer becomes Product Interaction, not linked to the user; the privacy page says so.
+The model year and then the model were added the same day, asked as type, year, make,
+model, so a count names a vehicle and its generation and not only a badge.
+
+---
+
 ## 2026-09-15 — Detection measured on real rooms; positioning decided
 
 ### What the eval found

@@ -48,6 +48,13 @@ export interface SmallVehicle {
   source: string;
 }
 
+/**
+ * The part of a vehicle the fit rule reads: a box, and the opening a piece must pass
+ * through to get into it. Pickups, trailers and a person's own car (see
+ * `ownVehicle.ts`) all answer to the same rule through this, so it is written once.
+ */
+export type CargoSpace = Pick<SmallVehicle, 'lengthIn' | 'widthIn' | 'loadHeightIn' | 'door'>;
+
 export interface VehicleFit {
   vehicle: SmallVehicle;
   fits: boolean;
@@ -61,7 +68,7 @@ export interface VehicleFit {
 
 const CUBIC_INCHES_PER_CUBIC_FOOT = 1728;
 
-export function usableCuFtOf(vehicle: SmallVehicle): number {
+export function usableCuFtOf(vehicle: CargoSpace): number {
   const cuFt = (vehicle.lengthIn * vehicle.widthIn * vehicle.loadHeightIn) / CUBIC_INCHES_PER_CUBIC_FOOT;
   return Math.round(cuFt * (1 - SAFETY_HEADROOM_PCT) * 10) / 10;
 }
@@ -71,7 +78,7 @@ export function usableCuFtOf(vehicle: SmallVehicle): number {
  * floor: its sides and the space's, each sorted longest first, compared side by side.
  * A sofa can be stood on end in a trailer; it cannot be folded.
  */
-export function itemFits(item: Pick<InventoryItem, 'dimensions'>, vehicle: SmallVehicle): boolean {
+export function itemFits(item: Pick<InventoryItem, 'dimensions'>, vehicle: CargoSpace): boolean {
   const piece = [item.dimensions.lengthIn, item.dimensions.widthIn, item.dimensions.heightIn].sort((a, b) => b - a);
   const space = [vehicle.lengthIn, vehicle.widthIn, vehicle.loadHeightIn].sort((a, b) => b - a);
   if (!piece.every((side, i) => side <= space[i]!)) return false;

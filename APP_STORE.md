@@ -15,10 +15,23 @@ and if permission is denied the alert explains the purpose again rather than jus
 complaining. `ITSAppUsesNonExemptEncryption: false` is set, which saves a compliance
 round-trip at upload.
 
-Still to do in App Store Connect: fill in the nutrition label itself. Loadsy collects
-no data — photos are processed and discarded — so the answers are
-"Data Not Collected" throughout. Confirm that is still true if the Vision agent starts
-retaining images server-side.
+Still to do in App Store Connect: fill in the nutrition label itself. Photos are
+processed and discarded, and are not collected. **One thing is, since 23 September:** the
+optional "Mine isn't listed" count (`app/v1/vehicle-request+api.ts`) writes the body type,
+model year, make and model a person picks into the server log. So the answer is no longer "Data Not
+Collected" throughout. Declare:
+
+- **Usage Data → Product Interaction**, used for **Analytics**
+- **Not linked to the user** – no account, identifier, move or address goes with it, and
+  the IP address is held in memory for an hour for rate limiting and never written
+- **Not used for tracking**
+
+Apple lets some optional, user-initiated data go undisclosed. Loadsy does not rely on that
+exemption: a label that says slightly more than it must costs nothing, and one that says
+less is a rejection. Everything else stays "Not Collected". Confirm that is still true if
+the Vision agent starts retaining images server-side, and change this entry if the vehicle
+count ever gains a field – `parseVehicleRequest` refuses any extra field so that can only
+happen deliberately.
 
 **Privacy policy URL and support URL – built 21 September**
 

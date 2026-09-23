@@ -36,6 +36,7 @@ function emptyMove(): Move {
     tripMiles: null,
     ceilingHeightIn: null,
     keptDuplicates: [],
+    ownVehicleId: null,
     moveDate: null,
     status: 'inventory',
   };

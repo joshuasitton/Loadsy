@@ -44,6 +44,10 @@ const TEXT_PAIRS: [string, string, string][] = [
   ['estimate text on a card', colors.amber, colors.surface],
   ['confirmed text on a card', colors.green, colors.surface],
   ['danger text on a card', colors.danger, colors.surface],
+  // Your own vehicle: "Measure first" is a pale amber block inside a card, and a
+  // selected vehicle in the picker sits on the accent tint.
+  ['measure-first note on its tint', colors.textDim, colors.amberDim],
+  ['selected vehicle detail on its tint', colors.textDim, colors.accentDim],
 
   // The diagram's captions sit on all three surfaces depending on the screen.
   ['diagram caption on the background', DIAGRAM_COLORS_FOR_TEST.caption, colors.bg],

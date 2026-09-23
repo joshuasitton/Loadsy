@@ -107,6 +107,11 @@ export interface Move {
    * two rooms – each the `duplicateKey` of the two item ids. See src/domain/duplicates.ts.
    */
   keptDuplicates: string[];
+  /**
+   * The person's own vehicle, as an id from `OWN_VEHICLES`, or null when none is chosen.
+   * An id no longer in the list reads as none – see src/domain/ownVehicle.ts.
+   */
+  ownVehicleId: string | null;
   /** ISO-8601 string; Date is not JSON-serialisable across the API boundary. */
   moveDate: string | null;
   status: MoveStatus;

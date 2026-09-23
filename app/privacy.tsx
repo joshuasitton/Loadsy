@@ -63,10 +63,28 @@ export default function PrivacyScreen() {
         </Card>
 
         <Card style={styles.block}>
+          <SectionLabel>THE ONE THING LOADSY KEEPS</SectionLabel>
+          <Para>
+            If your vehicle is not in the list and you choose to tell us what you drive, the app
+            sends the type, model year, make and model you picked – &ldquo;SUV, 2019, Honda,
+            CR-V&rdquo; – and nothing else. All four are chosen from fixed lists, so nothing you
+            type is ever sent.
+            Loadsy&apos;s server writes them into its log, where they are counted to decide which
+            vehicles to add next.
+          </Para>
+          <Para>
+            It is not linked to you: no name, account, move, location or identifier for you or
+            your phone goes with it. The internet address it comes from is used in memory, for an
+            hour, to count each person once, and is not written anywhere. Nothing is sent unless
+            you press &ldquo;Count my vehicle&rdquo;.
+          </Para>
+        </Card>
+
+        <Card style={styles.block}>
           <SectionLabel>WHAT STAYS ON YOUR PHONE</SectionLabel>
           <Para>
             Everything else: your inventory, the sizes you corrected, the truck size, the packing
-            plan, your past moves and the ceiling height. They are saved on this phone only. There
+            plan, your past moves, the ceiling height and the vehicle you picked. They are saved on this phone only. There
             is no account and no copy anywhere else, which is why nobody can see them and why Loadsy
             cannot recover them for you.
           </Para>
@@ -83,7 +101,8 @@ export default function PrivacyScreen() {
             No account or sign-in. No analytics, advertising or crash-reporting software. No
             location: the &ldquo;near me&rdquo; button opens your maps app with a search phrase, and
             where you are stays between you and the maps app. Nothing is sold or shared with anyone,
-            because nothing about you is held.
+            because nothing about you is held – the vehicle count above says what kind of car
+            someone drives, not who.
           </Para>
         </Card>
 
@@ -109,8 +128,9 @@ export default function PrivacyScreen() {
           <SectionLabel>DELETING YOUR DATA</SectionLabel>
           <Para>
             Past Moves lets you delete any move you have filed. Deleting the app removes everything
-            Loadsy holds, because all of it is on the phone. There is nothing on a server to ask us
-            to delete.
+            Loadsy holds about you, because all of it is on the phone. The only thing on a server
+            is the vehicle count, and since nothing links a count to the person who sent it, there
+            is no way to find yours to delete it – or for anyone else to find it.
           </Para>
         </Card>
 
@@ -118,7 +138,8 @@ export default function PrivacyScreen() {
           <SectionLabel>CHILDREN</SectionLabel>
           <Para>
             Loadsy is not directed at children under 13 and does not knowingly collect information
-            from them. It collects none from anyone.
+            from them. The only thing it collects from anyone is the optional vehicle count above,
+            which identifies nobody.
           </Para>
         </Card>
 

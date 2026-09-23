@@ -58,6 +58,7 @@ export function makeMove(rooms: Room[], overrides: Partial<Move> = {}): Move {
     tripMiles: null,
     ceilingHeightIn: null,
     keptDuplicates: [],
+    ownVehicleId: null,
     moveDate: null,
     status: 'inventory',
     ...overrides,

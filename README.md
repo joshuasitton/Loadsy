@@ -388,6 +388,78 @@ The company's site is the main action on Where to Rent and opens inside the app 
 an affiliate link will need. "Near me" is a maps search, so the nearest branch is found
 without Loadsy asking where anyone is.
 
+### Your own vehicle
+
+Decided 23 September: in v1, and "it fits in your own car" is a good outcome even though
+nobody rents anything. The truck screen has a Your Own Vehicle card: pick what you drive,
+and it says how many trips the load takes, which pieces go in each, and which never go in
+it at all.
+
+The answer is in trips because the question is different. A rental is yes or no – you
+rent the one that fits. Your car is already in the driveway, so "no" is rarely the useful
+answer; "three trips, and the sofa goes in something else" is. `src/domain/ownVehicle.ts`
+uses the same fit rule as a pickup or trailer – `itemFits`, which now takes any
+`CargoSpace` so there is still one rule – and then splits what fits into car-loads,
+biggest piece first, each held to the same 15% reserve a truck keeps. Past three trips the
+card says the truck does it in one, and stops listing trips nobody would follow.
+
+A car is not a box, so it is turned into a conservative one: floor length with the rear
+seats folded, width between the wheelhouses, the lower of the interior and the opening
+height, and the liftgate opening as a door the piece has to pass. "Cargo volume" in cubic
+feet is never used – it is measured with luggage-sized blocks, and says nothing about
+whether a dresser gets past the tailgate.
+
+**Tight pieces are the new failure, and they are handled by asking for a tape measure.**
+A truck's error is the sum of many pieces' errors, which mostly cancel. In a car one
+dresser is the whole answer, and the detector's per-dimension error (σ ≈ 0.15, see
+`truck.ts`) is bigger than any margin a car can spare. So an *estimated* piece that fits
+by less than 10% every way is listed under "Measure first": one measurement, entered in
+the inventory, and the answer for that piece is exact. A size the person entered is never
+tight.
+
+**The list holds only published figures, and is short on purpose.** `src/domain/ownVehicles.ts`
+follows the rule `smallVehicles.ts` does – a cited source, the smaller figure where sources
+disagree – and `__tests__/ownVehicle.test.ts` refuses an entry without one. At first commit
+it has one entry, the full-size 8 ft pickup, taken from the rental entry rather than
+copied. The research to fill it could not be done from the cloud session that built the
+feature, because its network blocks manufacturer sites and a search summary is not a
+source; `docs/own-vehicle-research.md` lists what to fetch. A vehicle not listed gets
+"Mine isn't listed" and the truck, never a guessed size: a car said to fit that does not
+is the one answer that costs the person their moving day.
+
+The choice is stored on the move, on the device, like the ceiling height, and is never
+sent.
+
+**"Mine isn't listed" is counted** (decided later on 23 September), because it is the
+number that says which vehicle to research next. The person picks, in this order, a body
+type, a model year, a make and a model, all from fixed lists, and presses "Count my
+vehicle"; nothing is sent before that, and nothing typed is ever sent, because a free-text
+box is where a name or a phone number would arrive. The model says which vehicle to
+research and the year says which generation of it – one CR-V is several cargo floors.
+
+The years run from next year back twenty, then "Older" and "Not sure", computed from the
+date so the list does not stop a year short every January. The models are
+`VEHICLE_MODELS` – names only, so unlike the cargo figures they need no source – offered
+for the chosen make and type with "Other" last; a make with no model of that type asks
+nothing more, and the route refuses a model that does not belong to its make and type, so a
+count can never name a Honda Tacoma. `/v1/vehicle-request` writes one log line –
+`{"event":"vehicle_not_listed","body":"suv","year":"2019","make":"Honda","model":"CR-V"}`
+– and keeps nothing else. `src/domain/vehicleRequest.ts` is
+the contract for both ends, and it refuses a request with any extra field rather than
+dropping it, so the payload can only grow by someone changing that function and its test.
+
+The counts live in the deployment's logs rather than a database, because a table would be
+a second thing to secure and pay for, holding four words a row. Read them from the EAS
+dashboard, filtering on `vehicle_not_listed`. How long the logs are kept is the hosting
+plan's, not Loadsy's, so read them before each research round rather than expecting a
+year of history. Each address is counted three times an hour at most, in memory – one
+person's taps should not outvote everyone else's – and a mock or demo build sends nothing,
+so testers never reorder the list.
+
+This is the first thing Loadsy's server keeps, so the App Store answer moved off "Data
+Not Collected" to Product Interaction, not linked to the user – see `APP_STORE.md`. The
+privacy page says the same.
+
 ### Nobody names a room
 
 Decided 18 September: "stuff is stuff" – take pictures, get a truck size, find a truck.
@@ -446,9 +518,11 @@ the screen asks the user to check it above 400 miles.
 
 ### The backend
 
-One endpoint, `app/v1/detect+api.ts`, deployed with the app itself.
+Two endpoints, deployed with the app itself. `app/v1/detect+api.ts` is the backend
+proper; `app/v1/vehicle-request+api.ts` counts "Mine isn't listed" into the log and is
+described under "Your own vehicle".
 
-It exists for exactly one reason: the vision model's API key must never reach the
+Detection exists for exactly one reason: the vision model's API key must never reach the
 device. Everything else Loadsy computes runs on the client because it can —
 volumes, truck sizing, prices and the packing plan are all pure functions of the
 inventory. A key is the only thing that cannot ship, so it is the whole backend.
@@ -499,9 +573,9 @@ ship the fixture furniture catalogue to real users and size a truck around
 somebody else's sofa.
 
 **Privacy.** The route is a strict pass-through: the image is forwarded, the result
-returned, and neither is written to disk or into a log. That is what keeps the
-"Data Not Collected" answer in `APP_STORE.md` true. If retention is ever added, the
-privacy label has to change with it.
+returned, and neither is written to disk or into a log. That keeps photos off the App
+Store privacy label entirely. If retention is ever added, the label has to change with
+it.
 
 ### Building for a device without Xcode
 
