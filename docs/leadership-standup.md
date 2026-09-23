@@ -37,7 +37,8 @@ Store privacy answer from "Data Not Collected".
 **Decided later the same day:** count them. Built as an opt-in pick of body type and make,
 sent only on "Count my vehicle", written as one log line by `/v1/vehicle-request`. The App
 Store answer becomes Product Interaction, not linked to the user; the privacy page says so.
-The model year was added the same day, so a count names a generation and not only a badge.
+The model year and then the model were added the same day, asked as type, year, make,
+model, so a count names a vehicle and its generation and not only a badge.
 
 ---
 

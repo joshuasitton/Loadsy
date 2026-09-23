@@ -2,11 +2,11 @@
  * POST /v1/vehicle-request – counts one "Mine isn't listed" (decided 23 September).
  *
  * The only thing Loadsy's server keeps, and all of it is one log line per request: the
- * body type, make and model year the person picked, from fixed lists – see
+ * body type, model year, make and model the person picked, from fixed lists – see
  * src/domain/vehicleRequest.ts. The address a request comes from is used, in memory, to
  * stop one person being counted many times, and is never written. The counts are read
  * from the deployment's logs, which is why there is no database: a table would be a
- * second thing to secure and pay for, holding three words per row.
+ * second thing to secure and pay for, holding four words per row.
  *
  * PRIVACY: this is what moved the App Store answer off "Data Not Collected" – see
  * APP_STORE.md. Adding a field here changes the label again.

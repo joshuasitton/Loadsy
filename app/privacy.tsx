@@ -66,8 +66,9 @@ export default function PrivacyScreen() {
           <SectionLabel>THE ONE THING LOADSY KEEPS</SectionLabel>
           <Para>
             If your vehicle is not in the list and you choose to tell us what you drive, the app
-            sends the type, make and model year you picked – &ldquo;SUV, Honda, 2019&rdquo; – and
-            nothing else. All three are chosen from fixed lists, so nothing you type is ever sent.
+            sends the type, model year, make and model you picked – &ldquo;SUV, 2019, Honda,
+            CR-V&rdquo; – and nothing else. All four are chosen from fixed lists, so nothing you
+            type is ever sent.
             Loadsy&apos;s server writes them into its log, where they are counted to decide which
             vehicles to add next.
           </Para>

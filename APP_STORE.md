@@ -18,7 +18,7 @@ round-trip at upload.
 Still to do in App Store Connect: fill in the nutrition label itself. Photos are
 processed and discarded, and are not collected. **One thing is, since 23 September:** the
 optional "Mine isn't listed" count (`app/v1/vehicle-request+api.ts`) writes the body type,
-make and model year a person picks into the server log. So the answer is no longer "Data Not
+model year, make and model a person picks into the server log. So the answer is no longer "Data Not
 Collected" throughout. Declare:
 
 - **Usage Data → Product Interaction**, used for **Analytics**

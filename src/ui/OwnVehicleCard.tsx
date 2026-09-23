@@ -10,7 +10,7 @@ import {
   type BodyType,
   type OwnVehicle,
 } from '../domain/ownVehicle';
-import { modelYears, VEHICLE_MAKES, type VehicleMake } from '../domain/vehicleRequest';
+import { modelsFor, modelYears, VEHICLE_MAKES, type VehicleMake } from '../domain/vehicleRequest';
 import { sendVehicleRequest } from '../api/vehicleRequest';
 import { OWN_VEHICLES } from '../domain/ownVehicles';
 import type { Move } from '../domain/types';
@@ -182,16 +182,26 @@ function VehiclePicker({
 /**
  * "Mine isn't listed": the truck, and – if the person chooses to say – which kind of
  * vehicle, so the next ones researched are the ones people drive. Decided 23 September.
- * Three picks from fixed lists and a button that says what it sends; nothing is sent
- * until it is pressed, and nothing typed is ever sent. See src/domain/vehicleRequest.ts.
+ * Four picks from fixed lists – type, year, make, model, in that order – and a button
+ * that says what it sends; nothing is sent until it is pressed, and nothing typed is ever
+ * sent. See src/domain/vehicleRequest.ts.
  */
 function NotListed() {
   const [body, setBody] = useState<BodyType | null>(null);
-  const [make, setMake] = useState<VehicleMake | null>(null);
   const [year, setYear] = useState<string | null>(null);
+  const [make, setMake] = useState<VehicleMake | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   // Once per opening: the list only moves in January, and a re-render must not reorder it.
   const [years] = useState(() => modelYears(new Date()));
   const [sent, setSent] = useState(false);
+
+  // The models hang off the type and the make, so changing either clears the pick – a
+  // Tacoma chosen under Toyota must not survive a switch to Honda.
+  const models = body !== null && make !== null ? modelsFor(make, body) : [];
+  // Where the only choice is "Other" – a Chevrolet minivan, or the make "Other" – there is
+  // nothing to ask, so it is taken as answered.
+  const chosenModel = models.length === 1 ? models[0]! : model;
+  const ready = body !== null && year !== null && make !== null && chosenModel !== null;
 
   return (
     <View style={styles.group}>
@@ -206,16 +216,23 @@ function NotListed() {
       ) : (
         <>
           <SectionLabel>TELL US WHAT YOU DRIVE</SectionLabel>
+
+          <Text style={styles.rowLabel}>Type</Text>
           <View style={styles.choices}>
             {BODY_TYPES.map((b) => (
-              <Choice key={b} label={BODY_TYPE_SINGULAR[b]} selected={body === b} onPress={() => setBody(b)} />
+              <Choice
+                key={b}
+                label={BODY_TYPE_SINGULAR[b]}
+                selected={body === b}
+                onPress={() => {
+                  setBody(b);
+                  setModel(null);
+                }}
+              />
             ))}
           </View>
-          <View style={styles.choices}>
-            {VEHICLE_MAKES.map((m) => (
-              <Choice key={m} label={m} selected={make === m} onPress={() => setMake(m)} />
-            ))}
-          </View>
+
+          <Text style={styles.rowLabel}>Year</Text>
           {/* One scrolling row: twenty-odd years as wrapped chips would push the button
               off the sheet. */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.yearRow}>
@@ -223,17 +240,44 @@ function NotListed() {
               <Choice key={y} label={y} selected={year === y} onPress={() => setYear(y)} />
             ))}
           </ScrollView>
+
+          <Text style={styles.rowLabel}>Make</Text>
+          <View style={styles.choices}>
+            {VEHICLE_MAKES.map((m) => (
+              <Choice
+                key={m}
+                label={m}
+                selected={make === m}
+                onPress={() => {
+                  setMake(m);
+                  setModel(null);
+                }}
+              />
+            ))}
+          </View>
+
+          {models.length > 1 ? (
+            <>
+              <Text style={styles.rowLabel}>Model</Text>
+              <View style={styles.choices}>
+                {models.map((m) => (
+                  <Choice key={m} label={m} selected={model === m} onPress={() => setModel(m)} />
+                ))}
+              </View>
+            </>
+          ) : null}
+
           <Text style={styles.note}>
-            Sends only the type, make and year you pick – nothing about you, your phone or your
-            move.
+            Sends only the type, year, make and model you pick – nothing about you, your phone or
+            your move.
           </Text>
           <SecondaryButton
             title="Count my vehicle"
-            disabled={body === null || make === null || year === null}
+            disabled={!ready}
             onPress={() => {
-              if (body === null || make === null || year === null) return;
+              if (body === null || year === null || make === null || chosenModel === null) return;
               setSent(true);
-              void sendVehicleRequest({ body, make, year });
+              void sendVehicleRequest({ body, year, make, model: chosenModel });
             }}
           />
         </>
