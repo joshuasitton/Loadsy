@@ -16,7 +16,7 @@ export const PRIVACY_URL = `${SITE_ORIGIN}${PRIVACY_PATH}`;
 export const SUPPORT_URL = `${SITE_ORIGIN}${SUPPORT_PATH}`;
 
 /** Moves whenever the privacy page's wording changes. The page shows it. */
-export const PRIVACY_UPDATED = '21 September 2026';
+export const PRIVACY_UPDATED = '23 September 2026';
 
 /**
  * Where a person can write to. Null until one is chosen – a made-up address on a

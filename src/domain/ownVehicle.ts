@@ -29,6 +29,14 @@ export const BODY_TYPE_LABEL: Record<BodyType, string> = {
   car: 'Cars and hatchbacks',
 };
 
+/** One of a kind, for a choice: "Pickup", not "Pickups". */
+export const BODY_TYPE_SINGULAR: Record<BodyType, string> = {
+  pickup: 'Pickup',
+  minivan: 'Minivan',
+  suv: 'SUV or crossover',
+  car: 'Car or hatchback',
+};
+
 export const BODY_TYPES: readonly BodyType[] = ['pickup', 'minivan', 'suv', 'car'];
 
 export interface OwnVehicle extends CargoSpace {

@@ -59,9 +59,11 @@ npm run eval:detect   # run the detection eval over eval-photos/
   with its line items (spec §4.2), and the location permission and privacy label return
   with it.
 - **`/v1/detect` is a strict pass-through.** The image is forwarded, the result
-  returned, and neither is written to disk or into a log. `APP_STORE.md`'s "Data
-  Not Collected" answer depends on that. Adding retention changes the App Store
-  privacy label.
+  returned, and neither is written to disk or into a log. Adding retention changes the
+  App Store privacy label.
+- **`/v1/vehicle-request` is the only thing the server keeps:** one log line of a body
+  type and a make, both from fixed lists (decided 23 September). `APP_STORE.md` declares
+  it as Product Interaction, not linked to the user. A new field changes the label.
 - **Never put a secret in an `EXPO_PUBLIC_` variable** — they are bundled into
   the app in plaintext. The vision key is an EAS project secret.
 - `EXPO_PUBLIC_USE_MOCKS` and `EXPO_PUBLIC_DEMO_MODE` default on in development

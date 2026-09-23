@@ -427,11 +427,29 @@ source; `docs/own-vehicle-research.md` lists what to fetch. A vehicle not listed
 "Mine isn't listed" and the truck, never a guessed size: a car said to fit that does not
 is the one answer that costs the person their moving day.
 
-The choice is stored on the move, on the device, like the ceiling height. It is not sent
-anywhere, so the App Store "Data Not Collected" answer is unchanged. That also means
-Loadsy cannot count how often people look for a car it does not list – the number that
-says which vehicles to research next. Counting it would need analytics, and analytics
-change the privacy label; that is a decision for Josh, not a side effect of this feature.
+The choice is stored on the move, on the device, like the ceiling height, and is never
+sent.
+
+**"Mine isn't listed" is counted** (decided later on 23 September), because it is the
+number that says which vehicle to research next. The person picks a body type and a make
+from fixed lists and presses "Count my vehicle"; nothing is sent before that, and nothing
+typed is ever sent, because a free-text box is where a name or a phone number would
+arrive. `/v1/vehicle-request` writes one log line – `{"event":"vehicle_not_listed",
+"body":"suv","make":"Honda"}` – and keeps nothing else. `src/domain/vehicleRequest.ts` is
+the contract for both ends, and it refuses a request with any extra field rather than
+dropping it, so the payload can only grow by someone changing that function and its test.
+
+The counts live in the deployment's logs rather than a database, because a table would be
+a second thing to secure and pay for, holding two words a row. Read them from the EAS
+dashboard, filtering on `vehicle_not_listed`. How long the logs are kept is the hosting
+plan's, not Loadsy's, so read them before each research round rather than expecting a
+year of history. Each address is counted three times an hour at most, in memory – one
+person's taps should not outvote everyone else's – and a mock or demo build sends nothing,
+so testers never reorder the list.
+
+This is the first thing Loadsy's server keeps, so the App Store answer moved off "Data
+Not Collected" to Product Interaction, not linked to the user – see `APP_STORE.md`. The
+privacy page says the same.
 
 ### Nobody names a room
 
@@ -491,9 +509,11 @@ the screen asks the user to check it above 400 miles.
 
 ### The backend
 
-One endpoint, `app/v1/detect+api.ts`, deployed with the app itself.
+Two endpoints, deployed with the app itself. `app/v1/detect+api.ts` is the backend
+proper; `app/v1/vehicle-request+api.ts` counts "Mine isn't listed" into the log and is
+described under "Your own vehicle".
 
-It exists for exactly one reason: the vision model's API key must never reach the
+Detection exists for exactly one reason: the vision model's API key must never reach the
 device. Everything else Loadsy computes runs on the client because it can —
 volumes, truck sizing, prices and the packing plan are all pure functions of the
 inventory. A key is the only thing that cannot ship, so it is the whole backend.
@@ -544,9 +564,9 @@ ship the fixture furniture catalogue to real users and size a truck around
 somebody else's sofa.
 
 **Privacy.** The route is a strict pass-through: the image is forwarded, the result
-returned, and neither is written to disk or into a log. That is what keeps the
-"Data Not Collected" answer in `APP_STORE.md` true. If retention is ever added, the
-privacy label has to change with it.
+returned, and neither is written to disk or into a log. That keeps photos off the App
+Store privacy label entirely. If retention is ever added, the label has to change with
+it.
 
 ### Building for a device without Xcode
 

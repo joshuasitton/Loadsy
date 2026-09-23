@@ -34,6 +34,10 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 which vehicles to research next, and counting it means analytics – which changes the App
 Store privacy answer from "Data Not Collected".
 
+**Decided later the same day:** count them. Built as an opt-in pick of body type and make,
+sent only on "Count my vehicle", written as one log line by `/v1/vehicle-request`. The App
+Store answer becomes Product Interaction, not linked to the user; the privacy page says so.
+
 ---
 
 ## 2026-09-15 — Detection measured on real rooms; positioning decided

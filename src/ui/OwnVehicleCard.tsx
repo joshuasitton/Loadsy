@@ -3,11 +3,15 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import {
   assessOwnVehicle,
   BODY_TYPE_LABEL,
+  BODY_TYPE_SINGULAR,
   BODY_TYPES,
   findOwnVehicle,
   tripLine,
+  type BodyType,
   type OwnVehicle,
 } from '../domain/ownVehicle';
+import { VEHICLE_MAKES, type VehicleMake } from '../domain/vehicleRequest';
+import { sendVehicleRequest } from '../api/vehicleRequest';
 import { OWN_VEHICLES } from '../domain/ownVehicles';
 import type { Move } from '../domain/types';
 import { Card, SecondaryButton, SectionLabel } from './components';
@@ -162,13 +166,7 @@ function VehiclePicker({
             ))}
 
             {notListed ? (
-              // A vehicle missing from the list gets the truck, never a guess at its size –
-              // see src/domain/ownVehicles.ts for why the list only holds published figures.
-              <Text style={styles.note}>
-                We only list vehicles whose cargo space the maker publishes, so the answer is
-                right on the day. Yours isn’t here yet – the truck recommendation above is sized
-                for your load.
-              </Text>
+              <NotListed />
             ) : (
               <SecondaryButton title="Mine isn’t listed" onPress={() => setNotListed(true)} />
             )}
@@ -178,6 +176,71 @@ function VehiclePicker({
         </View>
       </View>
     </Modal>
+  );
+}
+
+/**
+ * "Mine isn't listed": the truck, and – if the person chooses to say – which kind of
+ * vehicle, so the next ones researched are the ones people drive. Decided 23 September.
+ * Two picks from fixed lists and a button that says what it sends; nothing is sent
+ * until it is pressed, and nothing typed is ever sent. See src/domain/vehicleRequest.ts.
+ */
+function NotListed() {
+  const [body, setBody] = useState<BodyType | null>(null);
+  const [make, setMake] = useState<VehicleMake | null>(null);
+  const [sent, setSent] = useState(false);
+
+  return (
+    <View style={styles.group}>
+      {/* A vehicle missing from the list gets the truck, never a guess at its size –
+          see src/domain/ownVehicles.ts for why the list only holds published figures. */}
+      <Text style={styles.note}>
+        We only list vehicles whose cargo space the maker publishes, so the answer is right on
+        the day. Yours isn’t here yet – the truck recommendation above is sized for your load.
+      </Text>
+      {sent ? (
+        <Text style={styles.name}>Thanks – counted. We add vehicles in the order people ask for them.</Text>
+      ) : (
+        <>
+          <SectionLabel>TELL US WHAT YOU DRIVE</SectionLabel>
+          <View style={styles.choices}>
+            {BODY_TYPES.map((b) => (
+              <Choice key={b} label={BODY_TYPE_SINGULAR[b]} selected={body === b} onPress={() => setBody(b)} />
+            ))}
+          </View>
+          <View style={styles.choices}>
+            {VEHICLE_MAKES.map((m) => (
+              <Choice key={m} label={m} selected={make === m} onPress={() => setMake(m)} />
+            ))}
+          </View>
+          <Text style={styles.note}>
+            Sends only the type and make you pick – nothing about you, your phone or your move.
+          </Text>
+          <SecondaryButton
+            title="Count my vehicle"
+            disabled={body === null || make === null}
+            onPress={() => {
+              if (body === null || make === null) return;
+              setSent(true);
+              void sendVehicleRequest({ body, make });
+            }}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={[styles.choice, selected && styles.choiceSelected]}
+    >
+      <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -242,4 +305,16 @@ const styles = StyleSheet.create({
   },
   vehicleRowSelected: { borderColor: colors.accent, backgroundColor: colors.accentDim },
   pressed: { opacity: 0.85 },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  choice: {
+    paddingVertical: space.xs + 2,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.bg,
+  },
+  choiceSelected: { borderColor: colors.accent, backgroundColor: colors.accent },
+  choiceText: { ...type.caption, color: colors.text },
+  choiceTextSelected: { color: colors.accentText, fontWeight: '600' },
 });

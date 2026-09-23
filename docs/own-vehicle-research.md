@@ -31,6 +31,12 @@ Cargo volume in cubic feet is **not** one of these, and is never a substitute. I
 measured with luggage-sized blocks (SAE J1100) and says nothing about whether a dresser
 passes the tailgate.
 
+## Which vehicles first
+
+Once the app is live, the "Mine isn't listed" counts decide the order: filter the
+production deployment's logs in the EAS dashboard on `vehicle_not_listed` and research the
+most-asked body type and make first. Until there are counts, use the order below.
+
 ## Where to look, in order
 
 Makers' media sites publish the most complete tables – floor length, wheelhouse width and
