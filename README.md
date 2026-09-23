@@ -388,6 +388,51 @@ The company's site is the main action on Where to Rent and opens inside the app 
 an affiliate link will need. "Near me" is a maps search, so the nearest branch is found
 without Loadsy asking where anyone is.
 
+### Your own vehicle
+
+Decided 23 September: in v1, and "it fits in your own car" is a good outcome even though
+nobody rents anything. The truck screen has a Your Own Vehicle card: pick what you drive,
+and it says how many trips the load takes, which pieces go in each, and which never go in
+it at all.
+
+The answer is in trips because the question is different. A rental is yes or no – you
+rent the one that fits. Your car is already in the driveway, so "no" is rarely the useful
+answer; "three trips, and the sofa goes in something else" is. `src/domain/ownVehicle.ts`
+uses the same fit rule as a pickup or trailer – `itemFits`, which now takes any
+`CargoSpace` so there is still one rule – and then splits what fits into car-loads,
+biggest piece first, each held to the same 15% reserve a truck keeps. Past three trips the
+card says the truck does it in one, and stops listing trips nobody would follow.
+
+A car is not a box, so it is turned into a conservative one: floor length with the rear
+seats folded, width between the wheelhouses, the lower of the interior and the opening
+height, and the liftgate opening as a door the piece has to pass. "Cargo volume" in cubic
+feet is never used – it is measured with luggage-sized blocks, and says nothing about
+whether a dresser gets past the tailgate.
+
+**Tight pieces are the new failure, and they are handled by asking for a tape measure.**
+A truck's error is the sum of many pieces' errors, which mostly cancel. In a car one
+dresser is the whole answer, and the detector's per-dimension error (σ ≈ 0.15, see
+`truck.ts`) is bigger than any margin a car can spare. So an *estimated* piece that fits
+by less than 10% every way is listed under "Measure first": one measurement, entered in
+the inventory, and the answer for that piece is exact. A size the person entered is never
+tight.
+
+**The list holds only published figures, and is short on purpose.** `src/domain/ownVehicles.ts`
+follows the rule `smallVehicles.ts` does – a cited source, the smaller figure where sources
+disagree – and `__tests__/ownVehicle.test.ts` refuses an entry without one. At first commit
+it has one entry, the full-size 8 ft pickup, taken from the rental entry rather than
+copied. The research to fill it could not be done from the cloud session that built the
+feature, because its network blocks manufacturer sites and a search summary is not a
+source; `docs/own-vehicle-research.md` lists what to fetch. A vehicle not listed gets
+"Mine isn't listed" and the truck, never a guessed size: a car said to fit that does not
+is the one answer that costs the person their moving day.
+
+The choice is stored on the move, on the device, like the ceiling height. It is not sent
+anywhere, so the App Store "Data Not Collected" answer is unchanged. That also means
+Loadsy cannot count how often people look for a car it does not list – the number that
+says which vehicles to research next. Counting it would need analytics, and analytics
+change the privacy label; that is a decision for Josh, not a side effect of this feature.
+
 ### Nobody names a room
 
 Decided 18 September: "stuff is stuff" – take pictures, get a truck size, find a truck.

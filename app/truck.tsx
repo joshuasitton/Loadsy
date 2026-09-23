@@ -15,6 +15,7 @@ import { assessSmallVehicles, type VehicleFit } from '../src/domain/vehicleFit';
 import { useMove } from '../src/state/moveStore';
 import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
+import { OwnVehicleCard } from '../src/ui/OwnVehicleCard';
 import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 3 — Truck Recommendation. */
@@ -97,6 +98,8 @@ export default function TruckScreen() {
             </Text>
           ) : null}
         </Card>
+
+        <OwnVehicleCard move={move} onChoose={(id) => dispatch({ type: 'setOwnVehicle', id })} />
 
         <SmallerOptions fits={smaller} />
 

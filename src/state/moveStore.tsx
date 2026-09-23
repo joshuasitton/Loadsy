@@ -18,6 +18,8 @@ import type {
   TruckSize,
 } from '../domain/types';
 import { normaliseCeilingHeight } from '../domain/ceiling';
+import { findOwnVehicle } from '../domain/ownVehicle';
+import { OWN_VEHICLES } from '../domain/ownVehicles';
 import { buildPackingPlan } from '../domain/packingPlan';
 import { parseStoredState } from './persistence';
 import { buildRecommendation } from '../domain/truck';
@@ -74,6 +76,7 @@ type Action =
   | { type: 'setCeilingHeight'; inches: number }
   /** "I have two": the pair stays, and is not asked about again. */
   | { type: 'keepDuplicate'; key: string }
+  | { type: 'setOwnVehicle'; id: string | null }
   | { type: 'setMoveDate'; iso: string | null }
   | { type: 'setStatus'; status: MoveStatus }
   /**
@@ -97,6 +100,7 @@ function newMove(): Move {
     tripMiles: null,
     ceilingHeightIn: null,
     keptDuplicates: [],
+    ownVehicleId: null,
     moveDate: null,
     status: 'inventory',
   };
@@ -247,6 +251,13 @@ function reducer(state: MoveState, action: Action): MoveState {
       return state.move.keptDuplicates.includes(action.key)
         ? state
         : { ...state, move: { ...state.move, keptDuplicates: [...state.move.keptDuplicates, action.key] } };
+
+    case 'setOwnVehicle':
+      // Only a listed vehicle is stored – the same check persistence makes on the way in.
+      return {
+        ...state,
+        move: { ...state.move, ownVehicleId: findOwnVehicle(action.id, OWN_VEHICLES)?.id ?? null },
+      };
 
     case 'setMoveDate':
       return { ...state, move: { ...state.move, moveDate: action.iso } };

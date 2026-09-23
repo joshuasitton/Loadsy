@@ -32,6 +32,8 @@ import { normaliseCeilingHeight } from '../domain/ceiling';
 import { MOVE_STATUS_ORDER, TRUCK_SIZES } from '../domain/types';
 import { parseAddress, zipFor } from '../domain/address';
 import { normaliseMiles } from '../domain/trip';
+import { findOwnVehicle } from '../domain/ownVehicle';
+import { OWN_VEHICLES } from '../domain/ownVehicles';
 import { clampBuffer, cubicFeetFor, DEFAULT_PACKING_BUFFER_PCT } from '../domain/volume';
 
 const CATEGORIES: readonly ItemCategory[] = ['furniture', 'box', 'appliance', 'fragile', 'other'];
@@ -259,6 +261,10 @@ export function parseStoredState(raw: string): ParsedState | null {
     keptDuplicates: Array.isArray(storedMove.keptDuplicates)
       ? [...new Set(storedMove.keptDuplicates.filter((key): key is string => typeof key === 'string' && key.includes('|')))]
       : [],
+    // Absent before the question existed, which reads as none chosen. An id a later
+    // build no longer lists also reads as none: the screen then asks again rather than
+    // answering for a vehicle whose figures have gone.
+    ownVehicleId: findOwnVehicle(nonEmptyString(storedMove.ownVehicleId), OWN_VEHICLES)?.id ?? null,
     moveDate: nonEmptyString(storedMove.moveDate),
     status: status ?? 'inventory',
   };
