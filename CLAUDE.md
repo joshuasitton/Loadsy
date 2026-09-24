@@ -30,13 +30,14 @@ npm run eval:detect   # run the detection eval over eval-photos/
 | Path | What lives there |
 |---|---|
 | `app/` | expo-router screens, one file per screen |
-| `app/v1/detect+api.ts` | the entire backend — a pass-through to the vision model, deployed with the app |
-| `src/domain/` | pure functions: volume, truck sizing, quotes, packing, flow, tier, trip |
+| `app/v1/detect+api.ts` | the backend proper — a pass-through to the vision model, deployed with the app |
+| `app/v1/vehicle-request+api.ts` | counts "Mine isn't listed" into the log; the only thing the server keeps |
+| `src/domain/` | pure functions: volume, truck sizing, quotes, packing, flow, tier, trip, own-vehicle fit |
 | `src/truckmap/` | the bin-packing solver and its SVG projection |
 | `src/state/` | move and history stores, AsyncStorage persistence |
 | `src/billing/`, `src/auth/`, `src/demo/` | tier gating, the demo sign-in, prepared demo inventories |
 | `src/ui/` | shared components, theme, and `markGeometry.ts` |
-| `__tests__/` | 27 test files, all against the domain layer |
+| `__tests__/` | the test suite – the domain layer, persistence, both API routes and the contrast pairs |
 | `APP_STORE.md` | release checklist — what is done in code, what is outstanding |
 | `docs/` | project-level state and the leadership standup log |
 
@@ -72,14 +73,24 @@ npm run eval:detect   # run the detection eval over eval-photos/
 
 ## Environment
 
-Compiling and running are macOS jobs and belong in Josh's own Terminal — which
-is where Claude Code runs, so run them.
+Claude Code runs in more than one place, and what it can do depends on which.
 
-Cowork and other cloud sessions cannot: the npm registry answers 403 from both
-the cloud container and the Cowork device VM, and that VM is Linux with no
-Xcode. github.com is also blocked from it, so a cloud session can commit but
-cannot push. Those sessions read, reason and edit; Josh executes; the output
-comes back. None of that applies here.
+**On Josh's Mac** it can do everything: compile, run the simulator, deploy, set up EAS and
+Apple credentials, and read manufacturer websites. Signing and Apple's two-factor
+sign-in only work here, and so does deploying unless the cloud environment has been given
+an `EXPO_TOKEN`.
+
+**In a Claude Code cloud session** (claude.ai/code), as of 23 September, the container
+reaches the npm registry and GitHub. It installs dependencies, runs `npm test`,
+`typecheck` and `lint`, drives the web build headlessly with Playwright, commits, pushes
+and opens pull requests. It cannot deploy or run EAS builds – it is not logged in to Expo
+unless an `EXPO_TOKEN` is added to the environment – cannot sign in to Apple, and is
+refused by automakers' websites, so vehicle research happens on the Mac. It is Linux, with
+no Xcode. Its Metro dev server does not see file changes: restart it after an edit before
+trusting what the browser shows.
+
+**The Cowork device VM**, when last checked, was cut off from npm and github.com. There,
+Claude reads, reasons and edits; Josh executes and brings the output back.
 
 For the simulator, `xcode-select -p` must point at `/Applications/Xcode.app`.
 Xcode was installed 2026-08-25 but its first-launch configuration may still be
