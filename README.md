@@ -583,47 +583,56 @@ This machine has only the Command Line Tools, so `expo run:ios` and the simulato
 are unavailable. EAS Build compiles on Apple hardware in the cloud instead, which is
 what makes TestFlight, screenshots and submission reachable from here.
 
-`eas.json` is committed and ready. Three one-time steps, all needing your account:
+`eas.json` is committed and ready, and the project is already linked: `app.json`
+carries the EAS project id and the `jdsitton` owner, and `eas.json` pins the App Store
+Connect app id (`ascAppId`). What is left needs your Expo and Apple accounts, so it runs
+on the Mac, not in a cloud session – Apple's sign-in asks for a two-factor code.
 
 ```bash
 npx eas-cli login
+npx eas-cli credentials -p ios
 ```
+
+In `credentials`, choose the `production` profile and let EAS generate the distribution
+certificate and the provisioning profile for `com.loadsy.app`; you never touch either by
+hand again. In the same menu, let it create an **App Store Connect API key** as well.
+Without the key every `eas submit` stops for an Apple ID and a two-factor code; with it,
+and with `ascAppId` pinned, submission runs with no prompt at all. All of it needs an
+active Apple Developer Program membership, and the key needs the Admin or Account Holder
+role.
+
+Then build, and send the build to TestFlight:
 
 ```bash
-npx eas-cli init
+npx eas-cli build --platform ios --profile production
+npx eas-cli submit --platform ios --profile production
 ```
-
-`init` writes `extra.eas.projectId` into `app.json` — commit that. Then:
-
-```bash
-npx eas-cli build --platform ios --profile preview
-```
-
-The first build asks whether EAS should manage your signing credentials; saying yes
-means you never touch a provisioning profile. It needs an active Apple Developer
-Program membership.
 
 **The three profiles:**
 
 | Profile | What it is | Use it for |
 |---|---|---|
 | `development` | Dev client, simulator build | Running against a local Metro server |
-| `preview` | Release build, internal distribution | TestFlight, real-device testing, screenshots |
-| `production` | Release build, store credentials | App Store submission |
+| `preview` | Release build, ad hoc distribution, demo mode and mocks | Screenshots and demos on registered iPhones |
+| `production` | Release build, store credentials, live backend | TestFlight and App Store submission |
+
+**`preview` is not TestFlight.** Internal distribution is Apple's ad hoc route: the build
+installs only on iPhones registered to the account first (`npx eas-cli device:create`),
+and it is never uploaded to App Store Connect. TestFlight is reached only through a
+`production` build and `eas submit` – which is also the build a tester should use, since
+`preview` runs the demo inventories rather than the real detector.
 
 `production` sets `autoIncrement`, and `cli.appVersionSource` is `remote`, so EAS owns
 the build number — the `buildNumber` in `app.json` is no longer the source of truth.
 Bump `version` there for a marketing version change; leave the build number alone.
 
-All three profiles pin `EXPO_PUBLIC_USE_MOCKS=true`, because no backend exists yet.
-**Remove it from `production` the moment `/v1/detect` is real** — otherwise you would
-ship a build that quietly serves the mock catalogue.
-
-To submit once a production build finishes:
-
-```bash
-npx eas-cli submit --platform ios --profile production
-```
+`development` and `preview` pin `EXPO_PUBLIC_USE_MOCKS` and `EXPO_PUBLIC_DEMO_MODE`
+on. `production` pins neither – they default off in a release – and points
+`EXPO_PUBLIC_API_BASE_URL` at `https://loadsy.expo.app`, so a production build measures
+real photos through the deployed `/v1/detect`. That route answers 503 until the
+`VISION_API_KEY` secret is set on the `production` environment (see "The backend"), so
+set it before the first TestFlight build: a tester whose photos all fail learns nothing
+about the app.
 
 ---
 
@@ -636,7 +645,7 @@ The screens from spec §3, less prices – see "No prices in v1" above:
 | `app/index.tsx` | Screen 7 | My Move dashboard, 5-step tracker bound to `MoveStatus` |
 | `app/capture.tsx` | Screen 1 | Camera + gallery capture, tips card, photo quality gate |
 | `app/inventory.tsx` | Screen 2 | One inventory list, confidence and double-count gate, add by hand |
-| `app/truck.tsx` | Screen 3 | Recommendation with the raw → buffered → capacity breakdown |
+| `app/truck.tsx` | Screen 3 | Recommendation with the raw → buffered → capacity breakdown; trips in your own vehicle |
 | `app/rent.tsx` | Screen 4 | Where to rent the truck or a pickup or trailer that fits – each company's site, and "near me" |
 | `app/packing.tsx` | Screen 5 | Load plan in numbered groups, weight-class aware |
 | `app/layout-view.tsx` | Screen 6 | Top / 3D truck diagram, save and share |
@@ -663,7 +672,7 @@ agents can be swapped in behind `src/api/` without touching a screen.
 ## Tests
 
 ```bash
-npm test        # 56 tests, no dependencies required
+npm test        # every test file in __tests__/, no dependencies required
 ```
 
 Both contract invariants the spec asks QA to assert are covered:
