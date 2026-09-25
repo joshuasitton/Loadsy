@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
-import { PRIVACY_URL, SITE_ORIGIN, SUPPORT_URL, TAGLINE } from '../src/domain/site';
+import { PRIVACY_URL, SITE_ORIGIN, SUPPORT_EMAIL, SUPPORT_URL, TAGLINE } from '../src/domain/site';
 
 /**
  * The two URLs that go into App Store Connect by hand, pinned so the app's footer,
@@ -39,4 +39,13 @@ test('no screen types the tagline out – they all read TAGLINE', () => {
     .filter((name) => name.endsWith('.tsx'))
     .filter((name) => /Take pics\. Know it fits|Right size truck|Right price/.test(readFileSync(new URL(name, dir), 'utf8')));
   assert.deepEqual(offenders, []);
+});
+
+test('the support address is one address, written once', () => {
+  assert.match(SUPPORT_EMAIL, /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/);
+  // A second copy under app/ is how the listing and the pages came to disagree before.
+  const copies = readdirSync('app', { recursive: true, encoding: 'utf8' })
+    .filter((f) => /\.tsx?$/.test(f))
+    .filter((f) => readFileSync(`app/${f}`, 'utf8').includes(SUPPORT_EMAIL));
+  assert.deepEqual(copies, []);
 });
