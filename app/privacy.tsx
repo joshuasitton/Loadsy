@@ -163,25 +163,15 @@ function Para({ children }: { children: React.ReactNode }) {
   return <Text style={styles.para}>{children}</Text>;
 }
 
-/**
- * The address, or the honest absence of one. A policy with an address that does not
- * answer is worse than one that says the address is coming.
- */
+/** The support address, shared with the support page so the two cannot differ. */
 export function ContactLine() {
-  if (SUPPORT_EMAIL) {
-    return (
-      <Text style={styles.para}>
-        Questions go to{' '}
-        <Text style={styles.link} onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}>
-          {SUPPORT_EMAIL}
-        </Text>
-        .
-      </Text>
-    );
-  }
   return (
     <Text style={styles.para}>
-      A support address is being set up and will appear here before Loadsy is in the App Store.
+      Questions go to{' '}
+      <Text style={styles.link} onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}>
+        {SUPPORT_EMAIL}
+      </Text>
+      .
     </Text>
   );
 }

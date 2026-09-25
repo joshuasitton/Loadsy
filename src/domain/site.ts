@@ -16,17 +16,16 @@ export const PRIVACY_URL = `${SITE_ORIGIN}${PRIVACY_PATH}`;
 export const SUPPORT_URL = `${SITE_ORIGIN}${SUPPORT_PATH}`;
 
 /** Moves whenever the privacy page's wording changes. The page shows it. */
-export const PRIVACY_UPDATED = '23 September 2026';
+export const PRIVACY_UPDATED = '25 September 2026';
 
 /**
- * Where a person can write to. Null until one is chosen – a made-up address on a
- * privacy policy is worse than none, and the Chairman has not picked one yet. Set
- * `EXPO_PUBLIC_SUPPORT_EMAIL` for the build; the pages say so when it is absent.
+ * Where a person can write to – on the support page, the privacy page and the listing.
+ * Decided 25 September. Written here rather than read from an `EXPO_PUBLIC_` variable,
+ * as it first was: the variable was one more thing to set in EAS before every deploy,
+ * and a build made without it told App Review that an address was still coming. It is
+ * public by design, so it has no reason to live outside the code.
  */
-export const SUPPORT_EMAIL: string | null = (() => {
-  const value = process.env.EXPO_PUBLIC_SUPPORT_EMAIL?.trim();
-  return value ? value : null;
-})();
+export const SUPPORT_EMAIL = 'loadsysupport@gmail.com';
 
 /**
  * The tagline, as phrases so the dashboard can set one per line. Defined once because

@@ -41,9 +41,10 @@ cannot disagree: <https://loadsy.expo.app/privacy> (`app/privacy.tsx`) and
 dashboard as Apple asks. `src/domain/site.ts` holds the URLs; a test pins the host to the
 production API host in `eas.json`. The privacy page is written as claims about the code
 – the pass-through, the address counting in the rate limit, what stays on the phone – so
-when the code changes the page changes and its date moves. Two things still wait on the
-Chairman: the support address (`EXPO_PUBLIC_SUPPORT_EMAIL`; until it is set both pages say
-one is coming), and decision 6, confirming Anthropic's retention terms, which the page
+when the code changes the page changes and its date moves. The support address,
+loadsysupport@gmail.com, is `SUPPORT_EMAIL` in the same file (decided 25 September),
+written in code rather than an EAS variable so no build can ship without it. One thing
+still waits on the Chairman: decision 6, confirming Anthropic's retention terms, which the page
 currently describes as a limited safety-monitoring hold with no training use.
 
 **No location permission, no addresses, no prices – removed 15 September**

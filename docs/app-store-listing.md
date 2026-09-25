@@ -79,8 +79,8 @@ Apple already indexes, so repeating it wastes nine characters.
 **Sign-in required:** No. There is no account.
 
 **Contact information:** your first name, last name, phone number and email. Apple uses
-these only to reach you about the review. Not the support address – that one is
-**DECIDE** (see `EXPO_PUBLIC_SUPPORT_EMAIL`).
+these only to reach you about the review. Not the support address – that one,
+loadsysupport@gmail.com, is for users, and is on the support and privacy pages.
 
 **Notes** (paste as-is)
 
@@ -167,7 +167,8 @@ standard HTTPS provided by the operating system, which is exempt.
 - [ ] The build attached to the version is the latest production build – the one checked
       on TestFlight on 25 September – not an earlier one.
 - [ ] Both URLs open in a private browser window.
-- [ ] Copyright, availability and the support address are decided.
+- [x] The support address is decided: loadsysupport@gmail.com (25 September).
+- [ ] Copyright and availability are decided.
 - [x] The tagline question: decided 25 September – "Right price." is gone. The tagline is
       now "Take pics. Know it fits.", defined once in `src/domain/site.ts`.
 - [ ] The nutrition label matches decision 6.
