@@ -4,6 +4,26 @@ Snapshot imported from the claude.ai "Loadsy App" project on 2026-09-11. It is
 the running project-level record; the sections below are dated and kept in
 order rather than rewritten, so the reasoning stays readable.
 
+> **2026-09-25: the first production build is on TestFlight and checked on a phone.**
+> The entries below predate it, and "What's next" items 1 and 2 are done:
+>
+> - **Production is the real app again.** <https://loadsy.expo.app> had been
+>   serving a demo export since before 21 September, when the demo script still
+>   deployed with `--prod`. `npm run deploy:prod` replaced it, with
+>   `VISION_API_KEY` set on the `production` environment first. The demo lives at
+>   <https://loadsy--demo.expo.app>, and the "hosted demo" line in the 09-11 note
+>   below no longer describes the production URL.
+> - **Apple signing works.** EAS generated the credentials, and
+>   `eas build -p ios --profile production --auto-submit` built the app and
+>   uploaded it to App Store Connect.
+> - **Josh installed it through TestFlight and checked:** no demo sign-in on first
+>   launch, a real photo measured through `/v1/detect`, the Your Own Vehicle card on
+>   Truck Size, and the move surviving a restart.
+> - **Still open for review:** screenshots, the privacy label (Product Interaction,
+>   not linked – see `APP_STORE.md`), the support address, name clearance,
+>   Anthropic's retention terms, and whether the vehicle card ships with one
+>   vehicle listed.
+
 > **Verified against the repository on 2026-09-11, and parts of the 09-08 entry
 > below are now out of date.** Where they disagree, the code and `README.md`
 > win:

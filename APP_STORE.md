@@ -126,7 +126,14 @@ rent, packing plan. Generate at 6.7" and 6.1". Populate with a realistic 2BR inv
 than the mock catalogue – the audience is apartment moves, decided 15 September — and make sure the confidence banner is visible in the
 inventory shot, since the correction workflow is the differentiator.
 
-**TestFlight internal build, tested against the Josh persona**
+**TestFlight internal build, tested against the Josh persona – first build done 25 September**
+
+The first `production` build went through EAS and `--auto-submit` to TestFlight, and
+Josh installed and checked it on his iPhone: no demo sign-in, a real photo measured
+through the live `/v1/detect`, the Your Own Vehicle card on Truck Size, and the move
+kept across a restart. What that pass did not answer is the persona question below,
+which needs a real move rather than a checklist.
+
 Busy professional, wants simple/accurate/affordable, no guesswork. The specific thing to
 watch in testing: does the confidence gate feel like help or like an obstacle? It is a
 hard requirement and it blocks the primary CTA, so if it reads as friction the copy
