@@ -1,6 +1,6 @@
 # Loadsy
 
-**Right size truck. Right price. Right plan.**
+**Take pics. Know it fits.**
 
 React Native + Expo implementation of the Loadsy MVP Technical Spec.
 
@@ -240,7 +240,13 @@ does and a Get Started button; no pages, no account, nothing to skip on later op
 for after the first TestFlight install, where an empty dashboard was the right screen for
 the fiftieth launch and a cold one for the first. It does not appear under `DEMO_MODE`,
 where the sign-in screen is already the front door, but `/welcome` still opens for looking
-at it. The tagline is deliberately absent from it while "Right price." is under review.
+at it. The tagline is left off it: the three lines already say what the app does.
+
+The tagline was "Right size truck. Right price. Right plan." until 25 September. v1 shows
+no prices, and a price promise was the first line a reviewer read, so it became "Take
+pics. Know it fits." – the method and the answer, true for a truck, a trailer and your own
+car alike. It had been typed out in five places, which is how "Right price." outlived the
+prices in all of them; it now lives once, as `TAGLINE` in `src/domain/site.ts`.
 
 ### Moving through the flow
 

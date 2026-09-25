@@ -11,12 +11,13 @@ import { HistoryProvider } from '../src/state/historyStore';
 import { MoveProvider } from '../src/state/moveStore';
 import { SignOutButton } from '../src/ui/SignOutButton';
 import { colors } from '../src/ui/theme';
+import { TAGLINE } from '../src/domain/site';
 
 /**
  * What the browser tab says. Matches the <title> in app/+html.tsx, which is what
  * crawlers and link unfurls read from the served HTML.
  */
-const DOCUMENT_TITLE = 'Loadsy — Right size truck. Right price. Right plan.';
+const DOCUMENT_TITLE = `Loadsy — ${TAGLINE}`;
 
 /**
  * Keeps the tab title from going blank on web.

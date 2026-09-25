@@ -86,7 +86,9 @@ these only to reach you about the review. Not the support address – that one i
 
 > Loadsy sizes a moving truck from photographs of rooms. To test it: from My Move, tap "Take photos", photograph any furnished room (a wide shot from the doorway works best, with a second angle from another corner), and tap Measure. Detection sends the photos to a vision model and takes 20–60 seconds; progress is shown. The inventory then lists the furniture with sizes you can correct; items it was unsure about are marked and need a quick tap before the truck is sized. "Add items by hand" on the Inventory screen works without any photos, if a furnished room isn't available.
 >
-> The app needs no account and has no in-app purchases. It asks for camera access and photo library access only when those buttons are tapped. Nothing is stored on a server: photos are forwarded to the vision model and discarded. The privacy policy is at https://loadsy.expo.app/privacy.
+> On the Truck Size screen, "Your own vehicle" shows how many trips a vehicle the person drives would take, and which pieces won't fit in it. If theirs isn't listed, they can choose to send its type, model year, make and model from fixed lists, which is counted anonymously to decide which vehicles to add next.
+>
+> The app needs no account and has no in-app purchases. It asks for camera access and photo library access only when those buttons are tapped. Photos are forwarded to the vision model and discarded; the only thing Loadsy's server keeps is that optional, anonymous vehicle count. The privacy policy is at https://loadsy.expo.app/privacy.
 >
 > "Where to Rent" opens rental companies' own websites in an in-app browser; Loadsy has no affiliate relationship with any of them. "Near me" opens the Maps app with a search phrase; the app does not request location.
 
@@ -128,7 +130,12 @@ Territories can be added without a new build.
 
 ## App Privacy (the nutrition label)
 
-The intended answer is **Data Not Collected**, and Apple's definition is what makes it
+> **Changed 23 September.** The optional "Mine isn't listed" count is kept, so the answer is
+> no longer "Data Not Collected" throughout. Declare **Usage Data → Product Interaction**,
+> used for **Analytics**, **not linked** to the user, **not used for tracking** – see
+> `APP_STORE.md`. The reasoning below still decides the photos question.
+
+The intended answer was **Data Not Collected**, and Apple's definition is what makes it
 true or not. Apple counts data as "collected" when it is transmitted off the device and
 kept longer than needed to service the request. Two things leave the phone:
 
@@ -157,9 +164,10 @@ standard HTTPS provided by the operating system, which is exempt.
 
 ## Before pressing Submit for Review
 
-- [ ] Build 4 (1.0.0) is the one attached to the version, not build 3 (0.1.0).
+- [ ] The build attached to the version is the latest production build – the one checked
+      on TestFlight on 25 September – not an earlier one.
 - [ ] Both URLs open in a private browser window.
 - [ ] Copyright, availability and the support address are decided.
-- [ ] The tagline question: the dashboard still says "Right price." with no prices in the
-      app. It is on the first screen a reviewer sees. **DECIDE** whether it stays.
+- [x] The tagline question: decided 25 September – "Right price." is gone. The tagline is
+      now "Take pics. Know it fits.", defined once in `src/domain/site.ts`.
 - [ ] The nutrition label matches decision 6.

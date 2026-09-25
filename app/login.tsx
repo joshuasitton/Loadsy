@@ -17,6 +17,7 @@ import { useMove } from '../src/state/moveStore';
 import { Mark } from '../src/ui/Mark';
 import { Card, PrimaryButton, Screen } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
+import { TAGLINE } from '../src/domain/site';
 
 /**
  * The demo's front door.
@@ -81,7 +82,7 @@ export default function LoginScreen() {
             */}
             <Mark size={64} accessibilityLabel="Loadsy" />
             <Text style={styles.wordmark}>Loadsy</Text>
-            <Text style={styles.tagline}>Right size truck. Right price. Right plan.</Text>
+            <Text style={styles.tagline}>{TAGLINE}</Text>
           </View>
 
           <Card style={styles.card}>
