@@ -3,7 +3,7 @@ import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MOVE_STATUS_ORDER, type MoveStatus } from '../src/domain/types';
 import { dashboardRows, isPremiumRoute, type GatedRoute } from '../src/domain/tier';
-import { PRIVACY_PATH, SUPPORT_PATH } from '../src/domain/site';
+import { PRIVACY_PATH, SUPPORT_PATH, TAGLINE_PHRASES } from '../src/domain/site';
 import { TRUCK_LABEL } from '../src/domain/truck';
 import { inventoryBlockedReason, unresolvedCount, unresolvedDuplicates } from '../src/domain/confidence';
 import { allItems } from '../src/domain/volume';
@@ -152,7 +152,7 @@ export default function MyMoveScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Right size truck.{'\n'}Right price. Right plan.</Text>
+          <Text style={styles.heroTitle}>{TAGLINE_PHRASES.join('\n')}</Text>
           <Text style={styles.heroSubtitle}>
             Photograph what you&apos;re moving and Loadsy works out how much truck you actually need.
           </Text>

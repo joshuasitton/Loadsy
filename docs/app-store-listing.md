@@ -168,6 +168,6 @@ standard HTTPS provided by the operating system, which is exempt.
       on TestFlight on 25 September – not an earlier one.
 - [ ] Both URLs open in a private browser window.
 - [ ] Copyright, availability and the support address are decided.
-- [ ] The tagline question: the dashboard still says "Right price." with no prices in the
-      app. It is on the first screen a reviewer sees. **DECIDE** whether it stays.
+- [x] The tagline question: decided 25 September – "Right price." is gone. The tagline is
+      now "Right size truck. Right plan.", defined once in `src/domain/site.ts`.
 - [ ] The nutrition label matches decision 6.

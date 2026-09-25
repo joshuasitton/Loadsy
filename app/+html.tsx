@@ -1,5 +1,6 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
+import { TAGLINE } from '../src/domain/site';
 
 /**
  * The HTML document every web page is rendered into. Web only — native never
@@ -21,7 +22,7 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
 
-        <title>Loadsy — Right size truck. Right price. Right plan.</title>
+        <title>{`Loadsy — ${TAGLINE}`}</title>
         <meta
           name="description"
           content="Photograph what you're moving and Loadsy works out how much truck you actually need, where to rent it, and the order to load it in."

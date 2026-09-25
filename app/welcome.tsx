@@ -15,9 +15,8 @@ import { colors, radius, space, type } from '../src/ui/theme';
  * way – no pages to swipe, no account, nothing to skip on every open, because it is never
  * shown again. `src/onboarding/welcome.ts` holds the flag; the gate is in app/_layout.tsx.
  *
- * The tagline is not here. "Right price." is under review now that v1 shows no prices,
- * and the one screen that introduces the product should not introduce a claim it does
- * not make.
+ * The tagline is not here: three lines on what the app does say more than a slogan
+ * does, on the one screen that introduces the product.
  */
 const STEPS = [
   { title: 'Photograph each room', body: 'Stand in the doorway and get the whole room in. One more from another corner helps.' },

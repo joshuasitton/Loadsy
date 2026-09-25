@@ -28,5 +28,15 @@ export const SUPPORT_EMAIL: string | null = (() => {
   return value ? value : null;
 })();
 
+/**
+ * The tagline, as phrases so the dashboard can set one per line. Defined once because
+ * it was typed out in five places – the dashboard, the sign-in screen, both page
+ * titles and the README – and "Right price." outlived v1's prices in all of them.
+ * Decided 25 September: it promises only what the app does. `__tests__/site.test.ts`
+ * refuses a copy of it anywhere under `app/`, and a price claim in it.
+ */
+export const TAGLINE_PHRASES = ['Right size truck.', 'Right plan.'] as const;
+export const TAGLINE = TAGLINE_PHRASES.join(' ');
+
 /** Anthropic's published privacy policy, linked from the privacy page. */
 export const ANTHROPIC_PRIVACY_URL = 'https://www.anthropic.com/legal/privacy';

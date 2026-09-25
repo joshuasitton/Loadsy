@@ -1,6 +1,6 @@
 # Loadsy
 
-**Right size truck. Right price. Right plan.**
+**Right size truck. Right plan.**
 
 React Native + Expo implementation of the Loadsy MVP Technical Spec.
 
@@ -240,7 +240,9 @@ does and a Get Started button; no pages, no account, nothing to skip on later op
 for after the first TestFlight install, where an empty dashboard was the right screen for
 the fiftieth launch and a cold one for the first. It does not appear under `DEMO_MODE`,
 where the sign-in screen is already the front door, but `/welcome` still opens for looking
-at it. The tagline is deliberately absent from it while "Right price." is under review.
+at it. The tagline is left off it: the three lines already say what the app does. The
+tagline itself lost "Right price." on 25 September – v1 shows no prices, and it was the
+first thing a reviewer read – and now lives once, as `TAGLINE` in `src/domain/site.ts`.
 
 ### Moving through the flow
 

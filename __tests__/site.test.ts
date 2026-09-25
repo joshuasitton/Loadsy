@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
-import { PRIVACY_URL, SITE_ORIGIN, SUPPORT_URL } from '../src/domain/site';
+import { PRIVACY_URL, SITE_ORIGIN, SUPPORT_URL, TAGLINE } from '../src/domain/site';
 
 /**
  * The two URLs that go into App Store Connect by hand, pinned so the app's footer,
@@ -21,4 +21,22 @@ test('the site is the production deployment the app already calls', () => {
 test('the policy and support pages are routes on that site', () => {
   assert.equal(PRIVACY_URL, 'https://loadsy.expo.app/privacy');
   assert.equal(SUPPORT_URL, 'https://loadsy.expo.app/support');
+});
+
+/*
+ * The tagline lived as five hand-typed copies until 25 September, and "Right price."
+ * outlived v1's prices in every one of them. One constant now; these keep it that way.
+ */
+
+test('the tagline makes no price claim – v1 shows no prices', () => {
+  assert.equal(TAGLINE, 'Right size truck. Right plan.');
+  assert.doesNotMatch(TAGLINE, /price|cheap|save|\$/i);
+});
+
+test('no screen types the tagline out – they all read TAGLINE', () => {
+  const dir = new URL('../app/', import.meta.url);
+  const offenders = readdirSync(dir)
+    .filter((name) => name.endsWith('.tsx'))
+    .filter((name) => /Right size truck|Right price/.test(readFileSync(new URL(name, dir), 'utf8')));
+  assert.deepEqual(offenders, []);
 });
