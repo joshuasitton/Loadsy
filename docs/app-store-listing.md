@@ -169,5 +169,5 @@ standard HTTPS provided by the operating system, which is exempt.
 - [ ] Both URLs open in a private browser window.
 - [ ] Copyright, availability and the support address are decided.
 - [x] The tagline question: decided 25 September – "Right price." is gone. The tagline is
-      now "Right size truck. Right plan.", defined once in `src/domain/site.ts`.
+      now "Take pics. Know it fits.", defined once in `src/domain/site.ts`.
 - [ ] The nutrition label matches decision 6.

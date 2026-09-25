@@ -32,10 +32,11 @@ export const SUPPORT_EMAIL: string | null = (() => {
  * The tagline, as phrases so the dashboard can set one per line. Defined once because
  * it was typed out in five places – the dashboard, the sign-in screen, both page
  * titles and the README – and "Right price." outlived v1's prices in all of them.
- * Decided 25 September: it promises only what the app does. `__tests__/site.test.ts`
+ * Decided 25 September: "Take pics. Know it fits." – the method and the answer, which
+ * holds for the truck, a trailer and the person's own car alike. `__tests__/site.test.ts`
  * refuses a copy of it anywhere under `app/`, and a price claim in it.
  */
-export const TAGLINE_PHRASES = ['Right size truck.', 'Right plan.'] as const;
+export const TAGLINE_PHRASES = ['Take pics.', 'Know it fits.'] as const;
 export const TAGLINE = TAGLINE_PHRASES.join(' ');
 
 /** Anthropic's published privacy policy, linked from the privacy page. */

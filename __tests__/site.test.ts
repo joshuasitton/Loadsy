@@ -29,7 +29,7 @@ test('the policy and support pages are routes on that site', () => {
  */
 
 test('the tagline makes no price claim – v1 shows no prices', () => {
-  assert.equal(TAGLINE, 'Right size truck. Right plan.');
+  assert.equal(TAGLINE, 'Take pics. Know it fits.');
   assert.doesNotMatch(TAGLINE, /price|cheap|save|\$/i);
 });
 
@@ -37,6 +37,6 @@ test('no screen types the tagline out – they all read TAGLINE', () => {
   const dir = new URL('../app/', import.meta.url);
   const offenders = readdirSync(dir)
     .filter((name) => name.endsWith('.tsx'))
-    .filter((name) => /Right size truck|Right price/.test(readFileSync(new URL(name, dir), 'utf8')));
+    .filter((name) => /Take pics\. Know it fits|Right size truck|Right price/.test(readFileSync(new URL(name, dir), 'utf8')));
   assert.deepEqual(offenders, []);
 });
