@@ -10,6 +10,45 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-26 — Dog portrait prints: a new product
+
+### What was asked
+
+The customer photographs their dog, the app makes a 3D-printable figurine, we print
+it on Bambu Lab A1 printers with the AMS Lite and post it, up to four colours. The
+Chairman asked for the materials options.
+
+### Where it stands
+
+- **The brief is written** – `docs/dog-print-brief.md`: the customer flow, the
+  make-pipeline (a bought image-to-3D model, our own colour quantisation and 3MF
+  writing, headless Bambu Studio slicing), the printer's limits, the materials menu
+  and the four-colour purge budget that decides how colours are laid out.
+- **The menu is pinned by a test** – `dogprint/materials.ts` and
+  `__tests__/dogprintMaterials.test.ts`. Standard from day one: PLA Matte (default),
+  PLA Basic, PLA Silk+, PETG HF. Specialty once the hardened hotend is fitted: PLA
+  Sparkle. Not offered, each with its reason: PLA Glow and TPU (the AMS Lite will
+  not feed them), ABS/ASA/PC/PA (no enclosure), Silk Multi-Color (Bambu says not on
+  A-series), support material (it spends a slot).
+- **Four rows could not be verified from the cloud** – PLA Marble, Wood, Galaxy and
+  Metal. Bambu's site is blocked from the container; they stay off the menu until
+  the wiki table is checked on the Mac.
+- **The finding that changes the design:** every filament change on the A1 purges
+  about six grams. A four-colour dog whose colours all appear in every layer purges
+  kilograms for a ninety-gram print. So the design step bands colours by height,
+  the app shows the purge cost of each colour before the order, and the print queue
+  batches orders by palette.
+
+**Decisions needed:** where it lives (recommended: its own repository); a name;
+which mesh generator to evaluate first (Tripo, Meshy or self-hosted Hunyuan3D –
+recommended: all three on the same twenty dogs, scored on printing without hand
+repair); fitting the hardened hotend to every printer (recommended yes); photo and
+mesh retention, which sets the privacy label; price by size, material and colour
+count; the turnaround promise given palette batching; and the four "verify on the
+Mac" rows.
+
+---
+
 ## 2026-09-23 — Your own vehicle
 
 ### Chairman decisions

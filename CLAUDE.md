@@ -38,6 +38,7 @@ npm run eval:detect   # run the detection eval over eval-photos/
 | `src/billing/`, `src/auth/`, `src/demo/` | tier gating, the demo sign-in, prepared demo inventories |
 | `src/ui/` | shared components, theme, and `markGeometry.ts` |
 | `__tests__/` | the test suite – the domain layer, persistence, both API routes and the contrast pairs |
+| `dogprint/` | a second product, dog portrait prints – its materials menu, pinned by a test; the brief is `docs/dog-print-brief.md` |
 | `APP_STORE.md` | release checklist — what is done in code, what is outstanding |
 | `docs/` | project-level state and the leadership standup log |
 
