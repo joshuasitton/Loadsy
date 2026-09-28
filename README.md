@@ -466,6 +466,54 @@ This is the first thing Loadsy's server keeps, so the App Store answer moved off
 Not Collected" to Product Interaction, not linked to the user – see `APP_STORE.md`. The
 privacy page says the same.
 
+### Mover quotes – built, and off
+
+Decided 28 September: build a way for someone to ask a local mover for a quote, keep it off,
+and turn it on only when a partner is signed. It was asked for as lead generation that is
+"mostly unseen" by the user. The quiet part is kept; the unseen part is not, and cannot be.
+A lead is a way to reach a person. Taking one they did not knowingly hand over, or passing
+their move to a company they were not told about, is what App Review rejects under 5.1.1
+and 5.1.2, and it would make the privacy page – written as claims about the code – untrue.
+A deceptive-data rejection is also far harder to come back from than a missing field.
+
+So it is opt-in, and quiet. The truck screen gets one line under the pickups and trailers –
+"Rather not drive it yourself? Get a quote from local movers →" – and nothing else. Tapping
+it opens a sheet that first shows exactly what will be sent (the truck, its volume, how many
+items and rooms – never the list, never a photo), then asks for a phone number or email, a
+moving day and two ZIP codes, and a tick beside a sentence that names who receives it. The
+send button stays off until that box is ticked. A failed send is said out loud, unlike the
+vehicle count: this person is waiting for a call, and a silent failure means one that never
+comes.
+
+`src/domain/lead.ts` is the contract for both ends, as `vehicleRequest.ts` is for the count.
+The load summary is computed there from the move, so the client cannot send the inventory
+even by mistake. `parseLead` refuses any extra field, a consent that names a different
+partner, or a consent sentence other than the current `LEAD_CONSENT_VERSION` – so a lead
+can always be traced to the exact words the person agreed to. The consent sentence itself
+is `leadConsentSentence`, shown by the form and quoted by the privacy page, so the two
+cannot drift.
+
+**Two switches, both off.** `LEAD_PARTNER` is `null` in code, and a test fails the day it
+changes, because that is the day the privacy label changes too. `EXPO_PUBLIC_LEADS_ENABLED`
+must be exactly `"true"`, defaulting off in every environment as `PREMIUM_FOR_SALE` does.
+Only with both does `OFFERED_PARTNER` hold a partner; the form, the privacy-page section and
+the route all read that one value. With either off, the line is not drawn and `/v1/lead`
+answers 404 to everything, so an app that never showed the form cannot be made to send one.
+
+**The server keeps nothing.** `/v1/lead` (the handler is `src/server/leadHandler.ts`, built
+from its configuration so the tests can run it with a partner) checks the lead, posts it to
+`LEAD_WEBHOOK_URL` with `LEAD_WEBHOOK_TOKEN` as a bearer token, and logs one line –
+`{"event":"lead","truckSize":"15ft","delivered":true}` – with no way to reach anyone in it.
+Both are EAS project secrets and never `EXPO_PUBLIC_`: the URL alone would let anyone post
+fake leads to the partner in Loadsy's name. Three leads a day per address, then a 429 the
+form shows.
+
+**Turning it on** is a Chairman decision and a release, not a flag flip: name the partner in
+`LEAD_PARTNER` (with their privacy policy), set the two secrets and the flag, and change the
+App Store privacy label *in the same release* – see `APP_STORE.md`. A webhook is the lowest
+common denominator; if the partner has an API with its own fields, the handler changes, and
+so does this section.
+
 ### Nobody names a room
 
 Decided 18 September: "stuff is stuff" – take pictures, get a truck size, find a truck.

@@ -33,6 +33,24 @@ the Vision agent starts retaining images server-side, and change this entry if t
 count ever gains a field – `parseVehicleRequest` refuses any extra field so that can only
 happen deliberately.
 
+**Mover quotes – built 28 September, off, and a label change when turned on**
+
+The opt-in "Get a quote from local movers" form (README, "Mover quotes") is off in every
+build until `LEAD_PARTNER` names a signed partner and `EXPO_PUBLIC_LEADS_ENABLED` is
+`"true"`. Build 10 and anything else built with it off collect nothing new, and the label
+above stays right. The release that turns it on must also change the label, before it is
+submitted:
+
+- **Contact Info → Phone Number** and **Email Address**, used for **App Functionality**
+  (the person asked to be contacted), **linked to the user**, **not used for tracking**
+- **Location → Coarse Location** – two typed ZIP codes – same answers
+- In App Review notes, say that the form is opt-in, names the partner, and sends nothing
+  until the box is ticked; give the reviewer a test number the partner will ignore
+
+If the partner uses leads for anything but contacting that person about that move – selling
+them on, marketing other services – the purposes change again, and so does the consent
+sentence and its `LEAD_CONSENT_VERSION`.
+
 **Privacy policy URL and support URL – built 21 September**
 
 Both are routes in the app, so the web page and the in-app screen are one file and

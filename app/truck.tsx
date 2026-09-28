@@ -16,6 +16,8 @@ import { useMove } from '../src/state/moveStore';
 import { Card, Screen, SecondaryButton, SectionLabel } from '../src/ui/components';
 import { colors, radius, space, type } from '../src/ui/theme';
 import { OwnVehicleCard } from '../src/ui/OwnVehicleCard';
+import { LeadCard } from '../src/ui/LeadCard';
+import { OFFERED_PARTNER } from '../src/domain/lead';
 import { StepNav } from '../src/ui/StepNav';
 
 /** Screen 3 — Truck Recommendation. */
@@ -102,6 +104,11 @@ export default function TruckScreen() {
         <OwnVehicleCard move={move} onChoose={(id) => dispatch({ type: 'setOwnVehicle', id })} />
 
         <SmallerOptions fits={smaller} />
+
+        {/* Off until a partner is signed – see src/domain/lead.ts. */}
+        {OFFERED_PARTNER ? (
+          <LeadCard move={move} recommendation={recommendation} partner={OFFERED_PARTNER} />
+        ) : null}
 
         <View>
           <SectionLabel>COMPARE SIZES</SectionLabel>

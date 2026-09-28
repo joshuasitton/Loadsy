@@ -2,6 +2,7 @@ import { Link } from 'expo-router';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ANTHROPIC_PRIVACY_URL, PRIVACY_UPDATED, SUPPORT_EMAIL, SUPPORT_PATH } from '../src/domain/site';
 import { Card, Screen, SectionLabel } from '../src/ui/components';
+import { leadConsentSentence, OFFERED_PARTNER, type LeadPartner } from '../src/domain/lead';
 import { colors, space, type } from '../src/ui/theme';
 
 /**
@@ -80,6 +81,8 @@ export default function PrivacyScreen() {
           </Para>
         </Card>
 
+        {OFFERED_PARTNER ? <MoverQuotes partner={OFFERED_PARTNER} /> : null}
+
         <Card style={styles.block}>
           <SectionLabel>WHAT STAYS ON YOUR PHONE</SectionLabel>
           <Para>
@@ -100,7 +103,9 @@ export default function PrivacyScreen() {
           <Para>
             No account or sign-in. No analytics, advertising or crash-reporting software. No
             location: the &ldquo;near me&rdquo; button opens your maps app with a search phrase, and
-            where you are stays between you and the maps app. Nothing is sold or shared with anyone,
+            where you are stays between you and the maps app. {OFFERED_PARTNER
+              ? 'Nothing is sold, and nothing is shared except with a mover you ask to contact you, '
+              : 'Nothing is sold or shared with anyone, '}
             because nothing about you is held – the vehicle count above says what kind of car
             someone drives, not who.
           </Para>
@@ -156,6 +161,34 @@ export default function PrivacyScreen() {
         </Card>
       </ScrollView>
     </Screen>
+  );
+}
+
+/**
+ * Only in a build that offers mover quotes – see src/domain/lead.ts. The page is written as
+ * claims about the code, so it says this exactly when the code does it.
+ */
+function MoverQuotes({ partner }: { partner: LeadPartner }) {
+  return (
+    <Card style={styles.block}>
+      <SectionLabel>IF YOU ASK FOR MOVER QUOTES</SectionLabel>
+      <Para>
+        On the truck screen you can ask {partner.name} to contact you with a quote. Only if
+        you fill in the form and tick the box – &ldquo;{leadConsentSentence(partner)}&rdquo;
+        – the app sends them your phone number or email, your moving day, the two ZIP codes
+        you type, and the size of the load: the truck, its volume, and how many items and
+        rooms. Not the list of what you own, and no photos.
+      </Para>
+      <Para>
+        Loadsy&apos;s server passes it straight to {partner.name} and keeps no copy; its log
+        records only that a lead for that truck size was sent. From then on it is between you and{' '}
+        {partner.name}, under{' '}
+        <Text style={styles.link} onPress={() => void Linking.openURL(partner.privacyUrl)}>
+          their privacy policy
+        </Text>
+        .
+      </Para>
+    </Card>
   );
 }
 

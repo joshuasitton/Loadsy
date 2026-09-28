@@ -10,6 +10,29 @@ entry has since been overtaken, `docs/build-state.md` says so at the top.
 
 ---
 
+## 2026-09-28 — Mover quotes
+
+### Chairman decisions
+
+1. **Submit build 10 for review** as it is – tagline, own vehicle, support address.
+2. **Build lead generation now, for later.** Asked for as "mostly unseen by the user".
+   Engineering and Security's position, accepted: the quiet part can be built, the unseen
+   part cannot. Collecting a way to reach someone, or sharing their move, without their
+   knowing consent is an App Review rejection (5.1.1, 5.1.2) and would make the privacy
+   page untrue. Built as one quiet line on the truck screen and an opt-in form that names
+   the partner – see the README, "Mover quotes".
+
+### Where it stands
+
+- Built, tested, and **off**: `LEAD_PARTNER` is null and the flag defaults off. Nothing in
+  build 10 changes.
+- **Decision needed:** who the partner is. It decides the consent sentence, the fields a
+  lead carries (a webhook today; the partner's API may want more), and the privacy label.
+  Candidates raised before: a mover network, U-Haul or Penske, whose affiliate applications
+  (open since 09-08, with the revenue posture) are still not started.
+
+---
+
 ## 2026-09-23 — Your own vehicle
 
 ### Chairman decisions
