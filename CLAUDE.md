@@ -32,9 +32,11 @@ npm run eval:detect   # run the detection eval over eval-photos/
 | `app/` | expo-router screens, one file per screen |
 | `app/v1/detect+api.ts` | the backend proper — a pass-through to the vision model, deployed with the app |
 | `app/v1/vehicle-request+api.ts` | counts "Mine isn't listed" into the log; the only thing the server keeps |
+| `app/v1/lead+api.ts` | passes an opt-in mover-quote request to the partner; off until one is signed |
 | `src/domain/` | pure functions: volume, truck sizing, quotes, packing, flow, tier, trip, own-vehicle fit |
 | `src/truckmap/` | the bin-packing solver and its SVG projection |
 | `src/state/` | move and history stores, AsyncStorage persistence |
+| `src/server/` | route handlers built from their configuration, so tests can run them |
 | `src/billing/`, `src/auth/`, `src/demo/` | tier gating, the demo sign-in, prepared demo inventories |
 | `src/ui/` | shared components, theme, and `markGeometry.ts` |
 | `__tests__/` | the test suite – the domain layer, persistence, both API routes and the contrast pairs |
@@ -66,6 +68,10 @@ npm run eval:detect   # run the detection eval over eval-photos/
   type, model year, make and model, all from fixed lists (decided 23 September).
   `APP_STORE.md` declares it as Product Interaction, not linked to the user. A new field
   changes the label.
+- **Mover quotes are opt-in and off** (decided 28 September). `LEAD_PARTNER` is null until a
+  partner is signed, and `EXPO_PUBLIC_LEADS_ENABLED` defaults off. A lead is never collected
+  without the person ticking a box that names who receives it – there is no "unseen"
+  version of this feature. Turning it on changes the privacy label; see `APP_STORE.md`.
 - **Never put a secret in an `EXPO_PUBLIC_` variable** — they are bundled into
   the app in plaintext. The vision key is an EAS project secret.
 - `EXPO_PUBLIC_USE_MOCKS` and `EXPO_PUBLIC_DEMO_MODE` default on in development
