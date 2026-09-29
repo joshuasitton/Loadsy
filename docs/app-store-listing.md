@@ -82,17 +82,39 @@ Apple already indexes, so repeating it wastes nine characters.
 these only to reach you about the review. Not the support address – that one,
 loadsysupport@gmail.com, is for users, and is on the support and privacy pages.
 
-**Notes** (paste as-is)
+**Notes** (paste as-is – about 2,850 of Apple's 4,000 characters)
 
-> Loadsy sizes a moving truck from photographs of rooms. To test it: from My Move, tap "Take photos", photograph any furnished room (a wide shot from the doorway works best, with a second angle from another corner), and tap Measure. Detection sends the photos to a vision model and takes 20–60 seconds; progress is shown. The inventory then lists the furniture with sizes you can correct; items it was unsure about are marked and need a quick tap before the truck is sized. "Add items by hand" on the Inventory screen works without any photos, if a furnished room isn't available.
->
-> On the Truck Size screen, "Your own vehicle" shows how many trips a vehicle the person drives would take, and which pieces won't fit in it. If theirs isn't listed, they can choose to send its type, model year, make and model from fixed lists, which is counted anonymously to decide which vehicles to add next.
->
-> The app needs no account and has no in-app purchases. It asks for camera access and photo library access only when those buttons are tapped. Photos are forwarded to the vision model and discarded; the only thing Loadsy's server keeps is that optional, anonymous vehicle count. The privacy policy is at https://loadsy.expo.app/privacy.
->
-> "Where to Rent" opens rental companies' own websites in an in-app browser; Loadsy has no affiliate relationship with any of them. "Near me" opens the Maps app with a search phrase; the app does not request location.
+Rewritten 29 September, after App Review answered the first submission (build 10) with
+*Guideline 2.1 – Information Needed*. That is not a rejection of the app. Apple asks it of
+any developer account with little review history, and it wants six things, both as a reply
+in App Store Connect and in this field so later reviewers have them. The notes are therefore
+numbered to Apple's questions: a recording, the purpose and audience, how to get in, the
+external services, regional differences, and regulation. The earlier notes answered only the
+third. When the app changes, keep the numbering and change the answer – a reviewer compares
+them against the questions, not against the previous version.
 
-**Attachment:** none needed.
+> 1. Screen recording: attached, recorded on an iPhone running the latest iOS with version 1.0.0 (build 10) installed from TestFlight. It starts at launch and follows the typical flow: welcome, photographing a room, detection, correcting the inventory, the truck recommendation (with the pickup, trailer and "Your own vehicle" options), Where to Rent, and the loading order. Loadsy has no account registration, login or account deletion (there are no accounts), no user-generated content, and no paid content or in-app purchases.
+>
+> 2. Purpose and audience: Loadsy helps people who are moving themselves, mostly renters leaving a studio, one- or two-bedroom apartment in the US, rent the right size of truck. Most people guess, and a truck that is too small means a second trip or furniture left behind. The user photographs each room; Loadsy lists the furniture with an estimated size for each piece, which they can correct, adds up the volume and recommends the smallest truck that fits with a safety margin. It also says whether a pickup, a trailer or the person's own vehicle would do, links to rental companies' websites, and gives an order to load the truck in.
+>
+> 3. Setup and access: No account, login or sample files are needed. Open the app, tap "Get started", then "Take photos". Photograph any furnished room (a wide shot from the doorway, plus another from a corner) and tap "Measure these 2 photos"; detection takes 20–60 seconds. The inventory then lists what was found. If a furnished room is not available, "Add items by hand" works without any photos. Camera and photo library access are requested only when those buttons are tapped.
+>
+> 4. External services:
+> - Anthropic's Claude API (a vision model) identifies furniture and estimates sizes from the photos. The app sends photos to Loadsy's own server route, which forwards them to Anthropic and returns the result; Loadsy does not store them.
+> - Expo EAS Hosting runs that server route and one other – an optional, anonymous count of vehicles people say are not listed – and hosts the privacy policy and support pages at loadsy.expo.app.
+> - Rental companies' public websites (U-Haul, Penske, Budget, Home Depot, Enterprise) open in an in-app browser. There is no API, data sharing or affiliate relationship with any of them.
+> - Apple Maps opens with a search phrase when "near me" is tapped; the app does not request location.
+> There are no authentication, payment, analytics or advertising services.
+>
+> 5. Regional differences: Loadsy is offered in the United States only, and works the same everywhere it is offered. The rental companies and vehicle dimensions it uses are American, and sizes are in feet and inches.
+>
+> 6. Loadsy does not operate in a regulated industry and includes no protected third-party material. Rental companies are named only to link to their public websites.
+
+**Attachment:** the screen recording from answer 1 – on a physical iPhone running the
+latest iOS, the TestFlight build, starting at launch. Record it again for any build whose
+flow changes; a recording of a flow the build no longer has is the kind of mismatch a new
+account is being checked for.
+
 
 ---
 
